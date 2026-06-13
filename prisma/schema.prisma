@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id                String         @id @default(cuid())
+  githubId          Int            @unique
+  fullName          String         @unique
+  owner             String
+  name              String
+  url               String
+  description       String?
+  readmeHash        String?
+  readmeExcerpt     String?
+  primaryLanguage   String?
+  topicsJson        String         @default("[]")
+  license           String?
+  createdAt         DateTime
+  pushedAt          DateTime?
+  firstSeenAt       DateTime       @default(now())
+  lastSeenAt        DateTime       @default(now())
+  starsCurrent      Int            @default(0)
+  forksCurrent      Int            @default(0)
+  watchersCurrent   Int            @default(0)
+  openIssues        Int            @default(0)
+  ageMonths         Int            @default(0)
+  isOldRepo         Boolean        @default(false)
+  isArchived        Boolean        @default(false)
+  isFork            Boolean        @default(false)
+  isDeletedFromView Boolean        @default(false)
+  status            String         @default("NEW")
+  shortSummaryPl    String?
+  lastAnalyzedAt    DateTime?
+  trendScore        Int            @default(0)
+  relevanceScore    Int            @default(0)
+  source            String         @default("github")
+  createdDbAt       DateTime       @default(now())
+  updatedDbAt       DateTime       @updatedAt
+
+  snapshots         RepoSnapshot[]
+  reports           Report[]
+  ideas             Idea[]
+  openaiCache       OpenAiCache[]
+  ignoredRecord     IgnoredRepository?
+
+  @@index([status])
+  @@index([trendScore])
+  @@index([starsCurrent])
+  @@index([pushedAt])
+  @@index([createdAt])
+  @@index([isOldRepo])
+  @@index([source])
+}
+
+model RepoSnapshot {
+  id              String      @id @default(cuid())
+  repoId          String
+  capturedAt      DateTime    @default(now())
+  stars           Int
+  forks           Int
+  watchers        Int
+  openIssues      Int
+  pushedAt        DateTime?
+  growth24h       Int?
+  growth7d        Int?
+  growthPercent7d Float?
+
+  repository      Repository  @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, capturedAt])
+}
+
+model Report {
+  id              String      @id @default(cuid())
+  type            String
+  repoId          String?
+  title           String
+  markdownPath    String?
+  contentMarkdown String
+  summary         String?
+  repoCount       Int         @default(0)
+  topRepoIdsJson  String      @default("[]")
+  inputHash       String?
+  createdAt       DateTime    @default(now())
+
+  repository      Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([repoId])
+}
+
+model Idea {
+  id                    String      @id @default(cuid())
+  sourceRepoId          String
+  title                 String
+  problem               String
+  proposedSolution      String
+  targetUser            String
+  mvpScope              String
+  monetizationPotential String
+  difficulty            Int
+  usefulnessScore       Int
+  riskScore             Int
+  suggestedStack        String
+  firstStepsJson        String      @default("[]")
+  status                String      @default("NEW")
+  createdAt             DateTime    @default(now())
+
+  repository            Repository  @relation(fields: [sourceRepoId], references: [id], onDelete: Cascade)
+
+  @@index([sourceRepoId])
+  @@index([status])
+}
+
+model IgnoredRepository {
+  id          String      @id @default(cuid())
+  repoId      String?     @unique
+  fullName    String      @unique
+  reason      String?
+  ignoredAt   DateTime    @default(now())
+  permanent   Boolean     @default(true)
+
+  repository  Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model ScanRun {
+  id           String    @id @default(cuid())
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  status       String    @default("RUNNING")
+  reposFound   Int       @default(0)
+  reposUpdated Int       @default(0)
+  errorMessage String?
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+model OpenAiCache {
+  id        String      @id @default(cuid())
+  kind      String
+  repoId    String?
+  inputHash String
+  model     String
+  content   String
+  createdAt DateTime    @default(now())
+
+  repository Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+
+  @@unique([kind, repoId, inputHash, model])
+  @@index([kind])
+  @@index([createdAt])
+}

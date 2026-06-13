@@ -1,0 +1,60 @@
+# dependencies
+node_modules
+
+# next
+.next
+out
+
+# env
+.env
+.env*.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+!.env.example
+
+# private keys and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials*.json
+credential*.json
+secrets*.json
+secret*.json
+tokens*.json
+token*.json
+client_secret*.json
+service-account*.json
+serviceAccount*.json
+google-credentials*.json
+firebase-adminsdk*.json
+
+# prisma/sqlite
+prisma/dev.db
+prisma/dev.db-journal
+dev.db
+dev.db-journal
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# generated reports remain local by default
+reports/**/*.md
+!reports/.gitkeep
+!reports/**/.gitkeep
+
+# misc
+.DS_Store
+*.log
+coverage
+playwright-report
+test-results

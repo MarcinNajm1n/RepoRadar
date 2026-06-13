@@ -1,0 +1,240 @@
+import { prisma } from "./client";
+import { isRepositoryStatus } from "@/types/status";
+import type { RepositoryStatus } from "@/types/status";
+import type { DashboardData, IdeaListItem, ReportListItem, RepositoryListItem } from "@/types/repository";
+import { safeJsonParse } from "@/lib/utils";
+
+type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[number] & {
+  snapshots?: {
+    growth24h: number | null;
+    growth7d: number | null;
+    growthPercent7d: number | null;
+  }[];
+};
+
+function mapRepository(repository: RepositoryRecord): RepositoryListItem {
+  const latestSnapshot = repository.snapshots?.[0];
+
+  return {
+    id: repository.id,
+    fullName: repository.fullName,
+    owner: repository.owner,
+    name: repository.name,
+    url: repository.url,
+    description: repository.description,
+    readmeExcerpt: repository.readmeExcerpt,
+    primaryLanguage: repository.primaryLanguage,
+    topics: safeJsonParse<string[]>(repository.topicsJson, []),
+    license: repository.license,
+    createdAt: repository.createdAt.toISOString(),
+    pushedAt: repository.pushedAt?.toISOString() ?? null,
+    firstSeenAt: repository.firstSeenAt.toISOString(),
+    lastSeenAt: repository.lastSeenAt.toISOString(),
+    starsCurrent: repository.starsCurrent,
+    forksCurrent: repository.forksCurrent,
+    watchersCurrent: repository.watchersCurrent,
+    openIssues: repository.openIssues,
+    ageMonths: repository.ageMonths,
+    isOldRepo: repository.isOldRepo,
+    isArchived: repository.isArchived,
+    isFork: repository.isFork,
+    isDeletedFromView: repository.isDeletedFromView,
+    status: repository.status,
+    shortSummaryPl: repository.shortSummaryPl,
+    lastAnalyzedAt: repository.lastAnalyzedAt?.toISOString() ?? null,
+    trendScore: repository.trendScore,
+    relevanceScore: repository.relevanceScore,
+    source: repository.source,
+    growth24h: latestSnapshot?.growth24h ?? null,
+    growth7d: latestSnapshot?.growth7d ?? null,
+    growthPercent7d: latestSnapshot?.growthPercent7d ?? null
+  };
+}
+
+function mapIdea(idea: Awaited<ReturnType<typeof prisma.idea.findMany>>[number] & { repository?: { fullName: string } }): IdeaListItem {
+  return {
+    id: idea.id,
+    sourceRepoId: idea.sourceRepoId,
+    sourceRepoName: idea.repository?.fullName ?? "nieznane repo",
+    title: idea.title,
+    problem: idea.problem,
+    proposedSolution: idea.proposedSolution,
+    targetUser: idea.targetUser,
+    mvpScope: idea.mvpScope,
+    monetizationPotential: idea.monetizationPotential,
+    difficulty: idea.difficulty,
+    usefulnessScore: idea.usefulnessScore,
+    riskScore: idea.riskScore,
+    suggestedStack: idea.suggestedStack,
+    firstSteps: safeJsonParse<string[]>(idea.firstStepsJson, []),
+    status: idea.status,
+    createdAt: idea.createdAt.toISOString()
+  };
+}
+
+function mapReport(report: Awaited<ReturnType<typeof prisma.report.findMany>>[number]): ReportListItem {
+  return {
+    id: report.id,
+    type: report.type,
+    repoId: report.repoId,
+    title: report.title,
+    markdownPath: report.markdownPath,
+    contentMarkdown: report.contentMarkdown,
+    summary: report.summary,
+    repoCount: report.repoCount,
+    topRepoIds: safeJsonParse<string[]>(report.topRepoIdsJson, []),
+    createdAt: report.createdAt.toISOString()
+  };
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  const [repositories, ideas, weeklyReports, lastScan, counts] = await Promise.all([
+    prisma.repository.findMany({
+      orderBy: [{ trendScore: "desc" }, { starsCurrent: "desc" }],
+      include: {
+        snapshots: {
+          orderBy: { capturedAt: "desc" },
+          take: 1,
+          select: {
+            growth24h: true,
+            growth7d: true,
+            growthPercent7d: true
+          }
+        }
+      }
+    }),
+    prisma.idea.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { repository: { select: { fullName: true } } }
+    }),
+    prisma.report.findMany({
+      where: { type: "weekly" },
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.scanRun.findFirst({
+      orderBy: { startedAt: "desc" }
+    }),
+    getCounts()
+  ]);
+
+  return {
+    repositories: repositories.map(mapRepository),
+    ideas: ideas.map(mapIdea),
+    weeklyReports: weeklyReports.map(mapReport),
+    counts,
+    lastScan: lastScan
+      ? {
+          startedAt: lastScan.startedAt.toISOString(),
+          finishedAt: lastScan.finishedAt?.toISOString() ?? null,
+          status: lastScan.status,
+          reposFound: lastScan.reposFound,
+          reposUpdated: lastScan.reposUpdated,
+          errorMessage: lastScan.errorMessage
+        }
+      : null
+  };
+}
+
+async function getCounts() {
+  const [all, newlyFound, saved, read, ignored, ideas, old, hot] = await Promise.all([
+    prisma.repository.count({ where: { isDeletedFromView: false } }),
+    prisma.repository.count({ where: { status: "NEW", isDeletedFromView: false } }),
+    prisma.repository.count({ where: { status: "SAVED", isDeletedFromView: false } }),
+    prisma.repository.count({ where: { status: "READ", isDeletedFromView: false } }),
+    prisma.repository.count({ where: { status: "IGNORED" } }),
+    prisma.idea.count(),
+    prisma.repository.count({ where: { isOldRepo: true, status: { not: "HOT" }, isDeletedFromView: false } }),
+    prisma.repository.count({ where: { status: "HOT", isDeletedFromView: false } })
+  ]);
+
+  return {
+    all,
+    new: newlyFound,
+    saved,
+    read,
+    ignored,
+    ideas,
+    old,
+    hot
+  };
+}
+
+export async function updateRepositoryStatus(repoId: string, status: string, reason?: string) {
+  if (!isRepositoryStatus(status)) {
+    throw new Error(`Unsupported repository status: ${status}`);
+  }
+
+  const repository = await prisma.repository.findUniqueOrThrow({ where: { id: repoId } });
+  const nextStatus: RepositoryStatus = status;
+
+  if (nextStatus === "IGNORED") {
+    await prisma.ignoredRepository.upsert({
+      where: { fullName: repository.fullName },
+      update: {
+        repoId: repository.id,
+        reason,
+        permanent: true,
+        ignoredAt: new Date()
+      },
+      create: {
+        repoId: repository.id,
+        fullName: repository.fullName,
+        reason,
+        permanent: true
+      }
+    });
+
+    return prisma.repository.update({
+      where: { id: repoId },
+      data: {
+        status: nextStatus,
+        isDeletedFromView: true
+      }
+    });
+  }
+
+  await prisma.ignoredRepository.deleteMany({
+    where: {
+      OR: [{ repoId }, { fullName: repository.fullName }]
+    }
+  });
+
+  return prisma.repository.update({
+    where: { id: repoId },
+    data: {
+      status: nextStatus,
+      isDeletedFromView: false
+    }
+  });
+}
+
+export async function getRepositoryForReport(repoId: string) {
+  return prisma.repository.findUniqueOrThrow({
+    where: { id: repoId },
+    include: {
+      snapshots: {
+        orderBy: { capturedAt: "desc" },
+        take: 8
+      },
+      reports: {
+        where: { type: "repo" },
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
+  });
+}
+
+export async function getTopRepositories(limit = 20) {
+  return prisma.repository.findMany({
+    where: { isDeletedFromView: false },
+    orderBy: [{ trendScore: "desc" }, { starsCurrent: "desc" }],
+    take: limit,
+    include: {
+      snapshots: {
+        orderBy: { capturedAt: "desc" },
+        take: 1
+      }
+    }
+  });
+}
