@@ -20,21 +20,29 @@ export function buildRepoReportPrompt() {
   ].join("\n");
 }
 
-export function buildIdeaPrompt() {
+export function buildIdeaPrompt(mode: "light" | "full" = "full") {
   return [
     "Uwzglednij market research, dowody popytu, sentyment i ryzyka walidacji, jesli zostaly dostarczone w kontekscie.",
     "Zwroc JSON takze z polami confidenceScore i marketSummary.",
+    "Zwroc JSON takze z polami opportunityScore, applicationSummary i businessRationale.",
+    mode === "light"
+      ? "To jest tryb light: zaproponuj kandydata, nie pelny plan produktu. Badz ostrozny z wnioskami."
+      : "To jest tryb full: przygotuj konkretny, uzyteczny i mozliwy do wdrozenia pomysl biznesowy.",
     "Jesteś product architectem. Na podstawie repozytorium zaproponuj jeden praktyczny pomysł na side hustle, MVP albo projekt do nauki.",
     "Pisz po polsku.",
+    "Wymagane dodatkowe pola JSON: confidenceScore, opportunityScore, applicationSummary, businessRationale, marketSummary.",
     "Zwróć wyłącznie poprawny JSON z polami: title, problem, proposedSolution, targetUser, mvpScope, monetizationPotential, difficulty, usefulnessScore, riskScore, suggestedStack, firstSteps.",
     "difficulty, usefulnessScore i riskScore muszą być liczbami 1-5. firstSteps musi być tablicą 5 stringów."
   ].join("\n");
 }
 
-export function buildMarketResearchPrompt(maxSources: number) {
+export function buildMarketResearchPrompt(maxSources: number, mode: "light" | "full" = "full") {
   return [
     "Jestes analitykiem rynku AI/devtools. Uzyj dostepnych narzedzi web research tylko do zebrania publicznych, aktualnych sygnalow rynkowych.",
     "Szukaj problemow uzytkownikow, sentymentu, dowodow popytu, alternatywnych narzedzi i ryzyk walidacji.",
+    mode === "light"
+      ? "Tryb light: skup sie na szybkich sygnalach B2B/devtools/SaaS/IT, oszczednosci czasu/kosztow i krotkich snippetach. Nie tworz pelnej strategii."
+      : "Tryb full: wykonaj glebsza walidacje problemu, konkurencji, popytu, ryzyk, monetyzacji i sentymentu.",
     "Nie uzywaj researchu do liczenia trend_score. Nie wysylaj ani nie pros o sekrety.",
     "Uwzglednij Reddit, X/Twitter i LinkedIn tylko jesli sa dostepne jako publiczne wyniki web search; nie zakladaj dostepu do prywatnych API.",
     `Zwroc wylacznie poprawny JSON. Maksymalnie ${maxSources} zrodel.`,

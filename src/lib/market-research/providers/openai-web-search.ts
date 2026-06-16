@@ -7,14 +7,16 @@ import type { MarketResearchContext, MarketResearchProvider } from "../types";
 
 export const openAiWebSearchProvider: MarketResearchProvider = {
   name: "openai-web-search",
+  usesOpenAi: true,
   async research(context: MarketResearchContext) {
     const config = getConfig();
-    const content = await generateOpenAiText(buildMarketResearchPrompt(config.marketResearchMaxSources), context.repositoryContext, {
-      tools: [buildWebSearchTool(config.marketResearchMaxSources)],
+    const maxSources = Math.min(config.marketResearchMaxSources, context.mode === "light" ? 4 : config.marketResearchMaxSources);
+    const content = await generateOpenAiText(buildMarketResearchPrompt(maxSources, context.mode ?? "full"), context.repositoryContext, {
+      tools: [buildWebSearchTool(maxSources)],
       toolChoice: "required",
       include: ["web_search_call.action.sources"]
     });
 
-    return parseMarketResearchResult(this.name, content, config.marketResearchMaxSources);
+    return parseMarketResearchResult(this.name, content, maxSources);
   }
 };

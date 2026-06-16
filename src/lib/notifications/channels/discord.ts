@@ -20,6 +20,9 @@ function buildDiscordBody(payload: NotificationPayload) {
   const repoLines = repos
     .slice(0, 8)
     .map((repo) => {
+      if (payload.eventType === "opportunity_candidate_high") {
+        return `- ${repo.fullName} | opportunity ${repo.opportunityScore ?? "?"}/100 | confidence ${repo.confidenceScore ?? "?"}/5 | sources ${repo.sourceCount ?? 0} | ${repo.url}`;
+      }
       const growth = repo.growth7d === null ? "growth: zbieramy" : `growth 7d: +${repo.growth7d}`;
       return `- ${repo.fullName} | score ${repo.trendScore} | ${growth} | ${repo.url}`;
     })
@@ -33,7 +36,7 @@ function buildDiscordBody(payload: NotificationPayload) {
       {
         title: sanitizeExternalText(payload.title, 250) ?? "RepoRadar",
         description: truncateText(sanitizeExternalText(payload.error ?? payload.message, 1000) ?? "", 1000),
-        color: payload.eventType === "scan_failure" ? 0xdc2626 : 0x047857
+        color: payload.eventType === "scan_failure" ? 0xdc2626 : payload.eventType === "opportunity_candidate_high" ? 0x2563eb : 0x047857
       }
     ]
   };
@@ -71,7 +74,7 @@ export async function sendDiscordNotification(payload: NotificationPayload): Pro
         eventType: payload.eventType,
         status: "FAILED",
         maskedTarget,
-        payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0 }),
+        payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0, opportunityCandidateId: payload.opportunityCandidateId }),
         error: `Discord webhook failed with HTTP ${response.status}`
       };
     }
@@ -81,7 +84,7 @@ export async function sendDiscordNotification(payload: NotificationPayload): Pro
       eventType: payload.eventType,
       status: "SENT",
       maskedTarget,
-      payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0 })
+      payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0, opportunityCandidateId: payload.opportunityCandidateId })
     };
   } catch (error) {
     return {
@@ -89,7 +92,7 @@ export async function sendDiscordNotification(payload: NotificationPayload): Pro
       eventType: payload.eventType,
       status: "FAILED",
       maskedTarget,
-      payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0 }),
+      payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0, opportunityCandidateId: payload.opportunityCandidateId }),
       error: error instanceof Error ? error.message : "Discord webhook request failed"
     };
   } finally {

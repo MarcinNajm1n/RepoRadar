@@ -1,3 +1,5 @@
+export type MarketResearchMode = "light" | "full";
+
 export type MarketResearchSourceInput = {
   sourceType: string;
   title: string;
@@ -23,13 +25,15 @@ export type MarketResearchResult = {
 
 export type StoredMarketResearch = MarketResearchResult & {
   runId?: string;
+  runIds?: string[];
   sourceIds: string[];
   status: "DISABLED" | "CACHED" | "SUCCESS" | "UNAVAILABLE";
   error?: string;
 };
 
 export type MarketResearchContext = {
-  kind: "repo-report" | "idea";
+  kind: "repo-report" | "idea" | "opportunity-candidate";
+  mode?: MarketResearchMode;
   repoId: string;
   fullName: string;
   url: string;
@@ -48,5 +52,6 @@ export type MarketResearchContext = {
 
 export interface MarketResearchProvider {
   name: string;
+  usesOpenAi?: boolean;
   research(context: MarketResearchContext): Promise<MarketResearchResult>;
 }

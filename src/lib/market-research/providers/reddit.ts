@@ -35,6 +35,8 @@ async function getRedditAccessToken() {
     throw new Error("Reddit OAuth credentials are not configured");
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   const response = await fetch("https://www.reddit.com/api/v1/access_token", {
     method: "POST",
     headers: {
@@ -42,8 +44,9 @@ async function getRedditAccessToken() {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": config.redditUserAgent
     },
-    body: "grant_type=client_credentials"
-  });
+    body: "grant_type=client_credentials",
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
 
   const data = (await response.json()) as RedditTokenResponse;
   if (!response.ok || !data.access_token) {
@@ -51,6 +54,25 @@ async function getRedditAccessToken() {
   }
 
   return data.access_token;
+}
+
+function redditRateLimitError(response: Response) {
+  const remaining = response.headers.get("x-ratelimit-remaining");
+  const reset = response.headers.get("x-ratelimit-reset");
+  const retryAfter = response.headers.get("retry-after");
+
+  if (response.status !== 429 && response.status !== 403) {
+    return null;
+  }
+
+  return [
+    `Reddit rate limit or access error (${response.status})`,
+    remaining ? `remaining=${remaining}` : null,
+    reset ? `reset=${reset}s` : null,
+    retryAfter ? `retry-after=${retryAfter}s` : null
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 export const redditProvider: MarketResearchProvider = {
@@ -63,14 +85,21 @@ export const redditProvider: MarketResearchProvider = {
     const config = getConfig();
     const token = await getRedditAccessToken();
     const query = encodeURIComponent(`${context.fullName} OR "${context.description ?? context.fullName}" AI devtools`);
-    const limit = Math.min(config.marketResearchMaxSources, 8);
+    const limit = Math.min(config.marketResearchMaxSources, context.mode === "light" ? 4 : 8);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(`https://oauth.reddit.com/search?q=${query}&sort=relevance&limit=${limit}&type=link`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": config.redditUserAgent
-      }
-    });
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeout));
 
+    const rateLimitError = redditRateLimitError(response);
+    if (rateLimitError) {
+      throw new Error(rateLimitError);
+    }
     const data = (await response.json()) as RedditSearchResponse;
     if (!response.ok) {
       throw new Error(`Reddit search failed with HTTP ${response.status}`);

@@ -18,11 +18,12 @@ import {
   Star,
   Trash2
 } from "lucide-react";
-import type { DashboardData, EvidenceSourceItem, RepositoryListItem } from "@/types/repository";
+import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem } from "@/types/repository";
 import { REPOSITORY_STATUSES, formatStatus } from "@/types/status";
 import {
   createWeeklyReportAction,
   generateIdeaAction,
+  generateOpportunityCandidateAction,
   generateReportAction,
   runScanAction,
   updateSettingAction,
@@ -36,22 +37,40 @@ type TabKey =
   | "saved"
   | "read"
   | "ignored"
+  | "candidates"
   | "ideas"
   | "weekly"
   | "old"
   | "settings";
 
-const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { key: "library", label: "Biblioteka", icon: Github },
-  { key: "new", label: "Nowo znalezione", icon: Sparkles },
-  { key: "saved", label: "Zapisane", icon: Star },
-  { key: "read", label: "Przeczytane", icon: BookOpen },
-  { key: "ignored", label: "Ignorowane", icon: Trash2 },
+type SectionKey = "repo" | "ideas";
+
+const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
+  { key: "library", label: "Biblioteka", icon: Github, section: "repo" },
+  { key: "new", label: "Nowo znalezione", icon: Sparkles, section: "repo" },
+  { key: "saved", label: "Zapisane", icon: Star, section: "repo" },
+  { key: "read", label: "Przeczytane", icon: BookOpen, section: "repo" },
+  { key: "ignored", label: "Ignorowane", icon: Trash2, section: "repo" },
   { key: "ideas", label: "Pomysły", icon: Brain },
-  { key: "weekly", label: "Raporty tygodniowe", icon: FileText },
-  { key: "old", label: "Stare repo", icon: CheckCircle2 },
-  { key: "settings", label: "Ustawienia", icon: Settings }
+  { key: "candidates", label: "Kandydaci", icon: Search, section: "ideas" },
+  { key: "weekly", label: "Raporty tygodniowe", icon: FileText, section: "repo" },
+  { key: "old", label: "Stare repo", icon: CheckCircle2, section: "repo" },
+  { key: "settings", label: "Ustawienia", icon: Settings, section: "repo" }
 ];
+
+function getTabSection(tab: (typeof tabs)[number]): SectionKey {
+  return tab.section ?? (tab.key === "ideas" || tab.key === "candidates" ? "ideas" : "repo");
+}
+
+function getTabLabel(tab: (typeof tabs)[number]) {
+  if (tab.key === "ideas") {
+    return "Pelne pomysly";
+  }
+  if (tab.key === "candidates") {
+    return "Kandydaci";
+  }
+  return tab.label;
+}
 
 type ReportState = {
   title: string;
@@ -144,6 +163,7 @@ function repoMatchesQuery(repo: RepositoryListItem, query: string) {
 
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const router = useRouter();
+  const [activeSection, setActiveSection] = useState<SectionKey>("repo");
   const [activeTab, setActiveTab] = useState<TabKey>("library");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -151,6 +171,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [minTrend, setMinTrend] = useState(0);
   const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportState>(null);
+  const [ideaDetail, setIdeaDetail] = useState<IdeaListItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const reportDialogRef = useRef<HTMLDivElement | null>(null);
@@ -215,6 +236,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       .filter((repo) => (languageFilter === "ALL" ? true : repo.primaryLanguage === languageFilter))
       .filter((repo) => repo.trendScore >= minTrend);
   }, [activeTab, initialData.repositories, languageFilter, minTrend, query, statusFilter]);
+  const candidates = useMemo(() => initialData.ideas.filter((idea) => idea.status === "CANDIDATE"), [initialData.ideas]);
+  const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status !== "CANDIDATE"), [initialData.ideas]);
 
   function runAction<T>(action: () => Promise<T>, success: string) {
     setMessage(null);
@@ -265,8 +288,25 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 <p className="text-xs text-muted-foreground">Lokalny radar GitHub</p>
               </div>
             </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              {(["repo", "ideas"] as SectionKey[]).map((section) => (
+                <button
+                  key={section}
+                  className={cn(
+                    "rounded-md border border-border px-3 py-2 text-sm font-medium",
+                    activeSection === section && "bg-primary text-primary-foreground"
+                  )}
+                  onClick={() => {
+                    setActiveSection(section);
+                    setActiveTab(section === "repo" ? "library" : "candidates");
+                  }}
+                >
+                  {section === "repo" ? "Repo" : "Pomysly"}
+                </button>
+              ))}
+            </div>
             <nav className="space-y-1">
-              {tabs.map((tab) => {
+              {tabs.filter((tab) => getTabSection(tab) === activeSection).map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
@@ -279,7 +319,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   >
                     <span className="flex items-center gap-2">
                       <Icon className="h-4 w-4" />
-                      {tab.label}
+                      {getTabLabel(tab)}
                     </span>
                     {tab.key === "new" && initialData.counts.new > 0 ? (
                       <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
@@ -295,14 +335,31 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
         <section className="min-w-0 flex-1">
           <div className="mb-4 lg:hidden">
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              {(["repo", "ideas"] as SectionKey[]).map((section) => (
+                <button
+                  key={section}
+                  className={cn(
+                    "h-10 rounded-md border border-border bg-card text-sm font-medium",
+                    activeSection === section && "bg-primary text-primary-foreground"
+                  )}
+                  onClick={() => {
+                    setActiveSection(section);
+                    setActiveTab(section === "repo" ? "library" : "candidates");
+                  }}
+                >
+                  {section === "repo" ? "Repo" : "Pomysly"}
+                </button>
+              ))}
+            </div>
             <select
               className="h-11 w-full rounded-md border border-border bg-card px-3 text-sm font-medium shadow-soft"
               value={activeTab}
               onChange={(event) => setActiveTab(event.target.value as TabKey)}
             >
-              {tabs.map((tab) => (
+              {tabs.filter((tab) => getTabSection(tab) === activeSection).map((tab) => (
                 <option key={tab.key} value={tab.key}>
-                  {tab.label}
+                  {getTabLabel(tab)}
                 </option>
               ))}
             </select>
@@ -316,8 +373,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   <Badge>Hot: {initialData.counts.hot}</Badge>
                   <Badge>Zapisane: {initialData.counts.saved}</Badge>
                   <Badge>Ignorowane: {initialData.counts.ignored}</Badge>
+                  <Badge>Kandydaci: {initialData.counts.candidates}</Badge>
+                  <Badge>Pelne pomysly: {initialData.counts.fullIdeas}</Badge>
                 </div>
-                <h2 className="text-2xl font-semibold">{tabs.find((tab) => tab.key === activeTab)?.label}</h2>
+                <h2 className="text-2xl font-semibold">{getTabLabel(tabs.find((tab) => tab.key === activeTab) ?? tabs[0])}</h2>
                 <p className="text-sm text-muted-foreground">
                   Ostatni scan:{" "}
                   {initialData.lastScan
@@ -350,7 +409,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             ) : null}
           </header>
 
-          {activeTab !== "ideas" && activeTab !== "weekly" && activeTab !== "settings" ? (
+          {activeTab !== "ideas" && activeTab !== "candidates" && activeTab !== "weekly" && activeTab !== "settings" ? (
             <>
               <section className="mb-4 rounded-lg border border-border bg-card p-3">
                 <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_160px]">
@@ -506,6 +565,15 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                               <Brain className="h-4 w-4" /> Utwórz pomysł z repo
                             </Button>
                             <Button
+                              variant="secondary"
+                              onClick={(event) =>
+                                repoAction(event, () => generateOpportunityCandidateAction(repo.id), "Research light zakonczony.")
+                              }
+                              disabled={isPending}
+                            >
+                              <Search className="h-4 w-4" /> Znajdz okazje
+                            </Button>
+                            <Button
                               variant="danger"
                               onClick={(event) => repoAction(event, () => updateStatusAction(repo.id, "IGNORED"), "Repo przeniesione do ignorowanych.")}
                               disabled={isPending}
@@ -529,10 +597,48 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             </>
           ) : null}
 
+          {activeTab === "candidates" ? (
+            <section className="space-y-3">
+              {candidates.length ? (
+                candidates.map((idea) => (
+                  <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-semibold">{idea.title}</h3>
+                      {idea.opportunityScore !== null ? <Badge>Opportunity {idea.opportunityScore}/100</Badge> : null}
+                      {idea.confidenceScore ? <Badge>Confidence {idea.confidenceScore}/5</Badge> : null}
+                      {idea.evidenceSources.length ? <Badge>{idea.evidenceSources.length} sources</Badge> : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{idea.applicationSummary ?? idea.problem}</p>
+                    {idea.businessRationale ? <p className="mt-3 text-sm leading-6">{idea.businessRationale}</p> : null}
+                    <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+                      <Info label="Zastosowanie" value={idea.applicationSummary ?? idea.targetUser} />
+                      <Info label="Dlaczego moze zarabiac" value={idea.businessRationale ?? idea.monetizationPotential} />
+                      <Info label="Evidence" value={`${idea.evidenceSources.length} zrodel`} />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={(event) => repoAction(event, () => generateIdeaAction(idea.sourceRepoId), "Pelny pomysl zostal utworzony.")}
+                        disabled={isPending}
+                      >
+                        <Brain className="h-4 w-4" /> Rozwin pelny pomysl
+                      </Button>
+                      <Button variant="ghost" onClick={() => setIdeaDetail(idea)}>
+                        Szczegoly
+                      </Button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <EmptyState title="Brak kandydatow" text="Uzyj akcji Znajdz okazje przy repo albo wlacz auto opportunity research w .env." />
+              )}
+            </section>
+          ) : null}
+
           {activeTab === "ideas" ? (
             <section className="space-y-3">
-              {initialData.ideas.length ? (
-                initialData.ideas.map((idea) => (
+              {fullIdeas.length ? (
+                fullIdeas.map((idea) => (
                   <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">{idea.title}</h3>
@@ -621,6 +727,20 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   }
                 />
               </div>
+              <div className="mt-5 rounded-md border border-border p-4">
+                <h4 className="font-semibold">Zrodla zewnetrzne</h4>
+                <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                  <Info label="HN" value="ENABLE_HN_SOURCE" />
+                  <Info label="RSS" value="ENABLE_RSS_SOURCE + MARKET_RESEARCH_RSS_FEEDS" />
+                  <Info label="OpenAI web search" value="ENABLE_OPENAI_WEB_SEARCH_SOURCE" />
+                  <Info label="Auto opportunity" value="ENABLE_AUTO_OPPORTUNITY_RESEARCH" />
+                  <Info label="Reddit OAuth" value="ENABLE_REDDIT_SOURCE + REDDIT_CLIENT_ID/SECRET" />
+                  <Info label="Bluesky" value="ENABLE_BLUESKY_SOURCE" />
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Light uzywa HN/RSS/cache/OpenAI web search. Full moze uzyc Reddit i Bluesky tylko po wlaczeniu ich w .env.
+                </p>
+              </div>
               <div className="mt-4 rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">
                 GitHub token: Fine-grained PAT, read-only public repositories. OpenAI: pełne raporty i pomysły tylko na żądanie.
                 Windows Task Scheduler: `scripts/register-windows-task.ps1`.
@@ -629,6 +749,45 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           ) : null}
         </section>
       </div>
+
+      {ideaDetail ? (
+        <div className="fixed inset-0 z-50 bg-black/40 p-4" onClick={() => setIdeaDetail(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="mx-auto max-h-[92vh] max-w-4xl overflow-auto rounded-lg border border-border bg-card p-5 shadow-soft"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-border bg-card pb-4">
+              <div>
+                <h2 className="text-xl font-semibold">{ideaDetail.title}</h2>
+                <p className="text-sm text-muted-foreground">{ideaDetail.sourceRepoName}</p>
+              </div>
+              <Button variant="secondary" onClick={() => setIdeaDetail(null)}>
+                Zamknij
+              </Button>
+            </div>
+            <div className="grid gap-3 text-sm md:grid-cols-3">
+              <Info label="Opportunity" value={ideaDetail.opportunityScore === null ? "brak" : `${ideaDetail.opportunityScore}/100`} />
+              <Info label="Confidence" value={ideaDetail.confidenceScore === null ? "brak" : `${ideaDetail.confidenceScore}/5`} />
+              <Info label="Status" value={ideaDetail.status} />
+            </div>
+            <div className="mt-4 space-y-3 text-sm leading-6">
+              <p>{ideaDetail.problem}</p>
+              <p>{ideaDetail.proposedSolution}</p>
+              {ideaDetail.businessRationale ? <p>{ideaDetail.businessRationale}</p> : null}
+              {ideaDetail.marketSummary ? <p className="rounded-md border border-border bg-muted p-3">{ideaDetail.marketSummary}</p> : null}
+            </div>
+            <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+              <Info label="Target user" value={ideaDetail.targetUser} />
+              <Info label="MVP" value={ideaDetail.mvpScope} />
+              <Info label="Monetyzacja" value={ideaDetail.monetizationPotential} />
+              <Info label="Stack" value={ideaDetail.suggestedStack} />
+            </div>
+            <EvidenceSources sources={ideaDetail.evidenceSources} emptyText="Brak zapisanych zrodel dla tego kandydata." />
+          </div>
+        </div>
+      ) : null}
 
       {report ? (
         <div className="fixed inset-0 z-50 bg-black/40 p-4" onClick={() => setReport(null)}>

@@ -21,9 +21,21 @@ export type AppConfig = {
   notificationMinTrendScore: number;
   notificationMinWeeklyGrowth: number;
   marketResearchEnabled: boolean;
-  marketResearchProvider: "mcp" | "openai" | "hybrid" | "reddit" | "none";
+  marketResearchProvider: "mcp" | "openai" | "hybrid" | "reddit" | "bluesky" | "none";
+  marketResearchMode: "light" | "full";
   marketResearchDailyLimit: number;
   marketResearchMaxSources: number;
+  enableOpenAiWebSearchSource: boolean;
+  enableRssSource: boolean;
+  enableBlueskySource: boolean;
+  blueskyPublicApiBase: string;
+  marketResearchRssFeeds: string[];
+  enableAutoOpportunityResearch: boolean;
+  autoOpportunityResearchTopRepos: number;
+  opportunityCandidateMinScore: number;
+  opportunityNotificationMinScore: number;
+  opportunityMinConfidence: number;
+  opportunityMinSources: number;
   mcpWebResearchServerUrl?: string;
   mcpWebResearchServerLabel: string;
   mcpWebResearchAllowedTools: string[];
@@ -72,11 +84,16 @@ function readStringList(name: string, fallback: string[]) {
 
 function readMarketResearchProvider(): AppConfig["marketResearchProvider"] {
   const value = readString("MARKET_RESEARCH_PROVIDER", "hybrid").toLowerCase();
-  if (value === "mcp" || value === "openai" || value === "hybrid" || value === "reddit" || value === "none") {
+  if (value === "mcp" || value === "openai" || value === "hybrid" || value === "reddit" || value === "bluesky" || value === "none") {
     return value;
   }
 
   return "hybrid";
+}
+
+function readMarketResearchMode(): AppConfig["marketResearchMode"] {
+  const value = readString("MARKET_RESEARCH_MODE", "light").toLowerCase();
+  return value === "full" ? "full" : "light";
 }
 
 export function getConfig(): AppConfig {
@@ -104,8 +121,20 @@ export function getConfig(): AppConfig {
     notificationMinWeeklyGrowth: readNumber("NOTIFICATION_MIN_WEEKLY_GROWTH", 200),
     marketResearchEnabled: readBoolean("MARKET_RESEARCH_ENABLED", true),
     marketResearchProvider: readMarketResearchProvider(),
+    marketResearchMode: readMarketResearchMode(),
     marketResearchDailyLimit: readNumber("MARKET_RESEARCH_DAILY_LIMIT", 5),
     marketResearchMaxSources: readNumber("MARKET_RESEARCH_MAX_SOURCES", 8),
+    enableOpenAiWebSearchSource: readBoolean("ENABLE_OPENAI_WEB_SEARCH_SOURCE", true),
+    enableRssSource: readBoolean("ENABLE_RSS_SOURCE", true),
+    enableBlueskySource: readBoolean("ENABLE_BLUESKY_SOURCE", false),
+    blueskyPublicApiBase: readString("BLUESKY_PUBLIC_API_BASE", "https://public.api.bsky.app"),
+    marketResearchRssFeeds: readStringList("MARKET_RESEARCH_RSS_FEEDS", []),
+    enableAutoOpportunityResearch: readBoolean("ENABLE_AUTO_OPPORTUNITY_RESEARCH", false),
+    autoOpportunityResearchTopRepos: readNumber("AUTO_OPPORTUNITY_RESEARCH_TOP_REPOS", 3),
+    opportunityCandidateMinScore: readNumber("OPPORTUNITY_CANDIDATE_MIN_SCORE", 65),
+    opportunityNotificationMinScore: readNumber("OPPORTUNITY_NOTIFICATION_MIN_SCORE", 85),
+    opportunityMinConfidence: readNumber("OPPORTUNITY_MIN_CONFIDENCE", 4),
+    opportunityMinSources: readNumber("OPPORTUNITY_MIN_SOURCES", 3),
     mcpWebResearchServerUrl: readString("MCP_WEB_RESEARCH_SERVER_URL") || undefined,
     mcpWebResearchServerLabel: readString("MCP_WEB_RESEARCH_SERVER_LABEL", "web-research"),
     mcpWebResearchAllowedTools: readStringList("MCP_WEB_RESEARCH_ALLOWED_TOOLS", ["search", "fetch"]),

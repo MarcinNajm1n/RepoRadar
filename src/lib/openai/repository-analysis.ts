@@ -3,7 +3,7 @@ import { getRepositoryForReport } from "@/lib/db/repositories";
 import { countOpenAiAnalysesToday, getCachedOpenAiOutput, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
 import { stableHash } from "@/lib/hash";
-import { safeJsonParse } from "@/lib/utils";
+import { clamp, safeJsonParse } from "@/lib/utils";
 import { repoReportPath, writeMarkdownReport } from "@/lib/reports/writer";
 import {
   buildIdeaPrompt,
@@ -14,10 +14,12 @@ import {
 } from "./prompts";
 import { generateOpenAiText } from "./client";
 import {
-  attachResearchToIdea,
-  attachResearchToReport,
+  attachResearchRunsToIdea,
+  attachResearchRunsToReport,
   getMarketResearchForRepository
 } from "@/lib/market-research/service";
+import { buildOpportunityFallback, calculateOpportunityScore } from "@/lib/market-research/opportunity";
+import type { MarketResearchMode } from "@/lib/market-research/types";
 
 function topicsFromJson(value: string) {
   return safeJsonParse<string[]>(value, []);
@@ -44,9 +46,15 @@ function requiredOpenAiCallsForOnDemandGeneration() {
   return 2;
 }
 
-function buildResearchContext(kind: "repo-report" | "idea", repository: Awaited<ReturnType<typeof getRepositoryForReport>>, context: string) {
+function buildResearchContext(
+  kind: "repo-report" | "idea" | "opportunity-candidate",
+  repository: Awaited<ReturnType<typeof getRepositoryForReport>>,
+  context: string,
+  mode: MarketResearchMode
+) {
   return {
     kind,
+    mode,
     repoId: repository.id,
     fullName: repository.fullName,
     url: repository.url,
@@ -141,7 +149,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
   }
 
   await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
-  const research = await getMarketResearchForRepository(buildResearchContext("repo-report", repository, context));
+  const research = await getMarketResearchForRepository(buildResearchContext("repo-report", repository, context, "full"));
   const reportContext = [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n");
   await ensureOpenAiBudget();
 
@@ -162,7 +170,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
       inputHash: hash
     }
   });
-  await attachResearchToReport(research.runId, report.id);
+  await attachResearchRunsToReport(research.runIds ?? (research.runId ? [research.runId] : []), report.id);
 
   await prisma.repository.update({
     where: { id: repoId },
@@ -204,7 +212,7 @@ export async function generateIdeaForRepository(repoId: string) {
     ? null
     : await (async () => {
         await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
-        return getMarketResearchForRepository(buildResearchContext("idea", repository, context));
+        return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
       })();
   const ideaContext = research
     ? [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n")
@@ -212,7 +220,7 @@ export async function generateIdeaForRepository(repoId: string) {
   if (!cached) {
     await ensureOpenAiBudget();
   }
-  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt(), ideaContext));
+  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext));
 
   if (!cached) {
     await saveOpenAiOutput("idea", repoId, hash, config.openAiModel, content);
@@ -229,6 +237,9 @@ export async function generateIdeaForRepository(repoId: string) {
     usefulnessScore?: number;
     riskScore?: number;
     confidenceScore?: number;
+    opportunityScore?: number;
+    applicationSummary?: string;
+    businessRationale?: string;
     marketSummary?: string;
     suggestedStack?: string;
     firstSteps?: string[];
@@ -250,10 +261,16 @@ export async function generateIdeaForRepository(repoId: string) {
       marketSummary: (parsed.marketSummary ?? research?.summary) || null,
       evidenceIdsJson: JSON.stringify(research?.sourceIds ?? []),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
+      opportunityScore:
+        parsed.opportunityScore === undefined ? null : Math.round(clamp(Number(parsed.opportunityScore), 0, 100)),
+      applicationSummary: parsed.applicationSummary ?? null,
+      businessRationale: parsed.businessRationale ?? null,
+      researchMode: "full",
+      status: "FULL",
       firstStepsJson: JSON.stringify(parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"])
     }
   });
-  await attachResearchToIdea(research?.runId, idea.id);
+  await attachResearchRunsToIdea(research?.runIds ?? (research?.runId ? [research.runId] : []), idea.id);
 
   await prisma.repository.update({
     where: { id: repoId },
@@ -261,4 +278,96 @@ export async function generateIdeaForRepository(repoId: string) {
   });
 
   return idea;
+}
+
+function scoreToFive(score: number) {
+  return Math.max(1, Math.min(5, Math.round(score / 20)));
+}
+
+export async function generateOpportunityCandidateForRepository(repoId: string) {
+  const repository = await getRepositoryForReport(repoId);
+  const config = getConfig();
+  const context = buildRepositoryContext({
+    ...repository,
+    topics: topicsFromJson(repository.topicsJson),
+    snapshots: repository.snapshots
+  });
+  const research = await getMarketResearchForRepository(
+    buildResearchContext("opportunity-candidate", repository, context, "light")
+  );
+  const opportunityScore = calculateOpportunityScore({
+    trendScore: repository.trendScore,
+    relevanceScore: repository.relevanceScore,
+    starsCurrent: repository.starsCurrent,
+    research
+  });
+
+  if (opportunityScore < config.opportunityCandidateMinScore || research.sources.length < 2) {
+    return {
+      created: false,
+      opportunityScore,
+      confidenceScore: research.confidenceScore,
+      sourceCount: research.sources.length,
+      reason: `Kandydat nie przeszedl progu jakosci (${opportunityScore}/${config.opportunityCandidateMinScore}).`
+    };
+  }
+
+  const fallback = buildOpportunityFallback({ fullName: repository.fullName, research });
+  const existing = await prisma.idea.findFirst({
+    where: {
+      sourceRepoId: repoId,
+      status: "CANDIDATE",
+      researchMode: "light"
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const firstSteps = [
+    "Sprawdz 3 rozmowy/dyskusje ze zrodel evidence.",
+    "Opisz bol uzytkownika w jednym zdaniu.",
+    "Zrob landing lub mock flow.",
+    "Zweryfikuj gotowosc do platnosci z 5 osobami.",
+    "Dopiero potem rozwin pelny pomysl."
+  ];
+  const data = {
+    sourceRepoId: repoId,
+    title: fallback.title,
+    problem: research.userProblems[0] ?? research.summary ?? "Problem wymaga recznej walidacji.",
+    proposedSolution: `Zweryfikuj wykorzystanie ${repository.fullName} jako elementu rozwiazania problemu: ${fallback.applicationSummary}`,
+    targetUser: "Zespoly B2B/devtools/SaaS/IT albo developerzy oszczedzajacy czas w workflow.",
+    mvpScope: "Kandydat light: najpierw walidacja problemu i prosty prototyp, bez pelnego scope produktu.",
+    monetizationPotential: "Do walidacji; szukaj oszczednosci czasu, kosztow albo ryzyka operacyjnego.",
+    difficulty: 3,
+    usefulnessScore: scoreToFive(opportunityScore),
+    riskScore: research.confidenceScore && research.confidenceScore >= 4 ? 2 : 3,
+    suggestedStack: "Next.js, SQLite/PostgreSQL, GitHub API, OpenAI web search",
+    firstStepsJson: JSON.stringify(firstSteps),
+    marketSummary: research.summary || null,
+    evidenceIdsJson: JSON.stringify(research.sourceIds),
+    confidenceScore: research.confidenceScore,
+    opportunityScore,
+    applicationSummary: fallback.applicationSummary,
+    businessRationale: fallback.businessRationale,
+    researchMode: "light",
+    status: "CANDIDATE"
+  };
+
+  const idea = existing
+    ? await prisma.idea.update({
+        where: { id: existing.id },
+        data
+      })
+    : await prisma.idea.create({
+        data
+      });
+
+  await attachResearchRunsToIdea(research.runIds ?? (research.runId ? [research.runId] : []), idea.id);
+
+  return {
+    created: true,
+    ideaId: idea.id,
+    opportunityScore,
+    confidenceScore: research.confidenceScore,
+    sourceCount: research.sources.length,
+    reason: "Kandydat zostal zapisany w Pomysly > Kandydaci."
+  };
 }

@@ -26,6 +26,7 @@ export async function countOpenAiAnalysesToday() {
 
   return prisma.openAiCache.count({
     where: {
+      kind: { in: ["summary", "repo-report", "idea"] },
       createdAt: {
         gte: start
       }

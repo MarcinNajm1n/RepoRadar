@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getEvidenceSourcesForReport, updateRepositoryStatus } from "@/lib/db/repositories";
 import { runDailyScan } from "@/lib/github/scanner";
-import { generateFullReportForRepository, generateIdeaForRepository } from "@/lib/openai/repository-analysis";
+import {
+  generateFullReportForRepository,
+  generateIdeaForRepository,
+  generateOpportunityCandidateForRepository
+} from "@/lib/openai/repository-analysis";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
 
@@ -46,6 +50,12 @@ export async function generateIdeaAction(repoId: string) {
     id: idea.id,
     title: idea.title
   };
+}
+
+export async function generateOpportunityCandidateAction(repoId: string) {
+  const result = await generateOpportunityCandidateForRepository(repoId);
+  revalidatePath("/");
+  return result;
 }
 
 export async function createWeeklyReportAction() {

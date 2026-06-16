@@ -14,6 +14,10 @@ function buildWindowsMessage(payload: NotificationPayload) {
     return truncateText(payload.message, 240);
   }
 
+  if (payload.eventType === "opportunity_candidate_high") {
+    return truncateText(`${top.fullName} | opportunity ${top.opportunityScore ?? "?"}/100 | ${top.applicationSummary ?? payload.message}`, 240);
+  }
+
   const growth = top.growth7d === null ? "growth baseline" : `+${top.growth7d} stars / 7d`;
   return truncateText(`${top.fullName} | score ${top.trendScore} | ${growth}`, 240);
 }
@@ -57,7 +61,7 @@ export async function sendWindowsNotification(payload: NotificationPayload): Pro
           eventType: payload.eventType,
           status: "SENT",
           maskedTarget: "local-windows",
-          payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0 })
+            payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0, opportunityCandidateId: payload.opportunityCandidateId })
         });
       }
     );

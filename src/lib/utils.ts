@@ -65,11 +65,98 @@ export function sanitizeExternalUrl(value: string | null | undefined, maxLength 
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return null;
     }
+    if (isBlockedHost(parsed.hostname)) {
+      return null;
+    }
 
     return parsed.toString();
   } catch {
     return null;
   }
+}
+
+function isBlockedHost(hostname: string) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!normalized || normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
+    return true;
+  }
+
+  if (isBlockedIpv6Host(normalized)) {
+    return true;
+  }
+
+  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) {
+    return false;
+  }
+
+  const octets = ipv4.slice(1).map(Number);
+  if (octets.some((octet) => octet < 0 || octet > 255)) {
+    return true;
+  }
+
+  const [first, second] = octets;
+  return isBlockedIpv4Octets(first, second);
+}
+
+function isBlockedIpv4Octets(first: number, second: number) {
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 192 && second === 0) ||
+    (first === 198 && (second === 18 || second === 19)) ||
+    first >= 224
+  );
+}
+
+function isBlockedIpv6Host(hostname: string) {
+  if (!hostname.includes(":")) {
+    return false;
+  }
+
+  const withoutZone = hostname.split("%")[0];
+  if (withoutZone === "::" || withoutZone === "::1") {
+    return true;
+  }
+
+  const firstHextetRaw = withoutZone.split(":").find(Boolean) ?? "";
+  const firstHextet = Number.parseInt(firstHextetRaw, 16);
+  if (Number.isFinite(firstHextet)) {
+    if ((firstHextet & 0xfe00) === 0xfc00) {
+      return true;
+    }
+    if ((firstHextet & 0xffc0) === 0xfe80) {
+      return true;
+    }
+  }
+
+  const dottedIpv4 = withoutZone.match(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (dottedIpv4 && withoutZone.includes("ffff")) {
+    const octets = dottedIpv4.slice(1).map(Number);
+    if (octets.some((octet) => octet < 0 || octet > 255)) {
+      return true;
+    }
+    return isBlockedIpv4Octets(octets[0], octets[1]);
+  }
+
+  const mappedHex = withoutZone.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (mappedHex) {
+    const high = Number.parseInt(mappedHex[1], 16);
+    const low = Number.parseInt(mappedHex[2], 16);
+    if (!Number.isFinite(high) || !Number.isFinite(low)) {
+      return true;
+    }
+    const first = (high >> 8) & 255;
+    const second = high & 255;
+    return isBlockedIpv4Octets(first, second);
+  }
+
+  return false;
 }
 
 export function monthsBetween(from: Date, to = new Date()) {

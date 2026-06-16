@@ -1,4 +1,4 @@
-export type NotificationEventType = "scan_success" | "scan_failure";
+export type NotificationEventType = "scan_success" | "scan_failure" | "opportunity_candidate_high";
 export type NotificationChannel = "windows" | "discord" | "noop";
 
 export type NotificationRepository = {
@@ -8,6 +8,11 @@ export type NotificationRepository = {
   starsCurrent: number;
   growth7d: number | null;
   relevanceScore: number;
+  opportunityScore?: number | null;
+  confidenceScore?: number | null;
+  sourceCount?: number;
+  applicationSummary?: string | null;
+  businessRationale?: string | null;
 };
 
 export type NotificationPayload = {
@@ -15,6 +20,7 @@ export type NotificationPayload = {
   title: string;
   message: string;
   scanRunId?: string;
+  opportunityCandidateId?: string;
   repositories?: NotificationRepository[];
   error?: string;
 };

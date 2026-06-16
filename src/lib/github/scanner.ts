@@ -6,6 +6,7 @@ import { calculateTrendScore } from "@/lib/scoring/trend-score";
 import { generateShortSummaryForRepository } from "@/lib/openai/repository-analysis";
 import { createDailyReport } from "@/lib/reports/daily";
 import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } from "@/lib/notifications/dispatcher";
+import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportunities";
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
 import type { GitHubReadmeResult, GitHubRepositoryItem } from "./types";
@@ -264,6 +265,12 @@ export async function runDailyScan(options: ScanOptions = {}) {
     });
 
     await createDailyReport(scanRun.id);
+    await runAutoOpportunityResearch(scanRun.id).catch((opportunityError) => {
+      console.warn(
+        "RepoRadar opportunity research failed:",
+        opportunityError instanceof Error ? opportunityError.message : "Unknown opportunity research error"
+      );
+    });
     await dispatchScanSuccessNotifications(scanRun.id).catch((notificationError) => {
       console.warn(
         "RepoRadar notification dispatch failed:",

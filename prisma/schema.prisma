@@ -116,6 +116,10 @@ model Idea {
   marketSummary         String?
   evidenceIdsJson       String   @default("[]")
   confidenceScore       Int?
+  opportunityScore      Int?
+  applicationSummary    String?
+  businessRationale     String?
+  researchMode          String   @default("full")
   status                String   @default("NEW")
   createdAt             DateTime @default(now())
 
@@ -125,6 +129,7 @@ model Idea {
 
   @@index([sourceRepoId])
   @@index([status])
+  @@index([researchMode])
 }
 
 model IgnoredRepository {
@@ -179,6 +184,7 @@ model MarketResearchRun {
   reportId    String?
   ideaId      String?
   provider    String
+  mode        String    @default("full")
   queryHash   String
   status      String    @default("RUNNING")
   startedAt   DateTime  @default(now())
@@ -195,6 +201,7 @@ model MarketResearchRun {
   @@index([reportId])
   @@index([ideaId])
   @@index([provider])
+  @@index([mode])
   @@index([queryHash])
   @@index([status])
   @@index([startedAt])

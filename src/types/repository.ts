@@ -60,6 +60,10 @@ export type IdeaListItem = {
   usefulnessScore: number;
   riskScore: number;
   confidenceScore: number | null;
+  opportunityScore: number | null;
+  applicationSummary: string | null;
+  businessRationale: string | null;
+  researchMode: string;
   marketSummary: string | null;
   suggestedStack: string;
   firstSteps: string[];
@@ -93,6 +97,8 @@ export type DashboardData = {
     read: number;
     ignored: number;
     ideas: number;
+    candidates: number;
+    fullIdeas: number;
     old: number;
     hot: number;
   };

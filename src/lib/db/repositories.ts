@@ -105,6 +105,10 @@ function mapIdea(
     usefulnessScore: idea.usefulnessScore,
     riskScore: idea.riskScore,
     confidenceScore: idea.confidenceScore,
+    opportunityScore: idea.opportunityScore,
+    applicationSummary: idea.applicationSummary,
+    businessRationale: idea.businessRationale,
+    researchMode: idea.researchMode,
     marketSummary: idea.marketSummary,
     suggestedStack: idea.suggestedStack,
     firstSteps: safeJsonParse<string[]>(idea.firstStepsJson, []),
@@ -185,13 +189,15 @@ export async function getDashboardData(): Promise<DashboardData> {
 }
 
 async function getCounts() {
-  const [all, newlyFound, saved, read, ignored, ideas, old, hot] = await Promise.all([
+  const [all, newlyFound, saved, read, ignored, ideas, candidates, fullIdeas, old, hot] = await Promise.all([
     prisma.repository.count({ where: { isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "NEW", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "SAVED", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "READ", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "IGNORED" } }),
     prisma.idea.count(),
+    prisma.idea.count({ where: { status: "CANDIDATE" } }),
+    prisma.idea.count({ where: { status: { not: "CANDIDATE" } } }),
     prisma.repository.count({ where: { isOldRepo: true, status: { not: "HOT" }, isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "HOT", isDeletedFromView: false } })
   ]);
@@ -203,6 +209,8 @@ async function getCounts() {
     read,
     ignored,
     ideas,
+    candidates,
+    fullIdeas,
     old,
     hot
   };

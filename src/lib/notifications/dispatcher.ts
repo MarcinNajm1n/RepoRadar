@@ -1,6 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
 import { truncateText } from "@/lib/utils";
+import { isExcellentOpportunity } from "@/lib/market-research/opportunity";
 import { isHighValueRepository } from "./thresholds";
 import { sendDiscordNotification } from "./channels/discord";
 import { sendNoopNotification } from "./channels/noop";
@@ -103,5 +104,74 @@ export async function dispatchScanFailureNotification(scanRunId: string, error: 
     title: "RepoRadar: scan failed",
     message: "GitHub scan nie zakonczyl sie poprawnie.",
     error: truncateText(message, 1000)
+  });
+}
+
+export async function dispatchOpportunityCandidateNotification(candidateId: string) {
+  const duplicate = await prisma.notificationLog.findFirst({
+    where: {
+      eventType: "opportunity_candidate_high",
+      status: "SENT",
+      payloadJson: { contains: candidateId }
+    }
+  });
+  if (duplicate) {
+    return [];
+  }
+
+  const candidate = await prisma.idea.findUniqueOrThrow({
+    where: { id: candidateId },
+    include: {
+      repository: {
+        include: {
+          snapshots: {
+            orderBy: { capturedAt: "desc" },
+            take: 1,
+            select: { growth7d: true }
+          }
+        }
+      },
+      marketResearchSources: {
+        orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
+        take: 6
+      }
+    }
+  });
+
+  const text = [
+    candidate.title,
+    candidate.problem,
+    candidate.applicationSummary,
+    candidate.businessRationale,
+    candidate.marketSummary,
+    ...candidate.marketResearchSources.map((source) => `${source.title} ${source.snippet}`)
+  ].join(" ");
+  if (
+    !isExcellentOpportunity({
+      opportunityScore: candidate.opportunityScore,
+      confidenceScore: candidate.confidenceScore,
+      sourceCount: candidate.marketResearchSources.length,
+      text
+    })
+  ) {
+    return [];
+  }
+
+  const repo = notificationRepoFromRecord(candidate.repository);
+  return sendAndLog({
+    eventType: "opportunity_candidate_high",
+    opportunityCandidateId: candidate.id,
+    title: `RepoRadar: mocny kandydat ${candidate.opportunityScore ?? "?"}/100`,
+    message: candidate.businessRationale ?? "Znaleziono mocnego kandydata biznesowego.",
+    repositories: [
+      {
+        ...repo,
+        opportunityScore: candidate.opportunityScore,
+        confidenceScore: candidate.confidenceScore,
+        sourceCount: candidate.marketResearchSources.length,
+        applicationSummary: candidate.applicationSummary,
+        businessRationale: candidate.businessRationale
+      }
+    ]
   });
 }

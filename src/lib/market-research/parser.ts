@@ -93,6 +93,7 @@ export function emptyMarketResearch(status: "DISABLED" | "UNAVAILABLE", error?: 
     confidenceScore: null,
     sources: [],
     sourceIds: [],
+    runIds: [],
     status,
     error
   };

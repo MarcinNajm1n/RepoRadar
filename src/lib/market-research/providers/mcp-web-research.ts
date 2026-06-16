@@ -7,9 +7,10 @@ import type { MarketResearchContext, MarketResearchProvider } from "../types";
 
 export const mcpWebResearchProvider: MarketResearchProvider = {
   name: "mcp-web-research",
+  usesOpenAi: true,
   async research(context: MarketResearchContext) {
     const config = getConfig();
-    const content = await generateOpenAiText(buildMarketResearchPrompt(config.marketResearchMaxSources), context.repositoryContext, {
+    const content = await generateOpenAiText(buildMarketResearchPrompt(config.marketResearchMaxSources, context.mode ?? "full"), context.repositoryContext, {
       tools: [buildMcpWebResearchTool()],
       toolChoice: "required"
     });
