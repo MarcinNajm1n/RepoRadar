@@ -69,6 +69,7 @@ export const blueskyProvider: MarketResearchProvider = {
           sourceType: "bluesky",
           title: sanitizeExternalText(`Bluesky: ${handle ?? "public post"}`, 240) ?? "Bluesky public post",
           url: postUrl,
+          providerItemId: post.uri ?? null,
           publisher: handle ? `@${handle}` : "Bluesky",
           publishedAt: post.record?.createdAt ? new Date(post.record.createdAt).toISOString().slice(0, 10) : null,
           snippet: text,

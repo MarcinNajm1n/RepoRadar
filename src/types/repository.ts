@@ -61,6 +61,12 @@ export type EvidenceSourceItem = {
   snippet: string;
   sentiment: string | null;
   relevanceScore: number | null;
+  canonicalUrl: string | null;
+  sourceKey: string | null;
+  evidenceKind: string | null;
+  whatItProves: string | null;
+  sourceConfidence: number | null;
+  sourceRank: number | null;
 };
 
 export type IdeaListItem = {

@@ -191,6 +191,8 @@ model MarketResearchRun {
   provider    String
   mode        String    @default("full")
   queryHash   String
+  queriesJson String    @default("[]")
+  providersJson String  @default("[]")
   status      String    @default("RUNNING")
   startedAt   DateTime  @default(now())
   finishedAt  DateTime?
@@ -227,6 +229,12 @@ model MarketResearchSource {
   snippet        String
   sentiment      String?
   relevanceScore Int?
+  canonicalUrl   String?
+  sourceKey      String?
+  evidenceKind   String?
+  whatItProves   String?
+  sourceConfidence Int?
+  sourceRank     Int?
 
   run        MarketResearchRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   repository Repository?       @relation(fields: [repoId], references: [id], onDelete: SetNull)
@@ -239,6 +247,27 @@ model MarketResearchSource {
   @@index([ideaId])
   @@index([sourceType])
   @@index([retrievedAt])
+  @@index([sourceKey])
+  @@index([canonicalUrl])
+  @@index([evidenceKind])
+  @@index([sourceConfidence])
+}
+
+model ExternalResearchCache {
+  id          String   @id @default(cuid())
+  provider    String
+  cacheKey    String
+  mode        String?
+  query       String?
+  contentJson String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, cacheKey])
+  @@index([provider])
+  @@index([expiresAt])
+  @@index([createdAt])
 }
 
 model NotificationLog {

@@ -17,7 +17,12 @@ describe("parseMarketResearchResult", () => {
             url: "https://www.reddit.com/r/devtools/comments/1",
             snippet: "Users discuss workflow gaps.",
             sentiment: "mixed",
-            relevanceScore: 88
+            relevanceScore: 88,
+            evidenceKind: "pain_point",
+            whatItProves: "Users have workflow pain.",
+            sourceConfidence: 70,
+            sourceRank: 95,
+            providerItemId: "post_1"
           },
           {
             sourceType: "x",
@@ -32,6 +37,11 @@ describe("parseMarketResearchResult", () => {
 
     expect(result.sources).toHaveLength(1);
     expect(result.sources[0].url).toBe("https://www.reddit.com/r/devtools/comments/1");
+    expect(result.sources[0].evidenceKind).toBe("pain_point");
+    expect(result.sources[0].whatItProves).toBe("Users have workflow pain.");
+    expect(result.sources[0].sourceConfidence).toBe(70);
+    expect(result.sources[0].sourceRank).toBe(95);
+    expect(result.sources[0].providerItemId).toBe("post_1");
     expect(result.confidenceScore).toBe(4);
   });
 });

@@ -16,6 +16,7 @@ type RedditSearchResponse = {
         url?: string;
         subreddit_name_prefixed?: string;
         selftext?: string;
+        id?: string;
         created_utc?: number;
         score?: number;
         num_comments?: number;
@@ -120,6 +121,7 @@ export const redditProvider: MarketResearchProvider = {
             sourceType: "reddit",
             title: sanitizeExternalText(item!.title, 240) ?? "Reddit discussion",
             url: sanitizeExternalUrl(permalink) ?? "https://www.reddit.com/",
+            providerItemId: item!.id ?? item!.permalink ?? null,
             publisher: item!.subreddit_name_prefixed ?? "Reddit",
             publishedAt: item!.created_utc ? new Date(item!.created_utc * 1000).toISOString().slice(0, 10) : null,
             snippet: snippetParts.join(" | ") || "Public Reddit search result.",

@@ -1,11 +1,11 @@
 import { getConfig } from "@/lib/config";
 import type { AppConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
-import { getCachedOpenAiOutput, saveOpenAiOutput } from "@/lib/db/openai-cache";
-import { stableHash } from "@/lib/hash";
-import { sanitizeExternalText, sanitizeExternalUrl, safeJsonParse, truncateText } from "@/lib/utils";
+import { sanitizeExternalText, truncateText } from "@/lib/utils";
+import { buildExternalResearchCacheKey, getExternalResearchCache, setExternalResearchCache } from "./external-cache";
+import { canonicalizeUrl, dedupeEvidenceSources, summarizeEvidenceQuality } from "./evidence";
 import { emptyMarketResearch } from "./parser";
-import { dedupeSources } from "./query";
+import { buildResearchQueries } from "./query";
 import { blueskyProvider } from "./providers/bluesky";
 import { hackerNewsProvider } from "./providers/hacker-news";
 import { mcpWebResearchProvider } from "./providers/mcp-web-research";
@@ -21,23 +21,7 @@ import type {
 } from "./types";
 
 function queryHash(context: MarketResearchContext, provider: string) {
-  return stableHash(
-    [
-      "market-research",
-      context.kind,
-      context.mode ?? getConfig().marketResearchMode,
-      provider,
-      context.fullName,
-      context.readmeHash ?? "",
-      context.trendScore,
-      context.relevanceScore,
-      context.repositoryContext
-    ].join("\n")
-  );
-}
-
-function cacheKind(context: MarketResearchContext, provider: string) {
-  return `market-research:${context.kind}:${context.mode ?? getConfig().marketResearchMode}:${provider}`;
+  return buildExternalResearchCacheKey(provider, context, buildResearchQueries(context).join("\n"));
 }
 
 export function selectMarketResearchProviders(
@@ -112,11 +96,39 @@ function parsePublishedAt(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function enrichMarketResearchResult(
+  context: MarketResearchContext,
+  provider: string,
+  result: MarketResearchResult
+): MarketResearchResult {
+  const config = getConfig();
+  const normalizedSources = dedupeEvidenceSources(result.sources, {
+    maxSources: config.marketResearchMaxSources,
+    maxPerProvider: config.marketResearchMaxItemsPerProvider,
+    context
+  });
+  const quality = summarizeEvidenceQuality(normalizedSources);
+  const conflictRisks = quality.conflictSummary ? [quality.conflictSummary] : [];
+
+  return {
+    ...result,
+    provider: result.provider || provider,
+    sources: normalizedSources,
+    queries: result.queries?.length ? result.queries : buildResearchQueries(context),
+    providers: result.providers?.length ? result.providers : [provider],
+    independentSourceCount: quality.independentSourceCount,
+    evidenceSummary: quality.evidenceSummary,
+    conflictSummary: quality.conflictSummary,
+    validationRisks: [...new Set([...conflictRisks, ...result.validationRisks])].slice(0, 8)
+  };
+}
+
 function sourceCreateData(source: MarketResearchSourceInput, runId: string, repoId: string) {
-  const url = sanitizeExternalUrl(source.url);
+  const url = canonicalizeUrl(source.url);
   if (!url) {
     return null;
   }
+  const canonicalUrl = source.canonicalUrl ?? url;
 
   return {
     runId,
@@ -124,11 +136,18 @@ function sourceCreateData(source: MarketResearchSourceInput, runId: string, repo
     sourceType: sanitizeExternalText(source.sourceType, 80) ?? "web",
     title: sanitizeExternalText(source.title, 300) ?? "Untitled source",
     url,
+    canonicalUrl,
+    sourceKey: sanitizeExternalText(source.sourceKey, 300),
     publisher: sanitizeExternalText(source.publisher, 180),
     publishedAt: parsePublishedAt(source.publishedAt),
     snippet: sanitizeExternalText(source.snippet, 1400) ?? "",
     sentiment: sanitizeExternalText(source.sentiment, 60),
-    relevanceScore: source.relevanceScore === null || source.relevanceScore === undefined ? null : source.relevanceScore
+    relevanceScore: source.relevanceScore === null || source.relevanceScore === undefined ? null : source.relevanceScore,
+    evidenceKind: sanitizeExternalText(source.evidenceKind, 80),
+    whatItProves: sanitizeExternalText(source.whatItProves, 500),
+    sourceConfidence:
+      source.sourceConfidence === null || source.sourceConfidence === undefined ? null : Math.round(source.sourceConfidence),
+    sourceRank: source.sourceRank === null || source.sourceRank === undefined ? null : Math.round(source.sourceRank)
   };
 }
 
@@ -145,19 +164,22 @@ async function storeRun(
   status: "SUCCESS" | "CACHED",
   result: MarketResearchResult
 ): Promise<StoredMarketResearch> {
+  const enriched = enrichMarketResearchResult(context, provider, result);
   const run = await prisma.marketResearchRun.create({
     data: {
       repoId: context.repoId,
       provider,
       mode: context.mode ?? getConfig().marketResearchMode,
       queryHash: hash,
+      queriesJson: JSON.stringify(enriched.queries ?? []),
+      providersJson: JSON.stringify(enriched.providers ?? [provider]),
       status,
       finishedAt: new Date(),
       sourceCount: 0
     }
   });
 
-  const sourceData = validSourceCreateData(result.sources, run.id, context.repoId);
+  const sourceData = validSourceCreateData(enriched.sources, run.id, context.repoId);
   const createdSources = await Promise.all(
     sourceData.map((data) =>
       prisma.marketResearchSource.create({
@@ -172,7 +194,7 @@ async function storeRun(
   });
 
   return {
-    ...result,
+    ...enriched,
     runId: run.id,
     runIds: [run.id],
     sourceIds: createdSources.map((source) => source.id),
@@ -181,35 +203,45 @@ async function storeRun(
 }
 
 async function tryCached(context: MarketResearchContext, provider: MarketResearchProvider, hash: string) {
-  const config = getConfig();
-  const cached = await getCachedOpenAiOutput(cacheKind(context, provider.name), context.repoId, hash, config.openAiModel);
+  const queries = buildResearchQueries(context);
+  const cached = await getExternalResearchCache<MarketResearchResult>(provider.name, hash);
   if (!cached) {
     return null;
   }
 
-  const result = safeJsonParse<MarketResearchResult | null>(cached.content, null);
-  if (!result) {
-    return null;
-  }
-
-  return storeRun(context, provider.name, hash, "CACHED", result);
+  return storeRun(context, provider.name, hash, "CACHED", {
+    ...cached,
+    queries: cached.queries?.length ? cached.queries : queries,
+    providers: cached.providers?.length ? cached.providers : [provider.name]
+  });
 }
 
 async function runProvider(context: MarketResearchContext, provider: MarketResearchProvider, hash: string) {
   const config = getConfig();
+  const queries = buildResearchQueries(context);
   const run = await prisma.marketResearchRun.create({
     data: {
       repoId: context.repoId,
       provider: provider.name,
       mode: context.mode ?? config.marketResearchMode,
       queryHash: hash,
+      queriesJson: JSON.stringify(queries),
+      providersJson: JSON.stringify([provider.name]),
       status: "RUNNING"
     }
   });
 
   try {
-    const result = await provider.research(context);
-    await saveOpenAiOutput(cacheKind(context, provider.name), context.repoId, hash, config.openAiModel, JSON.stringify(result));
+    const rawResult = await provider.research(context);
+    const result = enrichMarketResearchResult(context, provider.name, {
+      ...rawResult,
+      queries: rawResult.queries?.length ? rawResult.queries : queries,
+      providers: rawResult.providers?.length ? rawResult.providers : [provider.name]
+    });
+    await setExternalResearchCache(provider.name, hash, result, {
+      mode: context.mode ?? config.marketResearchMode,
+      query: queries.join(" | ")
+    });
     const sourceData = validSourceCreateData(result.sources, run.id, context.repoId);
     const createdSources = await Promise.all(
       sourceData.map((data) =>
@@ -224,7 +256,9 @@ async function runProvider(context: MarketResearchContext, provider: MarketResea
       data: {
         status: "SUCCESS",
         finishedAt: new Date(),
-        sourceCount: createdSources.length
+        sourceCount: createdSources.length,
+        queriesJson: JSON.stringify(result.queries ?? queries),
+        providersJson: JSON.stringify(result.providers ?? [provider.name])
       }
     });
 
@@ -249,10 +283,12 @@ async function runProvider(context: MarketResearchContext, provider: MarketResea
 }
 
 function combineStoredResults(results: StoredMarketResearch[], mode: string): StoredMarketResearch {
-  const sources = dedupeSources(
-    results.flatMap((result) => result.sources),
-    getConfig().marketResearchMaxSources
-  );
+  const config = getConfig();
+  const sources = dedupeEvidenceSources(results.flatMap((result) => result.sources), {
+    maxSources: config.marketResearchMaxSources,
+    maxPerProvider: config.marketResearchMaxItemsPerProvider
+  });
+  const quality = summarizeEvidenceQuality(sources);
   const sourceIds = [...new Set(results.flatMap((result) => result.sourceIds))];
   const runIds = [...new Set(results.flatMap((result) => result.runIds ?? (result.runId ? [result.runId] : [])))];
   const confidenceScores = results
@@ -277,9 +313,14 @@ function combineStoredResults(results: StoredMarketResearch[], mode: string): St
     userProblems: [...new Set(results.flatMap((result) => result.userProblems))].slice(0, 8),
     sentiment: results.some((result) => result.sentiment === "negative" || result.sentiment === "mixed") ? "mixed" : "neutral",
     demandEvidence: [...new Set(results.flatMap((result) => result.demandEvidence))].slice(0, 8),
-    validationRisks: [...new Set([...conflictRisk, ...results.flatMap((result) => result.validationRisks)])].slice(0, 8),
+    validationRisks: [...new Set([...conflictRisk, quality.conflictSummary, ...results.flatMap((result) => result.validationRisks)].filter(Boolean) as string[])].slice(0, 8),
     confidenceScore: mode === "full" && sources.length >= 5 ? Math.max(avgConfidence ?? 3, 4) : avgConfidence,
     sources,
+    queries: [...new Set(results.flatMap((result) => result.queries ?? []))],
+    providers: [...new Set(results.flatMap((result) => result.providers ?? [result.provider]))],
+    independentSourceCount: quality.independentSourceCount,
+    evidenceSummary: quality.evidenceSummary,
+    conflictSummary: quality.conflictSummary,
     runId: runIds[0],
     runIds,
     sourceIds,

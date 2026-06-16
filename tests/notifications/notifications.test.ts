@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { isExcellentOpportunity } from "../../src/lib/market-research/opportunity";
 import { sendDiscordNotification, maskDiscordWebhookUrl } from "../../src/lib/notifications/channels/discord";
 import { isHighValueRepository } from "../../src/lib/notifications/thresholds";
 
@@ -37,5 +38,30 @@ describe("notification safety", () => {
     expect(isHighValueRepository({ trendScore: 75, growth7d: 0, relevanceScore: 0 })).toBe(true);
     expect(isHighValueRepository({ trendScore: 40, growth7d: 150, relevanceScore: 0 })).toBe(true);
     expect(isHighValueRepository({ trendScore: 40, growth7d: 20, relevanceScore: 40 })).toBe(false);
+  });
+
+  it("requires strong independent evidence for opportunity alerts", () => {
+    const text = "B2B devtools automation saves time and cost for teams";
+
+    expect(
+      isExcellentOpportunity({
+        opportunityScore: 90,
+        confidenceScore: 4,
+        sourceCount: 3,
+        independentSourceCount: 3,
+        averageSourceConfidence: 80,
+        text
+      })
+    ).toBe(true);
+    expect(
+      isExcellentOpportunity({
+        opportunityScore: 90,
+        confidenceScore: 4,
+        sourceCount: 3,
+        independentSourceCount: 1,
+        averageSourceConfidence: 80,
+        text
+      })
+    ).toBe(false);
   });
 });

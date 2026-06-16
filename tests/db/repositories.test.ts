@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapRepository } from "../../src/lib/db/repositories";
+import { mapEvidenceSource, mapRepository } from "../../src/lib/db/repositories";
 
 const now = new Date("2026-06-16T12:00:00Z");
 
@@ -80,5 +80,35 @@ describe("mapRepository", () => {
     expect(mapped.discoveryProfiles).toEqual([]);
     expect(mapped.scoreBreakdown.absoluteGrowthPoints).toBe(0);
     expect(mapped.scoreBreakdown.usedInitialMomentumFallback).toBe(false);
+  });
+
+  it("maps evidence quality fields safely", () => {
+    const mapped = mapEvidenceSource({
+      id: "source_1",
+      sourceType: "hn",
+      title: "Workflow pain",
+      url: "https://news.ycombinator.com/item?id=1",
+      publisher: "Hacker News",
+      retrievedAt: now,
+      publishedAt: null,
+      snippet: "Developers complain about manual workflow.",
+      sentiment: "mixed",
+      relevanceScore: 90,
+      canonicalUrl: "https://news.ycombinator.com/item?id=1",
+      sourceKey: "hn:1",
+      evidenceKind: "pain_point",
+      whatItProves: "Developers have workflow pain.",
+      sourceConfidence: 82,
+      sourceRank: 110
+    });
+
+    expect(mapped).toMatchObject({
+      canonicalUrl: "https://news.ycombinator.com/item?id=1",
+      sourceKey: "hn:1",
+      evidenceKind: "pain_point",
+      whatItProves: "Developers have workflow pain.",
+      sourceConfidence: 82,
+      sourceRank: 110
+    });
   });
 });

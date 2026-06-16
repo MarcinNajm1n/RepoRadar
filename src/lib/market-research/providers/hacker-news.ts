@@ -62,6 +62,7 @@ export const hackerNewsProvider: MarketResearchProvider = {
           sourceType: "hn",
           title,
           url,
+          providerItemId: hit.objectID ?? null,
           publisher: hit.author ? `HN: ${hit.author}` : "Hacker News",
           publishedAt: hit.created_at ? new Date(hit.created_at).toISOString().slice(0, 10) : null,
           snippet,

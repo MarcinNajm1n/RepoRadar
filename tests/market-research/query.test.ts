@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildResearchQueries } from "../../src/lib/market-research/query";
+import { buildResearchQueries, buildResearchQuerySpecs } from "../../src/lib/market-research/query";
 import type { MarketResearchContext } from "../../src/lib/market-research/types";
 
 const context: MarketResearchContext = {
@@ -20,17 +20,33 @@ const context: MarketResearchContext = {
 };
 
 describe("buildResearchQueries", () => {
-  it("builds short deduped opportunity research queries", () => {
+  it("builds short deduped light opportunity research queries", () => {
+    const specs = buildResearchQuerySpecs(context, "light");
     const queries = buildResearchQueries(context);
 
-    expect(queries.length).toBeGreaterThanOrEqual(5);
-    expect(queries.length).toBeLessThanOrEqual(8);
+    expect(specs).toHaveLength(4);
+    expect(queries).toHaveLength(4);
+    expect(specs.map((spec) => spec.intent)).toEqual(["base", "pain", "alternatives", "manual_workflow"]);
     expect(new Set(queries).size).toBe(queries.length);
     expect(queries.every((query) => query.length <= 180)).toBe(true);
     expect(queries.join(" ")).toContain("alternatives pricing");
-    expect(queries.join(" ")).toContain("developer workflow pain");
     expect(queries.join(" ")).toContain("manual workflow");
-    expect(queries.join(" ")).toContain("SaaS automation");
-    expect(queries.join(" ")).toContain("time saving cost saving");
+  });
+
+  it("builds full research query specs with evidence intents", () => {
+    const specs = buildResearchQuerySpecs({ ...context, mode: "full" }, "full");
+
+    expect(specs).toHaveLength(8);
+    expect(specs.map((spec) => spec.intent)).toEqual([
+      "base",
+      "pain",
+      "alternatives",
+      "manual_workflow",
+      "automation",
+      "pricing",
+      "competitors",
+      "risks"
+    ]);
+    expect(specs.every((spec) => spec.query.length <= 180)).toBe(true);
   });
 });

@@ -1030,22 +1030,111 @@ function sentimentClass(sentiment: string | null) {
 }
 
 function EvidenceSources({ sources, emptyText }: { sources: EvidenceSourceItem[]; emptyText: string }) {
+  const confidenceValues = sources
+    .map((source) => source.sourceConfidence)
+    .filter((score): score is number => typeof score === "number");
+  const averageConfidence = confidenceValues.length
+    ? Math.round(confidenceValues.reduce((sum, score) => sum + score, 0) / confidenceValues.length)
+    : null;
+  const independentSourceCount = new Set(
+    sources.map((source) => source.publisher || source.sourceType || source.canonicalUrl || source.sourceKey).filter(Boolean)
+  ).size;
+  const evidenceKinds = [...new Set(sources.map((source) => source.evidenceKind).filter(Boolean))];
+  const groups = groupEvidenceSources(sources);
+  const conflictSummary = hasMixedEvidenceSentiment(sources)
+    ? "Zrodla maja mieszany sentyment; warto sprawdzic, czy to realny pain point, czy tylko hype."
+    : null;
+
   return (
     <div className="mt-4">
-      <h4 className="text-sm font-semibold">Evidence</h4>
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold">Evidence</h4>
+        {sources.length ? <Badge>{sources.length} sources</Badge> : null}
+        {sources.length ? <Badge>{independentSourceCount} independent</Badge> : null}
+        {averageConfidence !== null ? <Badge>Avg confidence {averageConfidence}/100</Badge> : null}
+      </div>
       {sources.length ? (
-        <div className="mt-2 grid gap-2 md:grid-cols-2">
-          {sources.map((source) => (
-            <EvidenceSourceCard key={source.id} source={source} />
-          ))}
-        </div>
+        <>
+          <div className="mt-2 rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">
+            <div>
+              Glowne typy evidence: {evidenceKinds.length ? evidenceKinds.map(evidenceKindLabel).join(", ") : "brak klasyfikacji"}.
+            </div>
+            {conflictSummary ? <div className="mt-1 text-amber-800">{conflictSummary}</div> : null}
+          </div>
+          <div className="mt-3 space-y-3">
+            {groups.map((group) => (
+              <section key={group.label} className="rounded-md border border-border bg-background p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <h5 className="text-sm font-semibold">{group.label}</h5>
+                  <Badge>{group.sources.length}</Badge>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {group.sources.map((source) => (
+                    <EvidenceSourceCard key={source.id} source={source} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </>
       ) : (
         <p className="mt-2 rounded-md border border-dashed border-border bg-muted p-3 text-sm text-muted-foreground">
-          {emptyText}
+          {emptyText} Research moze byc wylaczony, provider mogl nie zwrocic wynikow albo uzyto cache bez zapisanych zrodel.
         </p>
       )}
     </div>
   );
+}
+
+function evidenceKindLabel(kind: string | null) {
+  const labels: Record<string, string> = {
+    demand_signal: "Demand",
+    pain_point: "Pain points",
+    alternative: "Alternatives",
+    competitor: "Competitors",
+    pricing: "Pricing",
+    manual_workflow: "Manual workflow",
+    automation_request: "Automation",
+    risk: "Risks",
+    technical_context: "Technical context",
+    launch_signal: "Launch signal",
+    other: "Other"
+  };
+  return kind ? labels[kind] ?? kind : "Other";
+}
+
+function evidenceGroup(source: EvidenceSourceItem) {
+  if (source.evidenceKind === "demand_signal" || source.evidenceKind === "launch_signal") {
+    return "Demand";
+  }
+  if (source.evidenceKind === "pain_point") {
+    return "Pain points";
+  }
+  if (source.evidenceKind === "alternative" || source.evidenceKind === "competitor" || source.evidenceKind === "pricing") {
+    return "Alternatives / competitors";
+  }
+  if (source.evidenceKind === "manual_workflow" || source.evidenceKind === "automation_request") {
+    return "Manual workflow / automation";
+  }
+  if (source.evidenceKind === "risk") {
+    return "Risks";
+  }
+  return "Other";
+}
+
+function groupEvidenceSources(sources: EvidenceSourceItem[]) {
+  const order = ["Demand", "Pain points", "Alternatives / competitors", "Manual workflow / automation", "Risks", "Other"];
+  return order
+    .map((label) => ({
+      label,
+      sources: sources.filter((source) => evidenceGroup(source) === label)
+    }))
+    .filter((group) => group.sources.length);
+}
+
+function hasMixedEvidenceSentiment(sources: EvidenceSourceItem[]) {
+  const sentiments = new Set(sources.map((source) => source.sentiment?.toLowerCase()).filter(Boolean));
+  return sentiments.has("positive") && (sentiments.has("negative") || sentiments.has("mixed"));
 }
 
 function EvidenceSourceCard({ source }: { source: EvidenceSourceItem }) {
@@ -1054,6 +1143,8 @@ function EvidenceSourceCard({ source }: { source: EvidenceSourceItem }) {
     <>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Badge>{source.sourceType}</Badge>
+        {source.evidenceKind ? <Badge>{evidenceKindLabel(source.evidenceKind)}</Badge> : null}
+        {source.sourceConfidence !== null ? <Badge>Conf {source.sourceConfidence}/100</Badge> : null}
         {source.sentiment ? <Badge className={sentimentClass(source.sentiment)}>{source.sentiment}</Badge> : null}
         {source.relevanceScore !== null ? <Badge>Rel {source.relevanceScore}/100</Badge> : null}
         {!safeUrl ? <Badge>URL blocked</Badge> : null}
@@ -1062,6 +1153,7 @@ function EvidenceSourceCard({ source }: { source: EvidenceSourceItem }) {
       <p className="mt-1 text-xs text-muted-foreground">
         {[source.publisher, source.publishedAt ? formatDate(source.publishedAt) : null].filter(Boolean).join(" | ")}
       </p>
+      {source.whatItProves ? <p className="mt-2 rounded border border-border bg-muted px-2 py-1 text-xs">{source.whatItProves}</p> : null}
       <p className="mt-2 line-clamp-4 text-muted-foreground">{source.snippet}</p>
     </>
   );

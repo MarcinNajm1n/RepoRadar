@@ -16,6 +16,11 @@ describe("getConfig", () => {
     delete process.env.ENABLE_OPENAI_WEB_SEARCH_SOURCE;
     delete process.env.ENABLE_REDDIT_SOURCE;
     delete process.env.ENABLE_BLUESKY_SOURCE;
+    delete process.env.EXTERNAL_RESEARCH_CACHE_TTL_HOURS;
+    delete process.env.MARKET_RESEARCH_MAX_ITEMS_PER_PROVIDER;
+    delete process.env.MARKET_RESEARCH_MIN_INDEPENDENT_SOURCES;
+    delete process.env.MARKET_RESEARCH_MIN_SOURCE_CONFIDENCE;
+    delete process.env.MARKET_RESEARCH_ENABLE_EVIDENCE_RANKING;
 
     const config = getConfig();
 
@@ -26,6 +31,11 @@ describe("getConfig", () => {
     expect(config.enableOpenAiWebSearchSource).toBe(true);
     expect(config.enableRedditSource).toBe(false);
     expect(config.enableBlueskySource).toBe(false);
+    expect(config.externalResearchCacheTtlHours).toBe(24);
+    expect(config.marketResearchMaxItemsPerProvider).toBe(4);
+    expect(config.marketResearchMinIndependentSources).toBe(2);
+    expect(config.marketResearchMinSourceConfidence).toBe(50);
+    expect(config.marketResearchEnableEvidenceRanking).toBe(true);
   });
 
   it("falls back unknown market research mode to light", () => {

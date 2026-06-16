@@ -1,5 +1,18 @@
 export type MarketResearchMode = "light" | "full";
 
+export type EvidenceKind =
+  | "demand_signal"
+  | "pain_point"
+  | "alternative"
+  | "competitor"
+  | "pricing"
+  | "manual_workflow"
+  | "automation_request"
+  | "risk"
+  | "technical_context"
+  | "launch_signal"
+  | "other";
+
 export type MarketResearchSourceInput = {
   sourceType: string;
   title: string;
@@ -9,6 +22,13 @@ export type MarketResearchSourceInput = {
   snippet: string;
   sentiment?: string | null;
   relevanceScore?: number | null;
+  canonicalUrl?: string | null;
+  sourceKey?: string | null;
+  evidenceKind?: EvidenceKind | string | null;
+  whatItProves?: string | null;
+  sourceConfidence?: number | null;
+  sourceRank?: number | null;
+  providerItemId?: string | null;
 };
 
 export type MarketResearchResult = {
@@ -21,6 +41,11 @@ export type MarketResearchResult = {
   validationRisks: string[];
   confidenceScore: number | null;
   sources: MarketResearchSourceInput[];
+  queries?: string[];
+  providers?: string[];
+  independentSourceCount?: number;
+  evidenceSummary?: string | null;
+  conflictSummary?: string | null;
 };
 
 export type StoredMarketResearch = MarketResearchResult & {

@@ -56,7 +56,14 @@ function sanitizeSource(value: unknown): MarketResearchSourceInput | null {
     publishedAt: publishedAt || null,
     snippet,
     sentiment: sanitizeExternalText(String(record.sentiment ?? ""), 40),
-    relevanceScore: numberOrNull(record.relevanceScore, 0, 100)
+    relevanceScore: numberOrNull(record.relevanceScore, 0, 100),
+    canonicalUrl: sanitizeExternalUrl(String(record.canonicalUrl ?? "")),
+    sourceKey: sanitizeExternalText(String(record.sourceKey ?? ""), 240),
+    evidenceKind: sanitizeExternalText(String(record.evidenceKind ?? ""), 80),
+    whatItProves: sanitizeExternalText(String(record.whatItProves ?? ""), 400),
+    sourceConfidence: numberOrNull(record.sourceConfidence, 0, 100),
+    sourceRank: numberOrNull(record.sourceRank, 0, 200),
+    providerItemId: sanitizeExternalText(String(record.providerItemId ?? ""), 240)
   };
 }
 
@@ -77,7 +84,12 @@ export function parseMarketResearchResult(provider: string, content: string, max
     demandEvidence: stringArray(parsed.demandEvidence, 8, 300),
     validationRisks: stringArray(parsed.validationRisks, 8, 300),
     confidenceScore: numberOrNull(parsed.confidenceScore, 1, 5),
-    sources
+    sources,
+    queries: stringArray(parsed.queries, 12, 180),
+    providers: stringArray(parsed.providers, 8, 80),
+    independentSourceCount: numberOrNull(parsed.independentSourceCount, 0, 100) ?? undefined,
+    evidenceSummary: sanitizeExternalText(String(parsed.evidenceSummary ?? ""), 1200),
+    conflictSummary: sanitizeExternalText(String(parsed.conflictSummary ?? ""), 1200)
   };
 }
 

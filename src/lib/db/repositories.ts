@@ -45,6 +45,12 @@ type EvidenceSourceRecord = {
   snippet: string;
   sentiment: string | null;
   relevanceScore: number | null;
+  canonicalUrl: string | null;
+  sourceKey: string | null;
+  evidenceKind: string | null;
+  whatItProves: string | null;
+  sourceConfidence: number | null;
+  sourceRank: number | null;
 };
 
 export function mapEvidenceSource(source: EvidenceSourceRecord): EvidenceSourceItem {
@@ -58,7 +64,13 @@ export function mapEvidenceSource(source: EvidenceSourceRecord): EvidenceSourceI
     publishedAt: source.publishedAt?.toISOString() ?? null,
     snippet: source.snippet,
     sentiment: source.sentiment,
-    relevanceScore: source.relevanceScore
+    relevanceScore: source.relevanceScore,
+    canonicalUrl: source.canonicalUrl,
+    sourceKey: source.sourceKey,
+    evidenceKind: source.evidenceKind,
+    whatItProves: source.whatItProves,
+    sourceConfidence: source.sourceConfidence,
+    sourceRank: source.sourceRank
   };
 }
 
@@ -176,8 +188,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       include: {
         repository: { select: { fullName: true } },
         marketResearchSources: {
-          orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
-          take: 6
+          orderBy: [{ sourceRank: "desc" }, { sourceConfidence: "desc" }, { relevanceScore: "desc" }, { retrievedAt: "desc" }],
+          take: 10
         }
       }
     }),
@@ -338,7 +350,7 @@ export async function getTopRepositories(limit = 20) {
 export async function getEvidenceSourcesForReport(reportId: string) {
   const sources = await prisma.marketResearchSource.findMany({
     where: { reportId },
-    orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
+    orderBy: [{ sourceRank: "desc" }, { sourceConfidence: "desc" }, { relevanceScore: "desc" }, { retrievedAt: "desc" }],
     take: 10
   });
 

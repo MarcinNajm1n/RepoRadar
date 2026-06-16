@@ -133,11 +133,22 @@ export async function dispatchOpportunityCandidateNotification(candidateId: stri
         }
       },
       marketResearchSources: {
-        orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
+        orderBy: [{ sourceRank: "desc" }, { sourceConfidence: "desc" }, { relevanceScore: "desc" }, { retrievedAt: "desc" }],
         take: 6
       }
     }
   });
+  const independentSourceCount = new Set(
+    candidate.marketResearchSources
+      .map((source) => source.publisher || source.sourceType || source.canonicalUrl || source.sourceKey)
+      .filter(Boolean)
+  ).size;
+  const confidenceValues = candidate.marketResearchSources
+    .map((source) => source.sourceConfidence)
+    .filter((score): score is number => typeof score === "number");
+  const averageSourceConfidence = confidenceValues.length
+    ? Math.round(confidenceValues.reduce((sum, score) => sum + score, 0) / confidenceValues.length)
+    : null;
 
   const text = [
     candidate.title,
@@ -155,6 +166,8 @@ export async function dispatchOpportunityCandidateNotification(candidateId: stri
       opportunityScore: candidate.opportunityScore,
       confidenceScore: candidate.confidenceScore,
       sourceCount: candidate.marketResearchSources.length,
+      independentSourceCount,
+      averageSourceConfidence,
       text
     })
   ) {

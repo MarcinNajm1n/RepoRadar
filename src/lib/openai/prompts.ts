@@ -46,7 +46,7 @@ export function buildMarketResearchPrompt(maxSources: number, mode: "light" | "f
     "Nie uzywaj researchu do liczenia trend_score. Nie wysylaj ani nie pros o sekrety.",
     "Uwzglednij Reddit, X/Twitter i LinkedIn tylko jesli sa dostepne jako publiczne wyniki web search; nie zakladaj dostepu do prywatnych API.",
     `Zwroc wylacznie poprawny JSON. Maksymalnie ${maxSources} zrodel.`,
-    "Schema: {\"summary\":\"string\",\"signals\":[\"string\"],\"userProblems\":[\"string\"],\"sentiment\":\"positive|neutral|mixed|negative\",\"demandEvidence\":[\"string\"],\"validationRisks\":[\"string\"],\"confidenceScore\":1,\"sources\":[{\"sourceType\":\"web|reddit|x|linkedin|hn|article|docs\",\"title\":\"string\",\"url\":\"https://...\",\"publisher\":\"string\",\"publishedAt\":\"YYYY-MM-DD or null\",\"snippet\":\"string\",\"sentiment\":\"positive|neutral|mixed|negative\",\"relevanceScore\":0}]}.",
+    "Schema: {\"summary\":\"string\",\"signals\":[\"string\"],\"userProblems\":[\"string\"],\"sentiment\":\"positive|neutral|mixed|negative\",\"demandEvidence\":[\"string\"],\"validationRisks\":[\"string\"],\"confidenceScore\":1,\"sources\":[{\"sourceType\":\"web|reddit|x|linkedin|hn|article|docs\",\"title\":\"string\",\"url\":\"https://...\",\"publisher\":\"string\",\"publishedAt\":\"YYYY-MM-DD or null\",\"snippet\":\"string\",\"sentiment\":\"positive|neutral|mixed|negative\",\"relevanceScore\":0,\"evidenceKind\":\"pain_point|demand_signal|alternative|pricing|risk|other\",\"whatItProves\":\"string\"}]}.",
     "Kazde zrodlo musi miec prawdziwy URL i krotki snippet. Jesli nie da sie potwierdzic danych, napisz to w summary i ogranicz confidenceScore."
   ].join("\n");
 }
@@ -66,7 +66,13 @@ export function formatMarketResearchForPrompt(input: {
     snippet: string;
     sentiment?: string | null;
     relevanceScore?: number | null;
+    evidenceKind?: string | null;
+    sourceConfidence?: number | null;
+    whatItProves?: string | null;
   }>;
+  independentSourceCount?: number;
+  evidenceSummary?: string | null;
+  conflictSummary?: string | null;
 }) {
   if (!input.summary && input.sources.length === 0) {
     return "Market research: brak danych albo research wylaczony.";
@@ -76,9 +82,13 @@ export function formatMarketResearchForPrompt(input: {
     .map((source, index) => {
       const publisher = source.publisher ? `, publisher: ${source.publisher}` : "";
       const sentiment = source.sentiment ? `, sentiment: ${source.sentiment}` : "";
+      const evidenceKind = source.evidenceKind ? `, evidence: ${source.evidenceKind}` : "";
+      const sourceConfidence =
+        source.sourceConfidence === null || source.sourceConfidence === undefined ? "" : `, source confidence: ${source.sourceConfidence}/100`;
       const relevance =
         source.relevanceScore === null || source.relevanceScore === undefined ? "" : `, relevance: ${source.relevanceScore}/100`;
-      return `${index + 1}. ${source.title} (${source.url}${publisher}${sentiment}${relevance}) - ${source.snippet}`;
+      const proof = source.whatItProves ? ` Proof: ${source.whatItProves}` : "";
+      return `${index + 1}. ${source.title} (${source.url}${publisher}${sentiment}${evidenceKind}${sourceConfidence}${relevance}) - ${source.snippet}${proof}`;
     })
     .join("\n");
 
@@ -87,6 +97,9 @@ export function formatMarketResearchForPrompt(input: {
       `Market summary: ${input.summary || "brak"}`,
       `Sentiment: ${input.sentiment}`,
       `Confidence: ${input.confidenceScore ?? "brak"}/5`,
+      `Evidence quality: ${input.evidenceSummary ?? "brak"}`,
+      `Independent sources: ${input.independentSourceCount ?? "brak"}`,
+      `Conflict summary: ${input.conflictSummary ?? "brak"}`,
       `Signals: ${input.signals.join(" | ") || "brak"}`,
       `User problems: ${input.userProblems.join(" | ") || "brak"}`,
       `Demand evidence: ${input.demandEvidence.join(" | ") || "brak"}`,

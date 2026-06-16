@@ -77,6 +77,33 @@ describe("opportunity scoring", () => {
     expect(result.breakdown.confidencePoints).toBeGreaterThan(0);
     expect(result.breakdown.b2bFitPoints).toBeGreaterThan(0);
     expect(result.breakdown.timeSavingPoints).toBeGreaterThan(0);
+    expect(result.breakdown.evidenceQualityPoints).toBeGreaterThan(0);
     expect(result.breakdown.competitionPenalty).toBeLessThanOrEqual(0);
+  });
+
+  it("blocks excellent opportunity notifications when evidence quality is weak", () => {
+    const text = "B2B devtools automation saves time and cost for teams";
+
+    expect(
+      isExcellentOpportunity({
+        opportunityScore: 90,
+        confidenceScore: 4,
+        sourceCount: 3,
+        independentSourceCount: 1,
+        averageSourceConfidence: 80,
+        text
+      })
+    ).toBe(false);
+
+    expect(
+      isExcellentOpportunity({
+        opportunityScore: 90,
+        confidenceScore: 4,
+        sourceCount: 3,
+        independentSourceCount: 3,
+        averageSourceConfidence: 30,
+        text
+      })
+    ).toBe(false);
   });
 });

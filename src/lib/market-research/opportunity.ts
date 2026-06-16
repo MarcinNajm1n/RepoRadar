@@ -1,5 +1,6 @@
 import { getConfig } from "@/lib/config";
 import { clamp, sanitizeExternalText } from "@/lib/utils";
+import { summarizeEvidenceQuality } from "./evidence";
 import type { MarketResearchResult } from "./types";
 
 const BUSINESS_KEYWORDS = [
@@ -29,7 +30,16 @@ export type OpportunityScoreInput = {
   starsCurrent: number;
   research: Pick<
     MarketResearchResult,
-    "sources" | "signals" | "userProblems" | "demandEvidence" | "validationRisks" | "confidenceScore" | "sentiment" | "summary"
+    | "sources"
+    | "signals"
+    | "userProblems"
+    | "demandEvidence"
+    | "validationRisks"
+    | "confidenceScore"
+    | "sentiment"
+    | "summary"
+    | "independentSourceCount"
+    | "conflictSummary"
   >;
 };
 
@@ -40,8 +50,12 @@ export type OpportunityScoreBreakdown = {
   problemClarityPoints: number;
   timeSavingPoints: number;
   mvpFeasibilityPoints: number;
+  evidenceQualityPoints: number;
   competitionPenalty: number;
   customerAcquisitionPenalty: number;
+  conflictPenalty: number;
+  lowDiversityPenalty: number;
+  lowConfidencePenalty: number;
 };
 
 function keywordScore(text: string, keywords: string[]) {
@@ -67,6 +81,13 @@ export function calculateOpportunityScoreWithBreakdown(input: OpportunityScoreIn
   const confidenceScore = clamp((input.research.confidenceScore ?? 1) / 5, 0, 1);
   const problemScore = clamp(input.research.userProblems.length / 4, 0, 1);
   const demandScore = clamp(input.research.demandEvidence.length / 4, 0, 1);
+  const quality = summarizeEvidenceQuality(input.research.sources);
+  const independentSourceCount = input.research.independentSourceCount ?? quality.independentSourceCount;
+  const averageSourceConfidence = quality.averageSourceConfidence ?? 0;
+  const evidenceKinds = new Set(input.research.sources.map((source) => source.evidenceKind).filter(Boolean));
+  const evidenceKindCoverage = ["pain_point", "demand_signal", "automation_request", "manual_workflow"].filter((kind) =>
+    evidenceKinds.has(kind)
+  ).length;
   const businessFitScore = keywordScore(evidenceText, BUSINESS_KEYWORDS);
   const savingsScore = keywordScore(evidenceText, SAVINGS_KEYWORDS);
   const mvpFeasibilityScore = keywordScore(evidenceText, [
@@ -87,6 +108,10 @@ export function calculateOpportunityScoreWithBreakdown(input: OpportunityScoreIn
     8,
     penaltyScore(evidenceText, ["unclear buyer", "hard to sell", "no budget", "consumer", "hobby"]) * 4
   );
+  const conflictPenalty = input.research.conflictSummary || quality.conflictSummary ? -8 : 0;
+  const lowDiversityPenalty = independentSourceCount < getConfig().marketResearchMinIndependentSources ? -10 : 0;
+  const lowConfidencePenalty =
+    input.research.sources.length && averageSourceConfidence < getConfig().marketResearchMinSourceConfidence ? -10 : 0;
   const breakdown: OpportunityScoreBreakdown = {
     sourcePoints: Math.round(18 * sourceCountScore),
     confidencePoints: Math.round(18 * confidenceScore),
@@ -94,8 +119,19 @@ export function calculateOpportunityScoreWithBreakdown(input: OpportunityScoreIn
     problemClarityPoints: Math.round(16 * problemScore),
     timeSavingPoints: Math.round(14 * savingsScore),
     mvpFeasibilityPoints: Math.round(12 * Math.max(mvpFeasibilityScore, demandScore * 0.6)),
+    evidenceQualityPoints: Math.round(
+      15 *
+        Math.max(
+          clamp(independentSourceCount / Math.max(1, getConfig().marketResearchMinIndependentSources + 1), 0, 1),
+          clamp(averageSourceConfidence / 100, 0, 1) * 0.7,
+          clamp(evidenceKindCoverage / 3, 0, 1)
+        )
+    ),
     competitionPenalty,
-    customerAcquisitionPenalty
+    customerAcquisitionPenalty,
+    conflictPenalty,
+    lowDiversityPenalty,
+    lowConfidencePenalty
   };
   const total =
     breakdown.sourcePoints +
@@ -104,8 +140,12 @@ export function calculateOpportunityScoreWithBreakdown(input: OpportunityScoreIn
     breakdown.problemClarityPoints +
     breakdown.timeSavingPoints +
     breakdown.mvpFeasibilityPoints +
+    breakdown.evidenceQualityPoints +
     breakdown.competitionPenalty +
-    breakdown.customerAcquisitionPenalty;
+    breakdown.customerAcquisitionPenalty +
+    breakdown.conflictPenalty +
+    breakdown.lowDiversityPenalty +
+    breakdown.lowConfidencePenalty;
 
   return {
     score: Math.round(clamp(total, 0, 100)),
@@ -117,12 +157,23 @@ export function calculateOpportunityScore(input: OpportunityScoreInput) {
   return calculateOpportunityScoreWithBreakdown(input).score;
 }
 
-export function isExcellentOpportunity(input: { opportunityScore: number | null; confidenceScore: number | null; sourceCount: number; text: string }) {
+export function isExcellentOpportunity(input: {
+  opportunityScore: number | null;
+  confidenceScore: number | null;
+  sourceCount: number;
+  text: string;
+  independentSourceCount?: number | null;
+  averageSourceConfidence?: number | null;
+}) {
   const config = getConfig();
+  const independentSourceCount = input.independentSourceCount ?? input.sourceCount;
+  const averageSourceConfidence = input.averageSourceConfidence ?? 100;
   return (
     (input.opportunityScore ?? 0) >= config.opportunityNotificationMinScore &&
     (input.confidenceScore ?? 0) >= config.opportunityMinConfidence &&
     input.sourceCount >= config.opportunityMinSources &&
+    independentSourceCount >= config.marketResearchMinIndependentSources &&
+    averageSourceConfidence >= config.marketResearchMinSourceConfidence &&
     keywordScore(input.text, BUSINESS_KEYWORDS) > 0 &&
     keywordScore(input.text, SAVINGS_KEYWORDS) > 0
   );

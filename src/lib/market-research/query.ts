@@ -1,5 +1,20 @@
 import { sanitizeExternalText, sanitizeExternalUrl } from "@/lib/utils";
-import type { MarketResearchContext, MarketResearchSourceInput } from "./types";
+import type { MarketResearchContext, MarketResearchMode, MarketResearchSourceInput } from "./types";
+
+export type ResearchQueryIntent =
+  | "base"
+  | "pain"
+  | "alternatives"
+  | "pricing"
+  | "manual_workflow"
+  | "automation"
+  | "competitors"
+  | "risks";
+
+export type ResearchQuerySpec = {
+  query: string;
+  intent: ResearchQueryIntent;
+};
 
 const STOP_WORDS = new Set([
   "and",
@@ -32,28 +47,48 @@ function tokenize(value: string | null | undefined) {
     .filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
 }
 
-export function buildResearchQueries(context: MarketResearchContext) {
+export function buildResearchQuerySpecs(context: MarketResearchContext, mode: MarketResearchMode = context.mode ?? "light") {
   const repoName = getRepoShortName(context.fullName);
   const topicTerms = context.topics.slice(0, 4).join(" ");
   const descriptionTerms = tokenize(context.description).slice(0, 6).join(" ");
   const base = [repoName, topicTerms, descriptionTerms].filter(Boolean).join(" ");
   const topic = topicTerms || repoName;
 
-  const queries = [
-    base,
-    `${repoName} problem pain`,
-    `${repoName} alternatives pricing`,
-    `${repoName} looking for tool`,
-    `${topic} developer workflow pain`,
-    `${topic} manual workflow`,
-    `${topic} how to automate`,
-    `${topic} SaaS automation time saving cost saving`
+  const specs: ResearchQuerySpec[] = [
+    { intent: "base", query: base },
+    { intent: "pain", query: `${repoName} problem pain looking for tool` },
+    { intent: "alternatives", query: `${repoName} alternatives pricing replace` },
+    { intent: "manual_workflow", query: `${topic} manual workflow repetitive process` },
+    { intent: "automation", query: `${topic} SaaS automation time saving cost saving` },
+    { intent: "pricing", query: `${repoName} pricing expensive cost paid subscription` },
+    { intent: "competitors", query: `${repoName} competitor alternative vs replace` },
+    { intent: "risks", query: `${topic} security privacy unreliable vendor lock-in risk` }
   ];
+  const maxQueries = mode === "light" ? 4 : 8;
+  const seen = new Set<string>();
+  const deduped: ResearchQuerySpec[] = [];
 
-  return [...new Set(queries.map((query) => sanitizeExternalText(query, 180)).filter((query): query is string => Boolean(query)))].slice(
-    0,
-    8
-  );
+  for (const spec of specs) {
+    const query = sanitizeExternalText(spec.query, 180);
+    if (!query) {
+      continue;
+    }
+    const key = query.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push({ ...spec, query });
+    if (deduped.length >= maxQueries) {
+      break;
+    }
+  }
+
+  return deduped;
+}
+
+export function buildResearchQueries(context: MarketResearchContext) {
+  return buildResearchQuerySpecs(context, context.mode ?? "light").map((spec) => spec.query);
 }
 
 export function buildPrimaryResearchQuery(context: MarketResearchContext) {

@@ -41,6 +41,11 @@ export type AppConfig = {
   marketResearchMode: "light" | "full";
   marketResearchDailyLimit: number;
   marketResearchMaxSources: number;
+  externalResearchCacheTtlHours: number;
+  marketResearchMaxItemsPerProvider: number;
+  marketResearchMinIndependentSources: number;
+  marketResearchMinSourceConfidence: number;
+  marketResearchEnableEvidenceRanking: boolean;
   enableOpenAiWebSearchSource: boolean;
   enableRssSource: boolean;
   enableBlueskySource: boolean;
@@ -160,6 +165,11 @@ export function getConfig(): AppConfig {
     marketResearchMode: readMarketResearchMode(),
     marketResearchDailyLimit: readNumber("MARKET_RESEARCH_DAILY_LIMIT", 5),
     marketResearchMaxSources: readNumber("MARKET_RESEARCH_MAX_SOURCES", 8),
+    externalResearchCacheTtlHours: readNumber("EXTERNAL_RESEARCH_CACHE_TTL_HOURS", 24),
+    marketResearchMaxItemsPerProvider: readNumber("MARKET_RESEARCH_MAX_ITEMS_PER_PROVIDER", 4),
+    marketResearchMinIndependentSources: readNumber("MARKET_RESEARCH_MIN_INDEPENDENT_SOURCES", 2),
+    marketResearchMinSourceConfidence: readNumber("MARKET_RESEARCH_MIN_SOURCE_CONFIDENCE", 50),
+    marketResearchEnableEvidenceRanking: readBoolean("MARKET_RESEARCH_ENABLE_EVIDENCE_RANKING", true),
     enableOpenAiWebSearchSource: readBoolean("ENABLE_OPENAI_WEB_SEARCH_SOURCE", true),
     enableRssSource: readBoolean("ENABLE_RSS_SOURCE", true),
     enableBlueskySource: readBoolean("ENABLE_BLUESKY_SOURCE", false),
