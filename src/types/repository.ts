@@ -1,3 +1,5 @@
+import type { ActionItemListItem } from "./action-item";
+
 export type ScoreBreakdown = {
   absoluteGrowthPoints: number;
   percentageGrowthPoints: number;
@@ -111,10 +113,78 @@ export type ReportListItem = {
   createdAt: string;
 };
 
+export type DashboardAlert = {
+  id: string;
+  level: "info" | "warning" | "critical";
+  title: string;
+  message: string;
+};
+
+export type SettingsSummary = {
+  githubTokenConfigured: boolean;
+  openAiConfigured: boolean;
+  discordWebhookConfigured: boolean;
+  notificationsEnabled: boolean;
+  windowsNotificationsEnabled: boolean;
+  marketResearchEnabled: boolean;
+  marketResearchMode: "light" | "full";
+  autoOpportunityResearchEnabled: boolean;
+  openAiDailyAnalysisLimit: number;
+  marketResearchDailyLimit: number;
+  externalResearchCacheTtlHours: number;
+  reportsDir: string;
+  persistedSettingCount: number;
+};
+
+export type NotificationLogItem = {
+  id: string;
+  channel: string;
+  eventType: string;
+  status: string;
+  maskedTarget: string | null;
+  error: string | null;
+  createdAt: string;
+};
+
+export type NotificationSummary = {
+  sent24h: number;
+  failed24h: number;
+  skipped24h: number;
+  lastResults: NotificationLogItem[];
+};
+
+export type DashboardLastScan = {
+  startedAt: string;
+  finishedAt: string | null;
+  status: string;
+  reposFound: number;
+  reposUpdated: number;
+  errorMessage: string | null;
+} | null;
+
+export type RadarTodayData = {
+  generatedAt: string;
+  topRepositories: RepositoryListItem[];
+  newGems: RepositoryListItem[];
+  highInitialMomentum: RepositoryListItem[];
+  businessCandidates: IdeaListItem[];
+  ideasToDevelop: IdeaListItem[];
+  actionItems: ActionItemListItem[];
+  scanChanges: {
+    lastScan: DashboardLastScan;
+    latestRepositories: RepositoryListItem[];
+  };
+  alerts: DashboardAlert[];
+};
+
 export type DashboardData = {
   repositories: RepositoryListItem[];
   ideas: IdeaListItem[];
+  actionItems: ActionItemListItem[];
   weeklyReports: ReportListItem[];
+  radarToday: RadarTodayData;
+  settingsSummary: SettingsSummary;
+  notificationSummary: NotificationSummary;
   counts: {
     all: number;
     new: number;
@@ -129,14 +199,7 @@ export type DashboardData = {
     old: number;
     hot: number;
   };
-  lastScan: {
-    startedAt: string;
-    finishedAt: string | null;
-    status: string;
-    reposFound: number;
-    reposUpdated: number;
-    errorMessage: string | null;
-  } | null;
+  lastScan: DashboardLastScan;
 };
 
 export type RepositoryFilters = {

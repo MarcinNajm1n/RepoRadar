@@ -14,6 +14,7 @@ export type RepositoryStatus = keyof typeof REPOSITORY_STATUSES;
 
 export const REPORT_TYPES = {
   DAILY: "daily",
+  DAILY_BRIEFING: "daily_briefing",
   WEEKLY: "weekly",
   REPO: "repo"
 } as const;

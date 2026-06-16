@@ -1,14 +1,23 @@
 import { prisma } from "./client";
+import { getConfig } from "@/lib/config";
 import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
 import type { IdeaStatus } from "@/types/idea-status";
+import { getActionItems } from "./action-items";
+import { getAllSettings } from "./settings";
+import type { ActionItemListItem } from "@/types/action-item";
 import type {
   DashboardData,
+  DashboardLastScan,
   EvidenceSourceItem,
   IdeaListItem,
+  NotificationLogItem,
+  NotificationSummary,
+  RadarTodayData,
   ReportListItem,
-  RepositoryListItem
+  RepositoryListItem,
+  SettingsSummary
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
 
@@ -51,6 +60,16 @@ type EvidenceSourceRecord = {
   whatItProves: string | null;
   sourceConfidence: number | null;
   sourceRank: number | null;
+};
+
+type NotificationLogRecord = {
+  id: string;
+  channel: string;
+  eventType: string;
+  status: string;
+  maskedTarget: string | null;
+  error: string | null;
+  createdAt: Date;
 };
 
 export function mapEvidenceSource(source: EvidenceSourceRecord): EvidenceSourceItem {
@@ -167,8 +186,215 @@ function mapReport(report: Awaited<ReturnType<typeof prisma.report.findMany>>[nu
   };
 }
 
+function mapNotificationLog(log: NotificationLogRecord): NotificationLogItem {
+  return {
+    id: log.id,
+    channel: log.channel,
+    eventType: log.eventType,
+    status: log.status,
+    maskedTarget: log.maskedTarget,
+    error: log.error,
+    createdAt: log.createdAt.toISOString()
+  };
+}
+
+function mapLastScan(scan: Awaited<ReturnType<typeof prisma.scanRun.findFirst>>): DashboardLastScan {
+  return scan
+    ? {
+        startedAt: scan.startedAt.toISOString(),
+        finishedAt: scan.finishedAt?.toISOString() ?? null,
+        status: scan.status,
+        reposFound: scan.reposFound,
+        reposUpdated: scan.reposUpdated,
+        errorMessage: scan.errorMessage
+      }
+    : null;
+}
+
+function sortRepositoriesByStrength(a: RepositoryListItem, b: RepositoryListItem) {
+  return (
+    b.trendScore - a.trendScore ||
+    b.initialMomentumScore - a.initialMomentumScore ||
+    b.relevanceScore - a.relevanceScore ||
+    b.starsCurrent - a.starsCurrent
+  );
+}
+
+function sortIdeasByOpportunity(a: IdeaListItem, b: IdeaListItem) {
+  return (
+    (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0) ||
+    (b.confidenceScore ?? 0) - (a.confidenceScore ?? 0) ||
+    b.usefulnessScore - a.usefulnessScore ||
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+function isActionItemVisibleNow(item: ActionItemListItem, now: Date) {
+  if (item.status === "DONE" || item.status === "DISMISSED") {
+    return false;
+  }
+
+  if (item.status !== "SNOOZED") {
+    return true;
+  }
+
+  return !item.snoozedUntil || new Date(item.snoozedUntil).getTime() <= now.getTime();
+}
+
+export function buildRadarToday(
+  input: {
+    repositories: RepositoryListItem[];
+    ideas: IdeaListItem[];
+    actionItems: ActionItemListItem[];
+    lastScan: DashboardLastScan;
+    settingsSummary: SettingsSummary;
+    notificationSummary: NotificationSummary;
+  },
+  limit = 5,
+  now = new Date()
+): RadarTodayData {
+  const activeRepositories = input.repositories.filter((repo) => repo.status !== "IGNORED" && !repo.isDeletedFromView);
+  const topRepositories = [...activeRepositories].sort(sortRepositoriesByStrength).slice(0, limit);
+  const newGems = [...activeRepositories]
+    .filter((repo) => repo.status === "NEW")
+    .sort(sortRepositoriesByStrength)
+    .slice(0, limit);
+  const highInitialMomentum = [...activeRepositories]
+    .filter((repo) => repo.initialMomentumScore > 0)
+    .sort((a, b) => b.initialMomentumScore - a.initialMomentumScore || sortRepositoriesByStrength(a, b))
+    .slice(0, limit);
+  const businessCandidates = input.ideas
+    .filter((idea) => idea.status === IDEA_STATUS.CANDIDATE)
+    .sort(sortIdeasByOpportunity)
+    .slice(0, limit);
+  const ideasToDevelop = input.ideas
+    .filter((idea) => FULL_IDEA_STATUSES.includes(idea.status) || idea.status === IDEA_STATUS.SAVED)
+    .sort(sortIdeasByOpportunity)
+    .slice(0, limit);
+  const latestRepositories = [...activeRepositories]
+    .sort((a, b) => new Date(b.firstSeenAt).getTime() - new Date(a.firstSeenAt).getTime())
+    .slice(0, limit);
+  const actionItems = input.actionItems
+    .filter((item) => isActionItemVisibleNow(item, now))
+    .sort(
+      (a, b) =>
+        b.priority - a.priority ||
+        new Date(a.dueAt ?? "9999-12-31T00:00:00.000Z").getTime() -
+          new Date(b.dueAt ?? "9999-12-31T00:00:00.000Z").getTime() ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    .slice(0, limit);
+  const alerts: RadarTodayData["alerts"] = [];
+
+  if (input.lastScan?.status === "FAILED") {
+    alerts.push({
+      id: "last-scan-failed",
+      level: "critical",
+      title: "Ostatni scan nie powiodl sie",
+      message: input.lastScan.errorMessage ?? "Sprawdz logi skanu i konfiguracje GitHub."
+    });
+  }
+  if (!input.settingsSummary.githubTokenConfigured) {
+    alerts.push({
+      id: "github-token-missing",
+      level: "warning",
+      title: "Brak GitHub token",
+      message: "Skan moze szybciej trafic w rate limit bez lokalnego GITHUB_TOKEN."
+    });
+  }
+  if (!input.settingsSummary.openAiConfigured) {
+    alerts.push({
+      id: "openai-missing",
+      level: "info",
+      title: "OpenAI nie jest skonfigurowane",
+      message: "Raporty AI i pelne pomysly beda niedostepne do czasu ustawienia OPENAI_API_KEY."
+    });
+  }
+  if (input.settingsSummary.autoOpportunityResearchEnabled) {
+    alerts.push({
+      id: "auto-research-enabled",
+      level: "warning",
+      title: "Auto research jest wlaczony",
+      message: "Kontroluj dzienne limity, bo automatyczny research moze uzywac platnych API."
+    });
+  }
+  if (input.notificationSummary.failed24h > 0) {
+    alerts.push({
+      id: "notification-failures",
+      level: "warning",
+      title: "Nieudane powiadomienia",
+      message: `${input.notificationSummary.failed24h} powiadomien nie powiodlo sie w ostatnich 24h.`
+    });
+  }
+
+  return {
+    generatedAt: now.toISOString(),
+    topRepositories,
+    newGems,
+    highInitialMomentum,
+    businessCandidates,
+    ideasToDevelop,
+    actionItems,
+    scanChanges: {
+      lastScan: input.lastScan,
+      latestRepositories
+    },
+    alerts: alerts.slice(0, limit)
+  };
+}
+
+async function getSettingsSummary(): Promise<SettingsSummary> {
+  const config = getConfig();
+  const persistedSettings = await getAllSettings();
+
+  return {
+    githubTokenConfigured: Boolean(config.githubToken),
+    openAiConfigured: Boolean(config.openAiApiKey),
+    discordWebhookConfigured: Boolean(config.discordWebhookUrl),
+    notificationsEnabled: config.enableNotifications,
+    windowsNotificationsEnabled: config.enableWindowsNotifications,
+    marketResearchEnabled: config.marketResearchEnabled,
+    marketResearchMode: config.marketResearchMode,
+    autoOpportunityResearchEnabled: config.enableAutoOpportunityResearch,
+    openAiDailyAnalysisLimit: config.openAiDailyAnalysisLimit,
+    marketResearchDailyLimit: config.marketResearchDailyLimit,
+    externalResearchCacheTtlHours: config.externalResearchCacheTtlHours,
+    reportsDir: config.reportsDir,
+    persistedSettingCount: Object.keys(persistedSettings).length
+  };
+}
+
+async function getNotificationSummary(): Promise<NotificationSummary> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [sent24h, failed24h, skipped24h, lastResults] = await Promise.all([
+    prisma.notificationLog.count({ where: { status: "SENT", createdAt: { gte: since } } }),
+    prisma.notificationLog.count({ where: { status: "FAILED", createdAt: { gte: since } } }),
+    prisma.notificationLog.count({ where: { status: "SKIPPED", createdAt: { gte: since } } }),
+    prisma.notificationLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        channel: true,
+        eventType: true,
+        status: true,
+        maskedTarget: true,
+        error: true,
+        createdAt: true
+      }
+    })
+  ]);
+
+  return {
+    sent24h,
+    failed24h,
+    skipped24h,
+    lastResults: lastResults.map(mapNotificationLog)
+  };
+}
+
 export async function getDashboardData(): Promise<DashboardData> {
-  const [repositories, ideas, weeklyReports, lastScan, counts] = await Promise.all([
+  const [repositories, ideas, actionItems, weeklyReports, lastScan, counts, settingsSummary, notificationSummary] = await Promise.all([
     prisma.repository.findMany({
       orderBy: [{ trendScore: "desc" }, { starsCurrent: "desc" }],
       include: {
@@ -193,6 +419,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         }
       }
     }),
+    getActionItems(),
     prisma.report.findMany({
       where: { type: "weekly" },
       orderBy: { createdAt: "desc" }
@@ -200,24 +427,32 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.scanRun.findFirst({
       orderBy: { startedAt: "desc" }
     }),
-    getCounts()
+    getCounts(),
+    getSettingsSummary(),
+    getNotificationSummary()
   ]);
+  const mappedRepositories = repositories.map(mapRepository);
+  const mappedIdeas = ideas.map(mapIdea);
+  const mappedReports = weeklyReports.map(mapReport);
+  const lastScanSummary = mapLastScan(lastScan);
 
   return {
-    repositories: repositories.map(mapRepository),
-    ideas: ideas.map(mapIdea),
-    weeklyReports: weeklyReports.map(mapReport),
+    repositories: mappedRepositories,
+    ideas: mappedIdeas,
+    actionItems,
+    weeklyReports: mappedReports,
+    radarToday: buildRadarToday({
+      repositories: mappedRepositories,
+      ideas: mappedIdeas,
+      actionItems,
+      lastScan: lastScanSummary,
+      settingsSummary,
+      notificationSummary
+    }),
+    settingsSummary,
+    notificationSummary,
     counts,
-    lastScan: lastScan
-      ? {
-          startedAt: lastScan.startedAt.toISOString(),
-          finishedAt: lastScan.finishedAt?.toISOString() ?? null,
-          status: lastScan.status,
-          reposFound: lastScan.reposFound,
-          reposUpdated: lastScan.reposUpdated,
-          errorMessage: lastScan.errorMessage
-        }
-      : null
+    lastScan: lastScanSummary
   };
 }
 
