@@ -192,3 +192,12 @@ export async function dispatchOpportunityCandidateNotification(candidateId: stri
     ]
   });
 }
+
+export async function dispatchTestNotification() {
+  return sendAndLog({
+    eventType: "test_notification",
+    title: "RepoRadar: test notification",
+    message: "Testowe powiadomienie z lokalnej aplikacji RepoRadar.",
+    repositories: []
+  });
+}

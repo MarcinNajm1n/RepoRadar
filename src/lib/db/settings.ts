@@ -1,12 +1,30 @@
 import { prisma } from "./client";
 import { safeJsonParse } from "@/lib/utils";
 
+const SECRET_SETTING_KEY_PATTERNS = [
+  /api[_-]?key/i,
+  /token/i,
+  /secret/i,
+  /password/i,
+  /webhook/i,
+  /^database[_-]?url$/i,
+  /client[_-]?secret/i
+];
+
+export function isSecretSettingKey(key: string) {
+  return SECRET_SETTING_KEY_PATTERNS.some((pattern) => pattern.test(key));
+}
+
 export async function getSetting(key: string, fallback = "") {
   const setting = await prisma.setting.findUnique({ where: { key } });
   return setting?.value ?? fallback;
 }
 
 export async function setSetting(key: string, value: string) {
+  if (isSecretSettingKey(key)) {
+    throw new Error("Secret-like settings must stay in .env and cannot be stored in SQLite.");
+  }
+
   return prisma.setting.upsert({
     where: { key },
     update: { value },

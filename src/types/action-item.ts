@@ -66,3 +66,23 @@ export type ActionItemListItem = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type CreateActionItemInput = {
+  type: string;
+  title: string;
+  description?: string | null;
+  repoId?: string | null;
+  ideaId?: string | null;
+  reportId?: string | null;
+  priority?: number;
+  dueAt?: string | Date | null;
+  dedupeKey?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type UpdateActionItemInput = Partial<CreateActionItemInput> & {
+  status?: string;
+  snoozedUntil?: string | Date | null;
+  completedAt?: string | Date | null;
+  dismissedAt?: string | Date | null;
+};

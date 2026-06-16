@@ -1,4 +1,4 @@
-export type NotificationEventType = "scan_success" | "scan_failure" | "opportunity_candidate_high";
+export type NotificationEventType = "scan_success" | "scan_failure" | "opportunity_candidate_high" | "test_notification";
 export type NotificationChannel = "windows" | "discord" | "noop";
 
 export type NotificationRepository = {

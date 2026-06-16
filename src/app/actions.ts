@@ -1,14 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  completeActionItem,
+  createActionItem,
+  dismissActionItem,
+  snoozeActionItem,
+  updateActionItem
+} from "@/lib/db/action-items";
 import { getEvidenceSourcesForReport, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
+import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
 import { runDailyScan } from "@/lib/github/scanner";
+import { exportIdeasCsv } from "@/lib/exports/ideas-csv";
+import { clearExpiredExternalCache, clearOldNotificationLogs, pruneOldSnapshots } from "@/lib/maintenance";
+import { dispatchTestNotification } from "@/lib/notifications/dispatcher";
 import {
   generateFullReportForRepository,
   generateIdeaForRepository,
   generateOpportunityCandidateForRepository,
   promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
+import { createDailyBriefing } from "@/lib/reports/briefing";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
 
@@ -82,6 +94,75 @@ export async function createWeeklyReportAction() {
     title: report.title,
     markdownPath: report.markdownPath
   };
+}
+
+export async function createActionItemAction(input: CreateActionItemInput) {
+  const item = await createActionItem(input);
+  revalidatePath("/");
+  return item;
+}
+
+export async function updateActionItemAction(id: string, input: UpdateActionItemInput) {
+  const item = await updateActionItem(id, input);
+  revalidatePath("/");
+  return item;
+}
+
+export async function completeActionItemAction(id: string) {
+  const item = await completeActionItem(id);
+  revalidatePath("/");
+  return item;
+}
+
+export async function snoozeActionItemAction(id: string, snoozedUntil: string) {
+  const item = await snoozeActionItem(id, snoozedUntil);
+  revalidatePath("/");
+  return item;
+}
+
+export async function dismissActionItemAction(id: string) {
+  const item = await dismissActionItem(id);
+  revalidatePath("/");
+  return item;
+}
+
+export async function generateDailyBriefingAction() {
+  const report = await createDailyBriefing();
+  revalidatePath("/");
+  return {
+    id: report.id,
+    title: report.title,
+    markdownPath: report.markdownPath,
+    contentMarkdown: report.contentMarkdown
+  };
+}
+
+export async function clearExpiredExternalCacheAction() {
+  const result = await clearExpiredExternalCache();
+  revalidatePath("/");
+  return result;
+}
+
+export async function clearOldNotificationLogsAction(daysToKeep = 30) {
+  const result = await clearOldNotificationLogs(daysToKeep);
+  revalidatePath("/");
+  return result;
+}
+
+export async function pruneOldSnapshotsAction(options: { daysToKeep?: number; confirmed?: boolean }) {
+  const result = await pruneOldSnapshots(options);
+  revalidatePath("/");
+  return result;
+}
+
+export async function exportIdeasCsvAction() {
+  return exportIdeasCsv();
+}
+
+export async function testNotificationAction() {
+  const results = await dispatchTestNotification();
+  revalidatePath("/");
+  return results;
 }
 
 export async function updateSettingAction(key: string, value: string) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSecretSettingKey,
   parseBooleanSetting,
   parseJsonSetting,
   parseNumberSetting,
@@ -26,5 +27,11 @@ describe("typed setting parsers", () => {
   it("parses json with fallback", () => {
     expect(parseJsonSetting('{"limit":5}', { limit: 1 })).toEqual({ limit: 5 });
     expect(parseJsonSetting("{bad", { limit: 1 })).toEqual({ limit: 1 });
+  });
+
+  it("detects secret-like setting keys", () => {
+    expect(isSecretSettingKey("OPENAI_API_KEY")).toBe(true);
+    expect(isSecretSettingKey("DISCORD_WEBHOOK_URL")).toBe(true);
+    expect(isSecretSettingKey("MARKET_RESEARCH_DAILY_LIMIT")).toBe(false);
   });
 });
