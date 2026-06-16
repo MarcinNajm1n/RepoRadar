@@ -126,6 +126,18 @@ function scoreClass(score: number) {
   return "bg-muted text-muted-foreground";
 }
 
+function discoveryProfileLabel(profile: string) {
+  const labels: Record<string, string> = {
+    fresh_repos: "Fresh repos",
+    fast_momentum: "Fast momentum",
+    established_hot: "Established hot",
+    old_reactivated: "Old reactivated",
+    niche_ai_tools: "Niche AI tools"
+  };
+
+  return labels[profile] ?? profile;
+}
+
 function filterByTab(tab: TabKey, repositories: RepositoryListItem[]) {
   switch (tab) {
     case "new":
@@ -168,6 +180,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [languageFilter, setLanguageFilter] = useState("ALL");
+  const [discoveryProfileFilter, setDiscoveryProfileFilter] = useState("ALL");
   const [minTrend, setMinTrend] = useState(0);
   const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportState>(null);
@@ -228,14 +241,19 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       [...new Set(initialData.repositories.map((repo) => repo.primaryLanguage).filter(Boolean) as string[])].sort(),
     [initialData.repositories]
   );
+  const discoveryProfiles = useMemo(
+    () => [...new Set(initialData.repositories.flatMap((repo) => repo.discoveryProfiles))].sort(),
+    [initialData.repositories]
+  );
 
   const visibleRepositories = useMemo(() => {
     return filterByTab(activeTab, initialData.repositories)
       .filter((repo) => repoMatchesQuery(repo, query))
       .filter((repo) => (statusFilter === "ALL" ? true : repo.status === statusFilter))
       .filter((repo) => (languageFilter === "ALL" ? true : repo.primaryLanguage === languageFilter))
+      .filter((repo) => (discoveryProfileFilter === "ALL" ? true : repo.discoveryProfiles.includes(discoveryProfileFilter)))
       .filter((repo) => repo.trendScore >= minTrend);
-  }, [activeTab, initialData.repositories, languageFilter, minTrend, query, statusFilter]);
+  }, [activeTab, discoveryProfileFilter, initialData.repositories, languageFilter, minTrend, query, statusFilter]);
   const candidates = useMemo(() => initialData.ideas.filter((idea) => idea.status === "CANDIDATE"), [initialData.ideas]);
   const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status !== "CANDIDATE"), [initialData.ideas]);
 
@@ -412,7 +430,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           {activeTab !== "ideas" && activeTab !== "candidates" && activeTab !== "weekly" && activeTab !== "settings" ? (
             <>
               <section className="mb-4 rounded-lg border border-border bg-card p-3">
-                <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_160px]">
+                <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_160px]">
                   <label className="relative">
                     <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
@@ -443,6 +461,18 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                     {languages.map((language) => (
                       <option key={language} value={language}>
                         {language}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+                    value={discoveryProfileFilter}
+                    onChange={(event) => setDiscoveryProfileFilter(event.target.value)}
+                  >
+                    <option value="ALL">Wszystkie profile</option>
+                    {discoveryProfiles.map((profile) => (
+                      <option key={profile} value={profile}>
+                        {discoveryProfileLabel(profile)}
                       </option>
                     ))}
                   </select>
@@ -497,6 +527,11 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                             <p className="mt-3 text-sm text-muted-foreground">Krótki opis PL nie został jeszcze wygenerowany.</p>
                           )}
                           <div className="mt-3 flex flex-wrap gap-2">
+                            {repo.discoveryProfiles.map((profile) => (
+                              <Badge key={profile} className="border-blue-200 bg-blue-50 text-blue-800">
+                                {discoveryProfileLabel(profile)}
+                              </Badge>
+                            ))}
                             {repo.topics.slice(0, 8).map((topic) => (
                               <Badge key={topic}>{topic}</Badge>
                             ))}
@@ -520,8 +555,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                             <Info label="Issues" value={String(repo.openIssues)} />
                             <Info label="Wiek" value={`${repo.ageMonths} mies.`} />
                             <Info label="Relevance" value={`${repo.relevanceScore}/100`} />
+                            <Info label="Initial momentum" value={`${repo.initialMomentumScore}/100`} />
                             <Info label="Źródło" value={repo.source} />
                           </div>
+                          <ScoreBreakdownPanel repo={repo} />
                           <div className="flex flex-wrap gap-2">
                             <Button
                               variant="secondary"
@@ -580,11 +617,12 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                             >
                               <Trash2 className="h-4 w-4" /> Ignoruj
                             </Button>
-                            <a href={repo.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                            <SafeRepoLink url={repo.url} />
+                            {/*
                               <Button variant="ghost" type="button">
                                 <ExternalLink className="h-4 w-4" /> Otwórz na GitHubie
                               </Button>
-                            </a>
+                            */}
                           </div>
                         </div>
                       ) : null}
@@ -941,6 +979,66 @@ function ReportViewer({ content, sources }: { content: string; sources: Evidence
         </section>
       </article>
     </div>
+  );
+}
+
+function ScoreBreakdownPanel({ repo }: { repo: RepositoryListItem }) {
+  const rows = [
+    ["Growth abs", repo.scoreBreakdown.absoluteGrowthPoints],
+    ["Growth %", repo.scoreBreakdown.percentageGrowthPoints],
+    ["Wiek", repo.scoreBreakdown.agePoints],
+    ["Stars", repo.scoreBreakdown.totalStarsPoints],
+    ["Forks", repo.scoreBreakdown.forksPoints],
+    ["Fresh push", repo.scoreBreakdown.pushFreshnessPoints],
+    ["Topics", repo.scoreBreakdown.topicRelevancePoints],
+    ["README", repo.scoreBreakdown.readmeQualityPoints],
+    ["Keywords", repo.scoreBreakdown.keywordRelevancePoints]
+  ] as const;
+
+  return (
+    <div className="mb-4 rounded-md border border-border bg-muted p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold">Dlaczego taki score?</h4>
+        <Badge>Trend {repo.trendScore}/100</Badge>
+        <Badge>Initial momentum {repo.initialMomentumScore}/100</Badge>
+        {repo.discoveryProfiles.map((profile) => (
+          <Badge key={profile}>{discoveryProfileLabel(profile)}</Badge>
+        ))}
+      </div>
+      {repo.growth7d === null ? (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Brak lokalnej historii 7d. RepoRadar pokazuje initial momentum jako osobny fallback, ale nie udaje realnego weekly growth.
+        </p>
+      ) : null}
+      <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-semibold">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SafeRepoLink({ url }: { url: string }) {
+  const safeUrl = sanitizeExternalUrl(url);
+
+  if (!safeUrl || !safeUrl.startsWith("https://github.com/")) {
+    return (
+      <Button variant="ghost" type="button" disabled>
+        <ExternalLink className="h-4 w-4" /> Link zablokowany
+      </Button>
+    );
+  }
+
+  return (
+    <a href={safeUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+      <Button variant="ghost" type="button">
+        <ExternalLink className="h-4 w-4" /> Otworz na GitHubie
+      </Button>
+    </a>
   );
 }
 

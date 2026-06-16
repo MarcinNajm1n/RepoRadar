@@ -1,3 +1,17 @@
+export type ScoreBreakdown = {
+  absoluteGrowthPoints: number;
+  percentageGrowthPoints: number;
+  agePoints: number;
+  totalStarsPoints: number;
+  forksPoints: number;
+  pushFreshnessPoints: number;
+  topicRelevancePoints: number;
+  readmeQualityPoints: number;
+  keywordRelevancePoints: number;
+  initialMomentumPoints: number;
+  usedInitialMomentumFallback: boolean;
+};
+
 export type RepositoryListItem = {
   id: string;
   fullName: string;
@@ -27,6 +41,9 @@ export type RepositoryListItem = {
   lastAnalyzedAt: string | null;
   trendScore: number;
   relevanceScore: number;
+  initialMomentumScore: number;
+  scoreBreakdown: ScoreBreakdown;
+  discoveryProfiles: string[];
   source: string;
   growth24h: number | null;
   growth7d: number | null;

@@ -9,7 +9,7 @@ import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } fro
 import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportunities";
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
-import type { GitHubReadmeResult, GitHubRepositoryItem } from "./types";
+import type { GitHubReadmeResult, GitHubRepositoryItem, GitHubSearchProfile } from "./types";
 
 type ScanOptions = {
   maxPages?: number;
@@ -43,7 +43,12 @@ async function maybeFetchReadme(
   return client.getReadme(item.owner.login, item.name).catch(() => null);
 }
 
-async function upsertRepositoryFromGitHub(item: GitHubRepositoryItem, readme: GitHubReadmeResult | null, now: Date) {
+async function upsertRepositoryFromGitHub(
+  item: GitHubRepositoryItem,
+  readme: GitHubReadmeResult | null,
+  now: Date,
+  matchedProfiles: GitHubSearchProfile[]
+) {
   const config = getConfig();
   const fullName = sanitizeExternalText(item.full_name, 300) ?? item.full_name;
   const owner = sanitizeExternalText(item.owner.login, 180) ?? item.owner.login;
@@ -87,7 +92,8 @@ async function upsertRepositoryFromGitHub(item: GitHubRepositoryItem, readme: Gi
     isArchived: item.archived,
     isFork: item.fork,
     status: ignored ? "IGNORED" : existing?.status ?? "NEW",
-    isDeletedFromView: Boolean(ignored) || existing?.isDeletedFromView === true
+    isDeletedFromView: Boolean(ignored) || existing?.isDeletedFromView === true,
+    discoveryProfilesJson: JSON.stringify(matchedProfiles)
   };
 
   const repository = existing
@@ -175,6 +181,8 @@ async function snapshotAndScoreRepository(repoId: string, readmeText: string | n
     data: {
       trendScore: score.trendScore,
       relevanceScore: score.relevanceScore,
+      initialMomentumScore: score.initialMomentumScore,
+      scoreBreakdownJson: JSON.stringify(score.scoreBreakdown),
       ageMonths: score.ageMonths,
       isOldRepo: score.isOldRepo,
       status: nextStatus
@@ -219,12 +227,8 @@ export async function runDailyScan(options: ScanOptions = {}) {
   try {
     const queries = buildGitHubSearchQueries(now);
     const rawItems = await searchGitHubRepositories(queries, options.maxPages ?? 1);
-    const filtered = rawItems.filter((item) => {
-      if (item.stargazers_count < config.minStars) {
-        return false;
-      }
-
-      if (config.excludeForks && item.fork) {
+    const filtered = rawItems.filter((discovered) => {
+      if (config.excludeForks && discovered.item.fork) {
         return false;
       }
 
@@ -236,10 +240,11 @@ export async function runDailyScan(options: ScanOptions = {}) {
     let updated = 0;
     const itemErrors: string[] = [];
 
-    for (const [index, item] of filtered.entries()) {
+    for (const [index, discovered] of filtered.entries()) {
+      const item = discovered.item;
       try {
         const readme = await maybeFetchReadme(client, item, index < readmeLimit);
-        const repository = await upsertRepositoryFromGitHub(item, readme, now);
+        const repository = await upsertRepositoryFromGitHub(item, readme, now, discovered.matchedProfiles);
         await snapshotAndScoreRepository(repository.id, readme?.text ?? null, now);
         updated += 1;
       } catch (error) {

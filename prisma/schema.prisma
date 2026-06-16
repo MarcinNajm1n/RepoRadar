@@ -38,6 +38,9 @@ model Repository {
   lastAnalyzedAt    DateTime?
   trendScore        Int       @default(0)
   relevanceScore    Int       @default(0)
+  initialMomentumScore Int    @default(0)
+  scoreBreakdownJson String   @default("{}")
+  discoveryProfilesJson String @default("[]")
   source            String    @default("github")
   createdDbAt       DateTime  @default(now())
   updatedDbAt       DateTime  @updatedAt

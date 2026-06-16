@@ -5,6 +5,22 @@ export type AppConfig = {
   databaseUrl: string;
   scanScheduleCron: string;
   minStars: number;
+  freshRepoMinStars: number;
+  freshRepoMaxAgeDays: number;
+  freshRepoPushedWithinDays: number;
+  fastMomentumMinStars: number;
+  fastMomentumPushedWithinDays: number;
+  establishedPushedWithinDays: number;
+  oldReactivatedMinStars: number;
+  oldReactivatedMinAgeMonths: number;
+  oldReactivatedPushedWithinDays: number;
+  nicheRepoMinStars: number;
+  nicheRepoPushedWithinDays: number;
+  enableScanProfileFreshRepos: boolean;
+  enableScanProfileFastMomentum: boolean;
+  enableScanProfileEstablishedHot: boolean;
+  enableScanProfileOldReactivated: boolean;
+  enableScanProfileNicheAiTools: boolean;
   newRepoMaxAgeMonths: number;
   oldRepoAgeMonths: number;
   minWeeklyStarGrowthAbsolute: number;
@@ -56,6 +72,10 @@ function readNumber(name: string, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readClampedNumber(name: string, fallback: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, readNumber(name, fallback)));
+}
+
 function readBoolean(name: string, fallback: boolean) {
   const raw = process.env[name];
   if (!raw) {
@@ -104,6 +124,22 @@ export function getConfig(): AppConfig {
     databaseUrl: readString("DATABASE_URL", "file:./dev.db"),
     scanScheduleCron: readString("SCAN_SCHEDULE_CRON", "0 9 * * *"),
     minStars: readNumber("MIN_STARS", 1000),
+    freshRepoMinStars: readClampedNumber("FRESH_REPO_MIN_STARS", 50, 1, 100000),
+    freshRepoMaxAgeDays: readClampedNumber("FRESH_REPO_MAX_AGE_DAYS", 90, 1, 730),
+    freshRepoPushedWithinDays: readClampedNumber("FRESH_REPO_PUSHED_WITHIN_DAYS", 30, 1, 365),
+    fastMomentumMinStars: readClampedNumber("FAST_MOMENTUM_MIN_STARS", 100, 1, 100000),
+    fastMomentumPushedWithinDays: readClampedNumber("FAST_MOMENTUM_PUSHED_WITHIN_DAYS", 30, 1, 365),
+    establishedPushedWithinDays: readClampedNumber("ESTABLISHED_PUSHED_WITHIN_DAYS", 30, 1, 365),
+    oldReactivatedMinStars: readClampedNumber("OLD_REACTIVATED_MIN_STARS", 500, 1, 100000),
+    oldReactivatedMinAgeMonths: readClampedNumber("OLD_REACTIVATED_MIN_AGE_MONTHS", 12, 1, 120),
+    oldReactivatedPushedWithinDays: readClampedNumber("OLD_REACTIVATED_PUSHED_WITHIN_DAYS", 30, 1, 365),
+    nicheRepoMinStars: readClampedNumber("NICHE_REPO_MIN_STARS", 100, 1, 100000),
+    nicheRepoPushedWithinDays: readClampedNumber("NICHE_REPO_PUSHED_WITHIN_DAYS", 90, 1, 365),
+    enableScanProfileFreshRepos: readBoolean("ENABLE_SCAN_PROFILE_FRESH_REPOS", true),
+    enableScanProfileFastMomentum: readBoolean("ENABLE_SCAN_PROFILE_FAST_MOMENTUM", true),
+    enableScanProfileEstablishedHot: readBoolean("ENABLE_SCAN_PROFILE_ESTABLISHED_HOT", true),
+    enableScanProfileOldReactivated: readBoolean("ENABLE_SCAN_PROFILE_OLD_REACTIVATED", true),
+    enableScanProfileNicheAiTools: readBoolean("ENABLE_SCAN_PROFILE_NICHE_AI_TOOLS", true),
     newRepoMaxAgeMonths: readNumber("NEW_REPO_MAX_AGE_MONTHS", 7),
     oldRepoAgeMonths: readNumber("OLD_REPO_AGE_MONTHS", 7),
     minWeeklyStarGrowthAbsolute: readNumber("MIN_WEEKLY_STAR_GROWTH_ABSOLUTE", 200),

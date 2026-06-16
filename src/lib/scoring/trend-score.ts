@@ -18,9 +18,25 @@ export type ScoreInput = {
   starsBefore7d: number | null;
 };
 
+export type ScoreBreakdown = {
+  absoluteGrowthPoints: number;
+  percentageGrowthPoints: number;
+  agePoints: number;
+  totalStarsPoints: number;
+  forksPoints: number;
+  pushFreshnessPoints: number;
+  topicRelevancePoints: number;
+  readmeQualityPoints: number;
+  keywordRelevancePoints: number;
+  initialMomentumPoints: number;
+  usedInitialMomentumFallback: boolean;
+};
+
 export type ScoreResult = {
   trendScore: number;
   relevanceScore: number;
+  initialMomentumScore: number;
+  scoreBreakdown: ScoreBreakdown;
   ageMonths: number;
   isOldRepo: boolean;
   status: RepositoryStatus;
@@ -69,6 +85,35 @@ function scorePushFreshness(pushedAt: Date | null) {
   return clamp(1 - (days - 14) / 166, 0, 1);
 }
 
+function calculateInitialMomentumScore(input: ScoreInput, scores: {
+  pushFreshnessScore: number;
+  forksScore: number;
+  topicRelevanceScore: number;
+  readmeQualityScore: number;
+  keywordRelevanceScore: number;
+  totalStarsScore: number;
+}) {
+  const ageDays = Math.max(1, (Date.now() - input.createdAt.getTime()) / 86400000);
+  const starsPerDay = input.starsCurrent / ageDays;
+  const forksPerDay = input.forksCurrent / ageDays;
+  const starsPerAgeScore = clamp(Math.log1p(starsPerDay) / Math.log1p(250), 0, 1);
+  const forksPerAgeScore = clamp(Math.log1p(forksPerDay) / Math.log1p(40), 0, 1);
+
+  return Math.round(
+    clamp(
+      25 * starsPerAgeScore +
+        20 * scores.pushFreshnessScore +
+        15 * forksPerAgeScore +
+        15 * scores.topicRelevanceScore +
+        10 * scores.keywordRelevanceScore +
+        10 * scores.readmeQualityScore +
+        5 * scores.totalStarsScore,
+      0,
+      100
+    )
+  );
+}
+
 export function calculateTrendScore(input: ScoreInput): ScoreResult {
   const config = getConfig();
   const ageMonths = monthsBetween(input.createdAt);
@@ -112,6 +157,27 @@ export function calculateTrendScore(input: ScoreInput): ScoreResult {
 
   const trendScore = Math.round(clamp(weightedScore, 0, 100));
   const relevanceScore = Math.round(clamp((topicRelevanceScore * 0.55 + keywordRelevanceScore * 0.45) * 100, 0, 100));
+  const initialMomentumScore = calculateInitialMomentumScore(input, {
+    pushFreshnessScore,
+    forksScore,
+    topicRelevanceScore,
+    readmeQualityScore,
+    keywordRelevanceScore,
+    totalStarsScore
+  });
+  const scoreBreakdown: ScoreBreakdown = {
+    absoluteGrowthPoints: hasGrowth ? Math.round(35 * absoluteGrowthScore) : 0,
+    percentageGrowthPoints: hasGrowth ? Math.round(20 * percentageGrowthScore) : 0,
+    agePoints: Math.round(10 * ageScore),
+    totalStarsPoints: Math.round(8 * totalStarsScore),
+    forksPoints: Math.round(5 * forksScore),
+    pushFreshnessPoints: Math.round(8 * pushFreshnessScore),
+    topicRelevancePoints: Math.round(7 * topicRelevanceScore),
+    readmeQualityPoints: Math.round(4 * readmeQualityScore),
+    keywordRelevancePoints: Math.round(3 * keywordRelevanceScore),
+    initialMomentumPoints: hasGrowth ? 0 : initialMomentumScore,
+    usedInitialMomentumFallback: !hasGrowth
+  };
 
   let status: RepositoryStatus = "NEW";
   if (trendScore >= 80) {
@@ -125,6 +191,8 @@ export function calculateTrendScore(input: ScoreInput): ScoreResult {
   return {
     trendScore,
     relevanceScore,
+    initialMomentumScore,
+    scoreBreakdown,
     ageMonths,
     isOldRepo,
     status,

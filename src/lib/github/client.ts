@@ -1,8 +1,8 @@
 import { getConfig } from "@/lib/config";
 import { stableHash } from "@/lib/hash";
 import { sanitizeExternalText, truncateText } from "@/lib/utils";
-import type { GitHubReadmeResult, GitHubSearchResponse, SearchOptions } from "./types";
-import { dedupeGitHubRepositories } from "./dedupe";
+import type { DiscoveredGitHubRepository, GitHubReadmeResult, GitHubSearchQuerySpec, GitHubSearchResponse, SearchOptions } from "./types";
+import { mergeDiscoveredGitHubRepository } from "./dedupe";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -79,8 +79,8 @@ export class GitHubClient {
   async searchRepositories(options: SearchOptions): Promise<GitHubSearchResponse> {
     const params = new URLSearchParams({
       q: options.query,
-      sort: "stars",
-      order: "desc",
+      sort: options.sort ?? "stars",
+      order: options.order ?? "desc",
       per_page: String(options.perPage ?? 100),
       page: String(options.page ?? 1)
     });
@@ -109,18 +109,26 @@ export class GitHubClient {
   }
 }
 
-export async function searchGitHubRepositories(queries: string[], maxPages = 1) {
+export async function searchGitHubRepositories(queries: GitHubSearchQuerySpec[], maxPages = 1) {
   const client = new GitHubClient();
-  const items: GitHubSearchResponse["items"] = [];
+  const discovered: DiscoveredGitHubRepository[] = [];
 
-  for (const query of queries) {
+  for (const spec of queries) {
     for (let page = 1; page <= maxPages; page += 1) {
-      const result = await client.searchRepositories({ query, page, perPage: 100 });
+      const result = await client.searchRepositories({
+        query: spec.query,
+        sort: spec.sort,
+        order: spec.order,
+        page,
+        perPage: 100
+      });
       for (const item of result.items) {
-        items.push(item);
+        if (item.stargazers_count >= spec.minStars) {
+          mergeDiscoveredGitHubRepository(discovered, item, spec);
+        }
       }
     }
   }
 
-  return dedupeGitHubRepositories(items);
+  return discovered;
 }

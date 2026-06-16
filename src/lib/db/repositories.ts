@@ -10,6 +10,20 @@ import type {
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
 
+const DEFAULT_SCORE_BREAKDOWN = {
+  absoluteGrowthPoints: 0,
+  percentageGrowthPoints: 0,
+  agePoints: 0,
+  totalStarsPoints: 0,
+  forksPoints: 0,
+  pushFreshnessPoints: 0,
+  topicRelevancePoints: 0,
+  readmeQualityPoints: 0,
+  keywordRelevancePoints: 0,
+  initialMomentumPoints: 0,
+  usedInitialMomentumFallback: false
+};
+
 type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[number] & {
   snapshots?: {
     growth24h: number | null;
@@ -46,7 +60,7 @@ export function mapEvidenceSource(source: EvidenceSourceRecord): EvidenceSourceI
   };
 }
 
-function mapRepository(repository: RepositoryRecord): RepositoryListItem {
+export function mapRepository(repository: RepositoryRecord): RepositoryListItem {
   const latestSnapshot = repository.snapshots?.[0];
 
   return {
@@ -78,6 +92,9 @@ function mapRepository(repository: RepositoryRecord): RepositoryListItem {
     lastAnalyzedAt: repository.lastAnalyzedAt?.toISOString() ?? null,
     trendScore: repository.trendScore,
     relevanceScore: repository.relevanceScore,
+    initialMomentumScore: repository.initialMomentumScore,
+    scoreBreakdown: safeJsonParse(repository.scoreBreakdownJson, DEFAULT_SCORE_BREAKDOWN),
+    discoveryProfiles: safeJsonParse<string[]>(repository.discoveryProfilesJson, []),
     source: repository.source,
     growth24h: latestSnapshot?.growth24h ?? null,
     growth7d: latestSnapshot?.growth7d ?? null,

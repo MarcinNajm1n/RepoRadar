@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dedupeGitHubRepositories } from "../../src/lib/github/dedupe";
-import type { GitHubRepositoryItem } from "../../src/lib/github/types";
+import { dedupeGitHubRepositories, mergeDiscoveredGitHubRepository } from "../../src/lib/github/dedupe";
+import type { DiscoveredGitHubRepository, GitHubRepositoryItem, GitHubSearchQuerySpec } from "../../src/lib/github/types";
 
 function repo(id: number, fullName: string): GitHubRepositoryItem {
   return {
@@ -35,5 +35,30 @@ describe("dedupeGitHubRepositories", () => {
     ]);
 
     expect(result.map((item) => item.full_name)).toEqual(["owner/tool", "owner/other"]);
+  });
+
+  it("merges discovery profiles for repeated search results", () => {
+    const discovered: DiscoveredGitHubRepository[] = [];
+    const firstSpec: GitHubSearchQuerySpec = {
+      profile: "fresh_repos",
+      query: "fresh",
+      sort: "updated",
+      order: "desc",
+      minStars: 50
+    };
+    const secondSpec: GitHubSearchQuerySpec = {
+      profile: "fast_momentum",
+      query: "fast",
+      sort: "stars",
+      order: "desc",
+      minStars: 100
+    };
+
+    mergeDiscoveredGitHubRepository(discovered, repo(1, "owner/tool"), firstSpec);
+    mergeDiscoveredGitHubRepository(discovered, repo(1, "OWNER/tool"), secondSpec);
+
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0].matchedProfiles).toEqual(["fresh_repos", "fast_momentum"]);
+    expect(discovered[0].minStarsMatched).toBe(50);
   });
 });

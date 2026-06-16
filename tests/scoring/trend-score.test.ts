@@ -75,5 +75,30 @@ describe("calculateTrendScore", () => {
 
     expect(result.trendScore).toBeGreaterThan(0);
     expect(result.components.percentageGrowthScore).toBe(0);
+    expect(result.initialMomentumScore).toBeGreaterThan(0);
+    expect(result.scoreBreakdown.usedInitialMomentumFallback).toBe(true);
+    expect(result.scoreBreakdown.initialMomentumPoints).toBe(result.initialMomentumScore);
+    expect(result.scoreBreakdown.absoluteGrowthPoints).toBe(0);
+    expect(result.scoreBreakdown.percentageGrowthPoints).toBe(0);
+  });
+
+  it("keeps initial momentum separate from confirmed growth trend score", () => {
+    const result = calculateTrendScore({
+      starsCurrent: 3500,
+      forksCurrent: 300,
+      createdAt: new Date("2026-05-01T00:00:00Z"),
+      pushedAt: new Date(),
+      topics: ["ai", "agent"],
+      description: "AI agent developer tool",
+      readmeExcerpt: "install usage example",
+      growth7d: 250,
+      growthPercent7d: 8,
+      starsBefore7d: 3250
+    });
+
+    expect(result.initialMomentumScore).toBeGreaterThanOrEqual(0);
+    expect(result.scoreBreakdown.usedInitialMomentumFallback).toBe(false);
+    expect(result.scoreBreakdown.initialMomentumPoints).toBe(0);
+    expect(result.scoreBreakdown.absoluteGrowthPoints).toBeGreaterThan(0);
   });
 });
