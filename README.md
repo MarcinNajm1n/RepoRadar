@@ -16,7 +16,9 @@ GitHub is full of useful AI/devtools repositories, but it is hard to track which
 - Deterministic `trend_score` from growth, age, stars, forks, activity, topics, README quality, and AI/LLM relevance.
 - Polish UI labels and Polish OpenAI-generated summaries/reports.
 - On-demand full repo report on double click.
+- On-demand evidence-backed market research for full reports and ideas.
 - Separate "Pomysły" tab for repo-based side hustle/MVP ideas.
+- Optional Windows and Discord scan notifications for high-value repositories.
 - Daily and weekly markdown reports in `reports/`.
 - Required tabs: Biblioteka, Nowo znalezione, Zapisane, Przeczytane, Ignorowane, Pomysły, Raporty tygodniowe, Stare repo, Ustawienia.
 - Ignored repositories stay in storage so they are not rediscovered as new.
@@ -34,6 +36,7 @@ GitHub is full of useful AI/devtools repositories, but it is hard to track which
 - Playwright
 - GitHub REST API
 - OpenAI Responses API
+- OpenAI web search / remote MCP for on-demand market research
 
 ## Screenshots
 
@@ -71,7 +74,9 @@ Open `http://localhost:3000`.
 - `OPENAI_MODEL` - model used for report generation.
 - `DATABASE_URL` - defaults to local SQLite.
 - scan thresholds: `MIN_STARS`, `NEW_REPO_MAX_AGE_MONTHS`, `OLD_REPO_AGE_MONTHS`, `MIN_WEEKLY_STAR_GROWTH_ABSOLUTE`, `MIN_WEEKLY_STAR_GROWTH_PERCENT`.
-- optional sources and notification toggles.
+- notifications: `ENABLE_NOTIFICATIONS`, `ENABLE_WINDOWS_NOTIFICATIONS`, `DISCORD_WEBHOOK_URL`, `NOTIFICATION_MIN_TREND_SCORE`, `NOTIFICATION_MIN_WEEKLY_GROWTH`.
+- market research: `MARKET_RESEARCH_ENABLED`, `MARKET_RESEARCH_PROVIDER`, `MARKET_RESEARCH_DAILY_LIMIT`, `MARKET_RESEARCH_MAX_SOURCES`, `MCP_WEB_RESEARCH_SERVER_URL`.
+- optional Reddit source: `ENABLE_REDDIT_SOURCE`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`.
 
 ### GitHub Token
 
@@ -130,14 +135,35 @@ OpenAI is used only for:
 - short Polish summaries for selected high-score repositories,
 - full Polish repo reports on double click or manual regeneration,
 - ideas created by clicking "Utwórz pomysł z repo".
+- on-demand market research for reports and ideas when `MARKET_RESEARCH_ENABLED=true`.
 
 Cost controls:
 
 - cache by input hash and model,
 - daily analysis limit,
+- separate daily market research limit,
+- market research cache by provider/query hash,
 - README/context truncation,
 - `store: false` in Responses API calls,
 - no secrets are sent to OpenAI.
+
+Market research provider order:
+
+1. Remote MCP web research if `MARKET_RESEARCH_PROVIDER=mcp|hybrid` and `MCP_WEB_RESEARCH_SERVER_URL` is configured.
+2. OpenAI Responses `web_search` fallback for `hybrid` or direct `openai` mode.
+3. Optional Reddit API only when explicitly enabled and OAuth credentials exist.
+
+Direct X/Twitter and LinkedIn APIs are not implemented. Public X/LinkedIn results may appear only through web research sources.
+
+## Notifications
+
+After a scan, RepoRadar sends notifications only for failures or high-value repositories:
+
+- `trendScore >= NOTIFICATION_MIN_TREND_SCORE`,
+- or `growth7d >= NOTIFICATION_MIN_WEEKLY_GROWTH`,
+- or a strong deterministic relevance/trend match.
+
+Windows notifications are local best-effort toasts. Discord uses `DISCORD_WEBHOOK_URL` from `.env`; the webhook URL is masked in logs and never committed.
 
 ## Reports
 
@@ -197,7 +223,7 @@ Commit `.env.example` with empty placeholders. Keep real values only in `.env` o
 
 - GitHub does not provide perfect historical stars through search, so growth starts only after RepoRadar begins tracking.
 - GitHub Search API has separate rate limits and may return incomplete results.
-- Optional sources like Reddit, HN, Product Hunt, and X are disabled by default.
+- Optional sources like Reddit, HN, Product Hunt, and X are disabled by default. Direct X/LinkedIn API integrations are intentionally not part of this MVP.
 - No cloud sync, auth, billing, or Supabase dependency in MVP.
 - RepoRadar does not mass-clone repositories and never executes code from discovered repositories.
 
@@ -206,6 +232,6 @@ Commit `.env.example` with empty placeholders. Keep real values only in `.env` o
 - More source adapters: HN Algolia, Reddit, Product Hunt.
 - Optional Tauri wrapper.
 - Better report search.
-- Windows notification and Discord webhook adapter.
+- Richer notification delivery controls.
 - PostgreSQL/Supabase migration path.
 - More Playwright coverage for report and idea flows.

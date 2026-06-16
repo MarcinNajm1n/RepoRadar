@@ -5,23 +5,63 @@ import { getConfig } from "@/lib/config";
 import { stableHash } from "@/lib/hash";
 import { safeJsonParse } from "@/lib/utils";
 import { repoReportPath, writeMarkdownReport } from "@/lib/reports/writer";
-import { buildIdeaPrompt, buildRepoReportPrompt, buildRepositoryContext, buildSummaryPrompt } from "./prompts";
+import {
+  buildIdeaPrompt,
+  buildRepoReportPrompt,
+  buildRepositoryContext,
+  buildSummaryPrompt,
+  formatMarketResearchForPrompt
+} from "./prompts";
 import { generateOpenAiText } from "./client";
+import {
+  attachResearchToIdea,
+  attachResearchToReport,
+  getMarketResearchForRepository
+} from "@/lib/market-research/service";
 
 function topicsFromJson(value: string) {
   return safeJsonParse<string[]>(value, []);
 }
 
-async function ensureOpenAiBudget() {
+async function ensureOpenAiBudget(requiredCalls = 1) {
   const config = getConfig();
   const usedToday = await countOpenAiAnalysesToday();
-  if (usedToday >= config.openAiDailyAnalysisLimit) {
+  if (usedToday + requiredCalls > config.openAiDailyAnalysisLimit) {
     throw new Error(`Daily OpenAI analysis limit reached (${config.openAiDailyAnalysisLimit})`);
   }
 }
 
 function inputHash(kind: string, context: string) {
   return stableHash(`${kind}\n${context}`);
+}
+
+function requiredOpenAiCallsForOnDemandGeneration() {
+  const config = getConfig();
+  if (!config.marketResearchEnabled || config.marketResearchProvider === "none" || config.marketResearchProvider === "reddit") {
+    return 1;
+  }
+
+  return 2;
+}
+
+function buildResearchContext(kind: "repo-report" | "idea", repository: Awaited<ReturnType<typeof getRepositoryForReport>>, context: string) {
+  return {
+    kind,
+    repoId: repository.id,
+    fullName: repository.fullName,
+    url: repository.url,
+    description: repository.description,
+    primaryLanguage: repository.primaryLanguage,
+    topics: topicsFromJson(repository.topicsJson),
+    starsCurrent: repository.starsCurrent,
+    forksCurrent: repository.forksCurrent,
+    openIssues: repository.openIssues,
+    trendScore: repository.trendScore,
+    relevanceScore: repository.relevanceScore,
+    readmeHash: repository.readmeHash,
+    readmeExcerpt: repository.readmeExcerpt,
+    repositoryContext: context
+  };
 }
 
 export async function generateShortSummaryForRepository(repoId: string, force = false) {
@@ -100,8 +140,12 @@ export async function generateFullReportForRepository(repoId: string, force = fa
     }
   }
 
+  await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+  const research = await getMarketResearchForRepository(buildResearchContext("repo-report", repository, context));
+  const reportContext = [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n");
   await ensureOpenAiBudget();
-  const content = await generateOpenAiText(buildRepoReportPrompt(), context);
+
+  const content = await generateOpenAiText(buildRepoReportPrompt(), reportContext);
   await saveOpenAiOutput("repo-report", repoId, hash, config.openAiModel, content);
   const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), content);
 
@@ -118,6 +162,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
       inputHash: hash
     }
   });
+  await attachResearchToReport(research.runId, report.id);
 
   await prisma.repository.update({
     where: { id: repoId },
@@ -155,10 +200,19 @@ export async function generateIdeaForRepository(repoId: string) {
   });
   const hash = inputHash("idea", context);
   const cached = await getCachedOpenAiOutput("idea", repoId, hash, config.openAiModel);
+  const research = cached
+    ? null
+    : await (async () => {
+        await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+        return getMarketResearchForRepository(buildResearchContext("idea", repository, context));
+      })();
+  const ideaContext = research
+    ? [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n")
+    : context;
   if (!cached) {
     await ensureOpenAiBudget();
   }
-  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt(), context));
+  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt(), ideaContext));
 
   if (!cached) {
     await saveOpenAiOutput("idea", repoId, hash, config.openAiModel, content);
@@ -174,6 +228,8 @@ export async function generateIdeaForRepository(repoId: string) {
     difficulty?: number;
     usefulnessScore?: number;
     riskScore?: number;
+    confidenceScore?: number;
+    marketSummary?: string;
     suggestedStack?: string;
     firstSteps?: string[];
   }>(extractJsonObject(content), {});
@@ -191,9 +247,13 @@ export async function generateIdeaForRepository(repoId: string) {
       usefulnessScore: parsed.usefulnessScore ?? 3,
       riskScore: parsed.riskScore ?? 3,
       suggestedStack: parsed.suggestedStack ?? "Next.js, SQLite, OpenAI API",
+      marketSummary: (parsed.marketSummary ?? research?.summary) || null,
+      evidenceIdsJson: JSON.stringify(research?.sourceIds ?? []),
+      confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
       firstStepsJson: JSON.stringify(parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"])
     }
   });
+  await attachResearchToIdea(research?.runId, idea.id);
 
   await prisma.repository.update({
     where: { id: repoId },

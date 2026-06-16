@@ -1,7 +1,13 @@
 import { prisma } from "./client";
 import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
-import type { DashboardData, IdeaListItem, ReportListItem, RepositoryListItem } from "@/types/repository";
+import type {
+  DashboardData,
+  EvidenceSourceItem,
+  IdeaListItem,
+  ReportListItem,
+  RepositoryListItem
+} from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
 
 type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[number] & {
@@ -11,6 +17,34 @@ type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[n
     growthPercent7d: number | null;
   }[];
 };
+
+type EvidenceSourceRecord = {
+  id: string;
+  sourceType: string;
+  title: string;
+  url: string;
+  publisher: string | null;
+  retrievedAt: Date;
+  publishedAt: Date | null;
+  snippet: string;
+  sentiment: string | null;
+  relevanceScore: number | null;
+};
+
+export function mapEvidenceSource(source: EvidenceSourceRecord): EvidenceSourceItem {
+  return {
+    id: source.id,
+    sourceType: source.sourceType,
+    title: source.title,
+    url: source.url,
+    publisher: source.publisher,
+    retrievedAt: source.retrievedAt.toISOString(),
+    publishedAt: source.publishedAt?.toISOString() ?? null,
+    snippet: source.snippet,
+    sentiment: source.sentiment,
+    relevanceScore: source.relevanceScore
+  };
+}
 
 function mapRepository(repository: RepositoryRecord): RepositoryListItem {
   const latestSnapshot = repository.snapshots?.[0];
@@ -51,7 +85,12 @@ function mapRepository(repository: RepositoryRecord): RepositoryListItem {
   };
 }
 
-function mapIdea(idea: Awaited<ReturnType<typeof prisma.idea.findMany>>[number] & { repository?: { fullName: string } }): IdeaListItem {
+function mapIdea(
+  idea: Awaited<ReturnType<typeof prisma.idea.findMany>>[number] & {
+    repository?: { fullName: string };
+    marketResearchSources?: EvidenceSourceRecord[];
+  }
+): IdeaListItem {
   return {
     id: idea.id,
     sourceRepoId: idea.sourceRepoId,
@@ -65,8 +104,12 @@ function mapIdea(idea: Awaited<ReturnType<typeof prisma.idea.findMany>>[number] 
     difficulty: idea.difficulty,
     usefulnessScore: idea.usefulnessScore,
     riskScore: idea.riskScore,
+    confidenceScore: idea.confidenceScore,
+    marketSummary: idea.marketSummary,
     suggestedStack: idea.suggestedStack,
     firstSteps: safeJsonParse<string[]>(idea.firstStepsJson, []),
+    evidenceIds: safeJsonParse<string[]>(idea.evidenceIdsJson, []),
+    evidenceSources: idea.marketResearchSources?.map(mapEvidenceSource) ?? [],
     status: idea.status,
     createdAt: idea.createdAt.toISOString()
   };
@@ -105,7 +148,13 @@ export async function getDashboardData(): Promise<DashboardData> {
     }),
     prisma.idea.findMany({
       orderBy: { createdAt: "desc" },
-      include: { repository: { select: { fullName: true } } }
+      include: {
+        repository: { select: { fullName: true } },
+        marketResearchSources: {
+          orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
+          take: 6
+        }
+      }
     }),
     prisma.report.findMany({
       where: { type: "weekly" },
@@ -237,4 +286,14 @@ export async function getTopRepositories(limit = 20) {
       }
     }
   });
+}
+
+export async function getEvidenceSourcesForReport(reportId: string) {
+  const sources = await prisma.marketResearchSource.findMany({
+    where: { reportId },
+    orderBy: [{ relevanceScore: "desc" }, { retrievedAt: "desc" }],
+    take: 10
+  });
+
+  return sources.map(mapEvidenceSource);
 }

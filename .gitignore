@@ -58,3 +58,4 @@ reports/**/*.md
 coverage
 playwright-report
 test-results
+*.tsbuildinfo

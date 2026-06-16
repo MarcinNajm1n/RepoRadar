@@ -15,8 +15,21 @@ export type AppConfig = {
   enableProductHuntSource: boolean;
   enableXSource: boolean;
   enableNotifications: boolean;
+  enableWindowsNotifications: boolean;
   enableEmailReports: boolean;
   discordWebhookUrl?: string;
+  notificationMinTrendScore: number;
+  notificationMinWeeklyGrowth: number;
+  marketResearchEnabled: boolean;
+  marketResearchProvider: "mcp" | "openai" | "hybrid" | "reddit" | "none";
+  marketResearchDailyLimit: number;
+  marketResearchMaxSources: number;
+  mcpWebResearchServerUrl?: string;
+  mcpWebResearchServerLabel: string;
+  mcpWebResearchAllowedTools: string[];
+  redditClientId?: string;
+  redditClientSecret?: string;
+  redditUserAgent: string;
   excludeForks: boolean;
   reportsDir: string;
 };
@@ -45,6 +58,27 @@ function readString(name: string, fallback = "") {
   return raw && raw.trim().length > 0 ? raw.trim() : fallback;
 }
 
+function readStringList(name: string, fallback: string[]) {
+  const raw = readString(name);
+  if (!raw) {
+    return fallback;
+  }
+
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function readMarketResearchProvider(): AppConfig["marketResearchProvider"] {
+  const value = readString("MARKET_RESEARCH_PROVIDER", "hybrid").toLowerCase();
+  if (value === "mcp" || value === "openai" || value === "hybrid" || value === "reddit" || value === "none") {
+    return value;
+  }
+
+  return "hybrid";
+}
+
 export function getConfig(): AppConfig {
   return {
     githubToken: readString("GITHUB_TOKEN") || undefined,
@@ -63,8 +97,21 @@ export function getConfig(): AppConfig {
     enableProductHuntSource: readBoolean("ENABLE_PRODUCT_HUNT_SOURCE", false),
     enableXSource: readBoolean("ENABLE_X_SOURCE", false),
     enableNotifications: readBoolean("ENABLE_NOTIFICATIONS", true),
+    enableWindowsNotifications: readBoolean("ENABLE_WINDOWS_NOTIFICATIONS", true),
     enableEmailReports: readBoolean("ENABLE_EMAIL_REPORTS", false),
     discordWebhookUrl: readString("DISCORD_WEBHOOK_URL") || undefined,
+    notificationMinTrendScore: readNumber("NOTIFICATION_MIN_TREND_SCORE", 80),
+    notificationMinWeeklyGrowth: readNumber("NOTIFICATION_MIN_WEEKLY_GROWTH", 200),
+    marketResearchEnabled: readBoolean("MARKET_RESEARCH_ENABLED", true),
+    marketResearchProvider: readMarketResearchProvider(),
+    marketResearchDailyLimit: readNumber("MARKET_RESEARCH_DAILY_LIMIT", 5),
+    marketResearchMaxSources: readNumber("MARKET_RESEARCH_MAX_SOURCES", 8),
+    mcpWebResearchServerUrl: readString("MCP_WEB_RESEARCH_SERVER_URL") || undefined,
+    mcpWebResearchServerLabel: readString("MCP_WEB_RESEARCH_SERVER_LABEL", "web-research"),
+    mcpWebResearchAllowedTools: readStringList("MCP_WEB_RESEARCH_ALLOWED_TOOLS", ["search", "fetch"]),
+    redditClientId: readString("REDDIT_CLIENT_ID") || undefined,
+    redditClientSecret: readString("REDDIT_CLIENT_SECRET") || undefined,
+    redditUserAgent: readString("REDDIT_USER_AGENT", "RepoRadar/0.1"),
     excludeForks: readBoolean("EXCLUDE_FORKS", true),
     reportsDir: readString("REPORTS_DIR", "reports")
   };

@@ -44,7 +44,7 @@ $secretContentPatterns = @(
   '(?i)\bgh[pousr]_[A-Za-z0-9_]{20,}\b',
   '(?i)\bxox[baprs]-[A-Za-z0-9-]{20,}\b',
   '\bAKIA[0-9A-Z]{16}\b',
-  '(?im)^[ \t]*(OPENAI_API_KEY|GITHUB_TOKEN|SMTP_PASSWORD|DISCORD_WEBHOOK_URL)[ \t]*=[ \t]*["'']?[^#\s"'']{8,}',
+  '(?im)^[ \t]*(OPENAI_API_KEY|GITHUB_TOKEN|SMTP_PASSWORD|DISCORD_WEBHOOK_URL|REDDIT_CLIENT_SECRET)[ \t]*=[ \t]*["'']?[^#\s"'']{8,}',
   '(?im)^[ \t]*DATABASE_URL[ \t]*=[ \t]*["'']?(postgres|postgresql|mysql|mongodb)[^#\s"'']*:[^#\s"'']+@'
 )
 

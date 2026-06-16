@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { updateRepositoryStatus } from "@/lib/db/repositories";
+import { getEvidenceSourcesForReport, updateRepositoryStatus } from "@/lib/db/repositories";
 import { runDailyScan } from "@/lib/github/scanner";
 import { generateFullReportForRepository, generateIdeaForRepository } from "@/lib/openai/repository-analysis";
 import { createWeeklyReport } from "@/lib/reports/weekly";
@@ -27,13 +27,15 @@ export async function updateStatusAction(repoId: string, status: string) {
 
 export async function generateReportAction(repoId: string, force = false) {
   const report = await generateFullReportForRepository(repoId, force);
+  const evidenceSources = await getEvidenceSourcesForReport(report.id);
   revalidatePath("/");
   return {
     id: report.id,
     title: report.title,
     contentMarkdown: report.contentMarkdown,
     markdownPath: report.markdownPath,
-    createdAt: report.createdAt.toISOString()
+    createdAt: report.createdAt.toISOString(),
+    evidenceSources
   };
 }
 

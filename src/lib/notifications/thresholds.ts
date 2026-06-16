@@ -7,8 +7,8 @@ export function isHighValueRepository(input: {
 }) {
   const config = getConfig();
   return (
-    input.trendScore >= 80 ||
-    (input.growth7d ?? 0) >= config.minWeeklyStarGrowthAbsolute ||
+    input.trendScore >= config.notificationMinTrendScore ||
+    (input.growth7d ?? 0) >= config.notificationMinWeeklyGrowth ||
     (input.relevanceScore >= 80 && input.trendScore >= 60)
   );
 }

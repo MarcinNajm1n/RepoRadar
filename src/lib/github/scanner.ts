@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db/client";
 import { getConfig } from "@/lib/config";
-import { monthsBetween, safeJsonParse } from "@/lib/utils";
+import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
 import { calculateGrowth } from "@/lib/scoring/growth";
 import { calculateTrendScore } from "@/lib/scoring/trend-score";
 import { generateShortSummaryForRepository } from "@/lib/openai/repository-analysis";
 import { createDailyReport } from "@/lib/reports/daily";
+import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } from "@/lib/notifications/dispatcher";
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
 import type { GitHubReadmeResult, GitHubRepositoryItem } from "./types";
@@ -18,11 +19,11 @@ type ScanOptions = {
 const USER_LOCKED_STATUSES = new Set(["SAVED", "READ", "IGNORED", "IDEA", "ANALYZED"]);
 
 function mapTopics(item: GitHubRepositoryItem) {
-  return Array.isArray(item.topics) ? item.topics.filter(Boolean) : [];
+  return sanitizeExternalStringArray(item.topics);
 }
 
 function getLicense(item: GitHubRepositoryItem) {
-  return item.license?.spdx_id || item.license?.key || item.license?.name || null;
+  return sanitizeExternalText(item.license?.spdx_id || item.license?.key || item.license?.name || null, 120);
 }
 
 function shouldPreserveStatus(status: string) {
@@ -43,72 +44,63 @@ async function maybeFetchReadme(
 
 async function upsertRepositoryFromGitHub(item: GitHubRepositoryItem, readme: GitHubReadmeResult | null, now: Date) {
   const config = getConfig();
-  const fullName = item.full_name;
+  const fullName = sanitizeExternalText(item.full_name, 300) ?? item.full_name;
+  const owner = sanitizeExternalText(item.owner.login, 180) ?? item.owner.login;
+  const name = sanitizeExternalText(item.name, 180) ?? item.name;
+  const url = sanitizeExternalText(item.html_url, 500) ?? item.html_url;
+  const description = sanitizeExternalText(item.description, 2000);
+  const primaryLanguage = sanitizeExternalText(item.language, 120);
+  const readmeExcerpt = sanitizeExternalText(readme?.excerpt, 2400);
   const topics = mapTopics(item);
   const ignored = await prisma.ignoredRepository.findUnique({ where: { fullName } });
-  const existing = await prisma.repository.findUnique({ where: { githubId: item.id } });
+  const existingByGitHubId = await prisma.repository.findUnique({ where: { githubId: item.id } });
+  const existingByFullName = existingByGitHubId ? null : await prisma.repository.findUnique({ where: { fullName } });
+  const existing = existingByGitHubId ?? existingByFullName;
 
   const createdAt = new Date(item.created_at);
   const pushedAt = item.pushed_at ? new Date(item.pushed_at) : null;
   const ageMonths = monthsBetween(createdAt, now);
   const isOldRepo = ageMonths > config.oldRepoAgeMonths;
 
-  const repository = await prisma.repository.upsert({
-    where: { githubId: item.id },
-    update: {
-      fullName,
-      owner: item.owner.login,
-      name: item.name,
-      url: item.html_url,
-      description: item.description,
-      readmeHash: readme?.hash ?? existing?.readmeHash ?? null,
-      readmeExcerpt: readme?.excerpt ?? existing?.readmeExcerpt ?? null,
-      primaryLanguage: item.language,
-      topicsJson: JSON.stringify(topics),
-      license: getLicense(item),
-      createdAt,
-      pushedAt,
-      lastSeenAt: now,
-      starsCurrent: item.stargazers_count,
-      forksCurrent: item.forks_count,
-      watchersCurrent: item.subscribers_count ?? item.watchers_count,
-      openIssues: item.open_issues_count,
-      ageMonths,
-      isOldRepo,
-      isArchived: item.archived,
-      isFork: item.fork,
-      status: ignored ? "IGNORED" : existing?.status ?? "NEW",
-      isDeletedFromView: Boolean(ignored) || existing?.isDeletedFromView === true
-    },
-    create: {
-      githubId: item.id,
-      fullName,
-      owner: item.owner.login,
-      name: item.name,
-      url: item.html_url,
-      description: item.description,
-      readmeHash: readme?.hash ?? null,
-      readmeExcerpt: readme?.excerpt ?? null,
-      primaryLanguage: item.language,
-      topicsJson: JSON.stringify(topics),
-      license: getLicense(item),
-      createdAt,
-      pushedAt,
-      firstSeenAt: now,
-      lastSeenAt: now,
-      starsCurrent: item.stargazers_count,
-      forksCurrent: item.forks_count,
-      watchersCurrent: item.subscribers_count ?? item.watchers_count,
-      openIssues: item.open_issues_count,
-      ageMonths,
-      isOldRepo,
-      isArchived: item.archived,
-      isFork: item.fork,
-      status: ignored ? "IGNORED" : "NEW",
-      isDeletedFromView: Boolean(ignored),
-      source: "github"
-    }
-  });
+  const updateData = {
+    githubId: item.id,
+    fullName,
+    owner,
+    name,
+    url,
+    description,
+    readmeHash: readme?.hash ?? existing?.readmeHash ?? null,
+    readmeExcerpt: readmeExcerpt ?? existing?.readmeExcerpt ?? null,
+    primaryLanguage,
+    topicsJson: JSON.stringify(topics),
+    license: getLicense(item),
+    createdAt,
+    pushedAt,
+    lastSeenAt: now,
+    starsCurrent: item.stargazers_count,
+    forksCurrent: item.forks_count,
+    watchersCurrent: item.subscribers_count ?? item.watchers_count,
+    openIssues: item.open_issues_count,
+    ageMonths,
+    isOldRepo,
+    isArchived: item.archived,
+    isFork: item.fork,
+    status: ignored ? "IGNORED" : existing?.status ?? "NEW",
+    isDeletedFromView: Boolean(ignored) || existing?.isDeletedFromView === true
+  };
+
+  const repository = existing
+    ? await prisma.repository.update({
+        where: { id: existing.id },
+        data: updateData
+      })
+    : await prisma.repository.create({
+        data: {
+          ...updateData,
+          firstSeenAt: now,
+          source: "github"
+        }
+      });
 
   if (ignored && !ignored.repoId) {
     await prisma.ignoredRepository.update({
@@ -241,12 +233,19 @@ export async function runDailyScan(options: ScanOptions = {}) {
     const client = new GitHubClient();
     const readmeLimit = options.fetchReadmeLimit ?? 25;
     let updated = 0;
+    const itemErrors: string[] = [];
 
     for (const [index, item] of filtered.entries()) {
-      const readme = await maybeFetchReadme(client, item, index < readmeLimit);
-      const repository = await upsertRepositoryFromGitHub(item, readme, now);
-      await snapshotAndScoreRepository(repository.id, readme?.text ?? null, now);
-      updated += 1;
+      try {
+        const readme = await maybeFetchReadme(client, item, index < readmeLimit);
+        const repository = await upsertRepositoryFromGitHub(item, readme, now);
+        await snapshotAndScoreRepository(repository.id, readme?.text ?? null, now);
+        updated += 1;
+      } catch (error) {
+        const fullName = sanitizeExternalText(item.full_name, 300) ?? `github:${item.id}`;
+        const message = error instanceof Error ? error.message : "Unknown item error";
+        itemErrors.push(`${fullName}: ${message.slice(0, 180)}`);
+      }
     }
 
     if (options.generateSummaries !== false) {
@@ -259,11 +258,18 @@ export async function runDailyScan(options: ScanOptions = {}) {
         status: "SUCCESS",
         finishedAt: new Date(),
         reposFound: filtered.length,
-        reposUpdated: updated
+        reposUpdated: updated,
+        errorMessage: itemErrors.length ? itemErrors.slice(0, 5).join(" | ") : null
       }
     });
 
     await createDailyReport(scanRun.id);
+    await dispatchScanSuccessNotifications(scanRun.id).catch((notificationError) => {
+      console.warn(
+        "RepoRadar notification dispatch failed:",
+        notificationError instanceof Error ? notificationError.message : "Unknown notification error"
+      );
+    });
 
     return prisma.scanRun.findUniqueOrThrow({ where: { id: scanRun.id } });
   } catch (error) {
@@ -275,6 +281,12 @@ export async function runDailyScan(options: ScanOptions = {}) {
         finishedAt: new Date(),
         errorMessage: message
       }
+    });
+    await dispatchScanFailureNotification(scanRun.id, error).catch((notificationError) => {
+      console.warn(
+        "RepoRadar failure notification dispatch failed:",
+        notificationError instanceof Error ? notificationError.message : "Unknown notification error"
+      );
     });
     throw error;
   }

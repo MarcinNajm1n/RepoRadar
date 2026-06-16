@@ -1,6 +1,6 @@
 import { getConfig } from "@/lib/config";
 import { stableHash } from "@/lib/hash";
-import { truncateText } from "@/lib/utils";
+import { sanitizeExternalText, truncateText } from "@/lib/utils";
 import type { GitHubReadmeResult, GitHubSearchResponse, SearchOptions } from "./types";
 import { dedupeGitHubRepositories } from "./dedupe";
 
@@ -97,7 +97,7 @@ export class GitHubClient {
       return {
         text,
         hash: stableHash(text),
-        excerpt: truncateText(text.replace(/\s+/g, " ").trim(), 2400)
+        excerpt: sanitizeExternalText(truncateText(text, 2400), 2400) ?? ""
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes("404")) {

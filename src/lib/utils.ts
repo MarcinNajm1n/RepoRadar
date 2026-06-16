@@ -29,6 +29,49 @@ export function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+export function sanitizeExternalText(value: string | null | undefined, maxLength = 12000) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const cleaned = value
+    .replace(/\u0000/g, "")
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/\\x(?![0-9a-fA-F]{2})/g, "/x")
+    .replace(/\\u(?![0-9a-fA-F]{4})/g, "/u")
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "�")
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return truncateText(cleaned, maxLength);
+}
+
+export function sanitizeExternalStringArray(values: string[] | undefined, maxItems = 30) {
+  return (values ?? [])
+    .map((value) => sanitizeExternalText(value, 80))
+    .filter((value): value is string => Boolean(value))
+    .slice(0, maxItems);
+}
+
+export function sanitizeExternalUrl(value: string | null | undefined, maxLength = 700) {
+  const cleaned = sanitizeExternalText(value, maxLength);
+  if (!cleaned) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function monthsBetween(from: Date, to = new Date()) {
   const years = to.getUTCFullYear() - from.getUTCFullYear();
   const months = to.getUTCMonth() - from.getUTCMonth();

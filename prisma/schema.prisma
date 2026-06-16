@@ -8,9 +8,9 @@ datasource db {
 }
 
 model Repository {
-  id                String         @id @default(cuid())
-  githubId          Int            @unique
-  fullName          String         @unique
+  id                String    @id @default(cuid())
+  githubId          Int       @unique
+  fullName          String    @unique
   owner             String
   name              String
   url               String
@@ -18,35 +18,37 @@ model Repository {
   readmeHash        String?
   readmeExcerpt     String?
   primaryLanguage   String?
-  topicsJson        String         @default("[]")
+  topicsJson        String    @default("[]")
   license           String?
   createdAt         DateTime
   pushedAt          DateTime?
-  firstSeenAt       DateTime       @default(now())
-  lastSeenAt        DateTime       @default(now())
-  starsCurrent      Int            @default(0)
-  forksCurrent      Int            @default(0)
-  watchersCurrent   Int            @default(0)
-  openIssues        Int            @default(0)
-  ageMonths         Int            @default(0)
-  isOldRepo         Boolean        @default(false)
-  isArchived        Boolean        @default(false)
-  isFork            Boolean        @default(false)
-  isDeletedFromView Boolean        @default(false)
-  status            String         @default("NEW")
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  starsCurrent      Int       @default(0)
+  forksCurrent      Int       @default(0)
+  watchersCurrent   Int       @default(0)
+  openIssues        Int       @default(0)
+  ageMonths         Int       @default(0)
+  isOldRepo         Boolean   @default(false)
+  isArchived        Boolean   @default(false)
+  isFork            Boolean   @default(false)
+  isDeletedFromView Boolean   @default(false)
+  status            String    @default("NEW")
   shortSummaryPl    String?
   lastAnalyzedAt    DateTime?
-  trendScore        Int            @default(0)
-  relevanceScore    Int            @default(0)
-  source            String         @default("github")
-  createdDbAt       DateTime       @default(now())
-  updatedDbAt       DateTime       @updatedAt
+  trendScore        Int       @default(0)
+  relevanceScore    Int       @default(0)
+  source            String    @default("github")
+  createdDbAt       DateTime  @default(now())
+  updatedDbAt       DateTime  @updatedAt
 
-  snapshots         RepoSnapshot[]
-  reports           Report[]
-  ideas             Idea[]
-  openaiCache       OpenAiCache[]
-  ignoredRecord     IgnoredRepository?
+  snapshots             RepoSnapshot[]
+  reports               Report[]
+  ideas                 Idea[]
+  openaiCache           OpenAiCache[]
+  marketResearchRuns    MarketResearchRun[]
+  marketResearchSources MarketResearchSource[]
+  ignoredRecord         IgnoredRepository?
 
   @@index([status])
   @@index([trendScore])
@@ -58,9 +60,9 @@ model Repository {
 }
 
 model RepoSnapshot {
-  id              String      @id @default(cuid())
+  id              String    @id @default(cuid())
   repoId          String
-  capturedAt      DateTime    @default(now())
+  capturedAt      DateTime  @default(now())
   stars           Int
   forks           Int
   watchers        Int
@@ -70,25 +72,27 @@ model RepoSnapshot {
   growth7d        Int?
   growthPercent7d Float?
 
-  repository      Repository  @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
 
   @@index([repoId, capturedAt])
 }
 
 model Report {
-  id              String      @id @default(cuid())
+  id              String   @id @default(cuid())
   type            String
   repoId          String?
   title           String
   markdownPath    String?
   contentMarkdown String
   summary         String?
-  repoCount       Int         @default(0)
-  topRepoIdsJson  String      @default("[]")
+  repoCount       Int      @default(0)
+  topRepoIdsJson  String   @default("[]")
   inputHash       String?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime @default(now())
 
-  repository      Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  repository            Repository?            @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  marketResearchRuns    MarketResearchRun[]
+  marketResearchSources MarketResearchSource[]
 
   @@index([type])
   @@index([createdAt])
@@ -96,7 +100,7 @@ model Report {
 }
 
 model Idea {
-  id                    String      @id @default(cuid())
+  id                    String   @id @default(cuid())
   sourceRepoId          String
   title                 String
   problem               String
@@ -108,25 +112,30 @@ model Idea {
   usefulnessScore       Int
   riskScore             Int
   suggestedStack        String
-  firstStepsJson        String      @default("[]")
-  status                String      @default("NEW")
-  createdAt             DateTime    @default(now())
+  firstStepsJson        String   @default("[]")
+  marketSummary         String?
+  evidenceIdsJson       String   @default("[]")
+  confidenceScore       Int?
+  status                String   @default("NEW")
+  createdAt             DateTime @default(now())
 
-  repository            Repository  @relation(fields: [sourceRepoId], references: [id], onDelete: Cascade)
+  repository            Repository             @relation(fields: [sourceRepoId], references: [id], onDelete: Cascade)
+  marketResearchRuns    MarketResearchRun[]
+  marketResearchSources MarketResearchSource[]
 
   @@index([sourceRepoId])
   @@index([status])
 }
 
 model IgnoredRepository {
-  id          String      @id @default(cuid())
-  repoId      String?     @unique
-  fullName    String      @unique
-  reason      String?
-  ignoredAt   DateTime    @default(now())
-  permanent   Boolean     @default(true)
+  id        String   @id @default(cuid())
+  repoId    String?  @unique
+  fullName  String   @unique
+  reason    String?
+  ignoredAt DateTime @default(now())
+  permanent Boolean  @default(true)
 
-  repository  Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  repository Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
 }
 
 model Setting {
@@ -149,17 +158,89 @@ model ScanRun {
 }
 
 model OpenAiCache {
-  id        String      @id @default(cuid())
+  id        String   @id @default(cuid())
   kind      String
   repoId    String?
   inputHash String
   model     String
   content   String
-  createdAt DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   repository Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
 
   @@unique([kind, repoId, inputHash, model])
   @@index([kind])
+  @@index([createdAt])
+}
+
+model MarketResearchRun {
+  id          String    @id @default(cuid())
+  repoId      String?
+  reportId    String?
+  ideaId      String?
+  provider    String
+  queryHash   String
+  status      String    @default("RUNNING")
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  sourceCount Int       @default(0)
+  error       String?
+
+  repository Repository?            @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  report     Report?                @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  idea       Idea?                  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  sources    MarketResearchSource[]
+
+  @@index([repoId])
+  @@index([reportId])
+  @@index([ideaId])
+  @@index([provider])
+  @@index([queryHash])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model MarketResearchSource {
+  id             String    @id @default(cuid())
+  runId          String
+  repoId         String?
+  reportId       String?
+  ideaId         String?
+  sourceType     String
+  title          String
+  url            String
+  publisher      String?
+  retrievedAt    DateTime  @default(now())
+  publishedAt    DateTime?
+  snippet        String
+  sentiment      String?
+  relevanceScore Int?
+
+  run        MarketResearchRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  repository Repository?       @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  report     Report?           @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  idea       Idea?             @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+
+  @@index([runId])
+  @@index([repoId])
+  @@index([reportId])
+  @@index([ideaId])
+  @@index([sourceType])
+  @@index([retrievedAt])
+}
+
+model NotificationLog {
+  id           String   @id @default(cuid())
+  channel      String
+  eventType    String
+  status       String
+  maskedTarget String?
+  payloadJson  String?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([channel])
+  @@index([eventType])
+  @@index([status])
   @@index([createdAt])
 }

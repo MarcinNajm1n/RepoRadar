@@ -33,6 +33,19 @@ export type RepositoryListItem = {
   growthPercent7d: number | null;
 };
 
+export type EvidenceSourceItem = {
+  id: string;
+  sourceType: string;
+  title: string;
+  url: string;
+  publisher: string | null;
+  retrievedAt: string;
+  publishedAt: string | null;
+  snippet: string;
+  sentiment: string | null;
+  relevanceScore: number | null;
+};
+
 export type IdeaListItem = {
   id: string;
   sourceRepoId: string;
@@ -46,8 +59,12 @@ export type IdeaListItem = {
   difficulty: number;
   usefulnessScore: number;
   riskScore: number;
+  confidenceScore: number | null;
+  marketSummary: string | null;
   suggestedStack: string;
   firstSteps: string[];
+  evidenceIds: string[];
+  evidenceSources: EvidenceSourceItem[];
   status: string;
   createdAt: string;
 };

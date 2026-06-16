@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -18,7 +18,7 @@ import {
   Star,
   Trash2
 } from "lucide-react";
-import type { DashboardData, RepositoryListItem } from "@/types/repository";
+import type { DashboardData, EvidenceSourceItem, RepositoryListItem } from "@/types/repository";
 import { REPOSITORY_STATUSES, formatStatus } from "@/types/status";
 import {
   createWeeklyReportAction,
@@ -28,7 +28,7 @@ import {
   updateSettingAction,
   updateStatusAction
 } from "@/app/actions";
-import { cn, formatCompactNumber, formatDate } from "@/lib/utils";
+import { cn, formatCompactNumber, formatDate, sanitizeExternalUrl } from "@/lib/utils";
 
 type TabKey =
   | "library"
@@ -57,6 +57,7 @@ type ReportState = {
   title: string;
   content: string;
   path: string | null;
+  evidenceSources: EvidenceSourceItem[];
 } | null;
 
 function Button({
@@ -152,6 +153,54 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [report, setReport] = useState<ReportState>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const reportDialogRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!report) {
+      return;
+    }
+
+    const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    reportDialogRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setReport(null);
+        return;
+      }
+
+      if (event.key !== "Tab" || !reportDialogRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(
+        reportDialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
+
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus();
+    };
+  }, [report]);
 
   const languages = useMemo(
     () =>
@@ -186,7 +235,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       setReport({
         title: generated.title,
         content: generated.contentMarkdown,
-        path: generated.markdownPath
+        path: generated.markdownPath,
+        evidenceSources: generated.evidenceSources
       });
     }, force ? "Raport został zregenerowany." : "Raport jest gotowy.");
   }
@@ -194,6 +244,11 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   function repoAction(event: React.MouseEvent, action: () => Promise<unknown>, success: string) {
     event.stopPropagation();
     runAction(action, success);
+  }
+
+  function toggleRepo(event: React.MouseEvent, repoId: string) {
+    event.stopPropagation();
+    setExpandedRepoId(expandedRepoId === repoId ? null : repoId);
   }
 
   return (
@@ -367,6 +422,14 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                             ) : null}
                             {repo.isArchived ? <Badge>archived</Badge> : null}
                             {repo.isFork ? <Badge>fork</Badge> : null}
+                            <Button
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={(event) => toggleRepo(event, repo.id)}
+                              aria-expanded={expandedRepoId === repo.id}
+                            >
+                              {expandedRepoId === repo.id ? "Zwin" : "Rozwin"}
+                            </Button>
                           </div>
                           <p className="text-sm text-muted-foreground">{repo.description ?? "Brak opisu w GitHub metadata."}</p>
                           {repo.shortSummaryPl ? (
@@ -380,7 +443,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                             ))}
                           </div>
                         </div>
-                        <div className="grid min-w-[280px] grid-cols-2 gap-2 text-sm sm:grid-cols-3 xl:text-right">
+                        <div className="grid w-full min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-3 xl:w-auto xl:min-w-[280px] xl:text-right">
                           <Metric label="Stars" value={formatCompactNumber(repo.starsCurrent)} />
                           <Metric label="Growth 7d" value={repo.growth7d === null ? "zbieramy" : `+${repo.growth7d}`} />
                           <Metric label="Score" value={repo.trendScore} className={scoreClass(repo.trendScore)} />
@@ -474,15 +537,38 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">{idea.title}</h3>
                       <Badge>{idea.sourceRepoName}</Badge>
+                      {idea.confidenceScore ? <Badge>Confidence {idea.confidenceScore}/5</Badge> : null}
+                      {idea.evidenceSources.length ? <Badge>{idea.evidenceSources.length} sources</Badge> : null}
                     </div>
                     <p className="text-sm text-muted-foreground">{idea.problem}</p>
+                    {idea.marketSummary ? (
+                      <p className="mt-3 rounded-md border border-border bg-muted p-3 text-sm leading-6">
+                        {idea.marketSummary}
+                      </p>
+                    ) : null}
                     <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
                       <Info label="Dla kogo" value={idea.targetUser} />
+                      <Info label="MVP" value={idea.mvpScope} />
+                      <Info label="Monetyzacja" value={idea.monetizationPotential} />
+                      <Info label="Ryzyko" value={`${idea.riskScore}/5`} />
                       <Info label="Trudność" value={`${idea.difficulty}/5`} />
                       <Info label="Potencjał" value={`${idea.usefulnessScore}/5`} />
                     </div>
                     <p className="mt-3 text-sm">{idea.proposedSolution}</p>
                     <p className="mt-2 text-sm text-muted-foreground">Stack: {idea.suggestedStack}</p>
+                    {idea.firstSteps.length ? (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold">Pierwsze kroki</h4>
+                        <ol className="mt-2 grid gap-2 text-sm md:grid-cols-2">
+                          {idea.firstSteps.map((step, index) => (
+                            <li key={`${idea.id}-step-${index}`} className="rounded-md border border-border bg-muted p-2">
+                              {index + 1}. {step}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+                    <EvidenceSources sources={idea.evidenceSources} emptyText="Brak zapisanych zrodel dla tego pomyslu." />
                   </article>
                 ))
               ) : (
@@ -547,23 +633,155 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       {report ? (
         <div className="fixed inset-0 z-50 bg-black/40 p-4" onClick={() => setReport(null)}>
           <div
+            ref={reportDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="repo-report-dialog-title"
+            tabIndex={-1}
             className="mx-auto max-h-[92vh] max-w-5xl overflow-auto rounded-lg border border-border bg-card p-5 shadow-soft"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-border bg-card pb-4">
               <div>
-                <h2 className="text-xl font-semibold">{report.title}</h2>
+                <h2 id="repo-report-dialog-title" className="text-xl font-semibold">{report.title}</h2>
                 {report.path ? <p className="text-sm text-muted-foreground">Zapisano: {report.path}</p> : null}
               </div>
               <Button variant="secondary" onClick={() => setReport(null)}>
                 Zamknij
               </Button>
             </div>
-            <article className="repo-report rounded-md bg-muted p-4 text-sm">{report.content}</article>
+            <ReportViewer content={report.content} sources={report.evidenceSources} />
           </div>
         </div>
       ) : null}
     </main>
+  );
+}
+
+function parseReportSections(content: string) {
+  const lines = content.split(/\r?\n/);
+  const sections: Array<{ title: string; body: string }> = [];
+  let currentTitle = "Raport";
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const match = line.match(/^#{1,3}\s+(.+)$/);
+    if (match) {
+      if (currentBody.join("\n").trim()) {
+        sections.push({ title: currentTitle, body: currentBody.join("\n").trim() });
+      }
+      currentTitle = match[1].trim();
+      currentBody = [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+
+  if (currentBody.join("\n").trim()) {
+    sections.push({ title: currentTitle, body: currentBody.join("\n").trim() });
+  }
+
+  return sections.length ? sections : [{ title: "Raport", body: content }];
+}
+
+function sentimentClass(sentiment: string | null) {
+  const normalized = sentiment?.toLowerCase() ?? "";
+  if (normalized.includes("positive")) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  if (normalized.includes("negative")) {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+  if (normalized.includes("mixed")) {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  return "border-border bg-muted text-muted-foreground";
+}
+
+function EvidenceSources({ sources, emptyText }: { sources: EvidenceSourceItem[]; emptyText: string }) {
+  return (
+    <div className="mt-4">
+      <h4 className="text-sm font-semibold">Evidence</h4>
+      {sources.length ? (
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {sources.map((source) => (
+            <EvidenceSourceCard key={source.id} source={source} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 rounded-md border border-dashed border-border bg-muted p-3 text-sm text-muted-foreground">
+          {emptyText}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function EvidenceSourceCard({ source }: { source: EvidenceSourceItem }) {
+  const safeUrl = sanitizeExternalUrl(source.url);
+  const content = (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Badge>{source.sourceType}</Badge>
+        {source.sentiment ? <Badge className={sentimentClass(source.sentiment)}>{source.sentiment}</Badge> : null}
+        {source.relevanceScore !== null ? <Badge>Rel {source.relevanceScore}/100</Badge> : null}
+        {!safeUrl ? <Badge>URL blocked</Badge> : null}
+      </div>
+      <div className="font-medium leading-5">{source.title}</div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {[source.publisher, source.publishedAt ? formatDate(source.publishedAt) : null].filter(Boolean).join(" | ")}
+      </p>
+      <p className="mt-2 line-clamp-4 text-muted-foreground">{source.snippet}</p>
+    </>
+  );
+
+  if (!safeUrl) {
+    return <div className="block rounded-md border border-border bg-background p-3 text-sm">{content}</div>;
+  }
+
+  return (
+    <a
+      href={safeUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="block rounded-md border border-border bg-background p-3 text-sm transition hover:border-primary/50"
+    >
+      {content}
+    </a>
+  );
+}
+
+function ReportViewer({ content, sources }: { content: string; sources: EvidenceSourceItem[] }) {
+  const sections = parseReportSections(content);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+      <aside className="hidden rounded-md border border-border bg-muted p-3 text-sm lg:block">
+        <div className="mb-2 font-semibold">Sekcje</div>
+        <nav className="space-y-1">
+          {sections.slice(0, 18).map((section, index) => (
+            <a key={`${section.title}-${index}`} href={`#report-section-${index}`} className="block rounded px-2 py-1 text-muted-foreground hover:bg-card hover:text-foreground">
+              {section.title}
+            </a>
+          ))}
+        </nav>
+      </aside>
+      <article className="min-w-0 space-y-3">
+        {sections.map((section, index) => (
+          <section id={`report-section-${index}`} key={`${section.title}-${index}`} className="rounded-md border border-border bg-muted p-4">
+            <h3 className="text-base font-semibold">{section.title}</h3>
+            <pre className="repo-report mt-2 whitespace-pre-wrap break-words text-sm leading-6">{section.body}</pre>
+          </section>
+        ))}
+        <section className="rounded-md border border-border bg-card p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold">Zrodla i dowody</h3>
+            {sources.length ? <Badge>{sources.length} sources</Badge> : null}
+          </div>
+          <EvidenceSources sources={sources} emptyText="Ten raport nie ma zapisanych zrodel market research." />
+        </section>
+      </article>
+    </div>
   );
 }
 
