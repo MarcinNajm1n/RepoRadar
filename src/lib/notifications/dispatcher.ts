@@ -2,6 +2,7 @@ import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
 import { truncateText } from "@/lib/utils";
 import { isExcellentOpportunity } from "@/lib/market-research/opportunity";
+import { IDEA_STATUS } from "@/types/idea-status";
 import { isHighValueRepository } from "./thresholds";
 import { sendDiscordNotification } from "./channels/discord";
 import { sendNoopNotification } from "./channels/noop";
@@ -146,6 +147,9 @@ export async function dispatchOpportunityCandidateNotification(candidateId: stri
     candidate.marketSummary,
     ...candidate.marketResearchSources.map((source) => `${source.title} ${source.snippet}`)
   ].join(" ");
+  if (candidate.status !== IDEA_STATUS.CANDIDATE && candidate.status !== IDEA_STATUS.FULL) {
+    return [];
+  }
   if (
     !isExcellentOpportunity({
       opportunityScore: candidate.opportunityScore,

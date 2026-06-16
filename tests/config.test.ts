@@ -8,6 +8,32 @@ afterEach(() => {
 });
 
 describe("getConfig", () => {
+  it("uses stable market research defaults", () => {
+    delete process.env.MARKET_RESEARCH_MODE;
+    delete process.env.ENABLE_AUTO_OPPORTUNITY_RESEARCH;
+    delete process.env.ENABLE_HN_SOURCE;
+    delete process.env.ENABLE_RSS_SOURCE;
+    delete process.env.ENABLE_OPENAI_WEB_SEARCH_SOURCE;
+    delete process.env.ENABLE_REDDIT_SOURCE;
+    delete process.env.ENABLE_BLUESKY_SOURCE;
+
+    const config = getConfig();
+
+    expect(config.marketResearchMode).toBe("light");
+    expect(config.enableAutoOpportunityResearch).toBe(false);
+    expect(config.enableHnSource).toBe(true);
+    expect(config.enableRssSource).toBe(true);
+    expect(config.enableOpenAiWebSearchSource).toBe(true);
+    expect(config.enableRedditSource).toBe(false);
+    expect(config.enableBlueskySource).toBe(false);
+  });
+
+  it("falls back unknown market research mode to light", () => {
+    process.env.MARKET_RESEARCH_MODE = "expensive";
+
+    expect(getConfig().marketResearchMode).toBe("light");
+  });
+
   it("clamps GitHub discovery profile ranges from env", () => {
     process.env.FRESH_REPO_MIN_STARS = "-10";
     process.env.FRESH_REPO_MAX_AGE_DAYS = "99999";

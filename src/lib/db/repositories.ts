@@ -1,6 +1,8 @@
 import { prisma } from "./client";
 import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
+import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
+import type { IdeaStatus } from "@/types/idea-status";
 import type {
   DashboardData,
   EvidenceSourceItem,
@@ -123,6 +125,7 @@ function mapIdea(
     riskScore: idea.riskScore,
     confidenceScore: idea.confidenceScore,
     opportunityScore: idea.opportunityScore,
+    opportunityBreakdown: safeJsonParse<Record<string, number>>(idea.opportunityBreakdownJson, {}),
     applicationSummary: idea.applicationSummary,
     businessRationale: idea.businessRationale,
     researchMode: idea.researchMode,
@@ -132,6 +135,7 @@ function mapIdea(
     evidenceIds: safeJsonParse<string[]>(idea.evidenceIdsJson, []),
     evidenceSources: idea.marketResearchSources?.map(mapEvidenceSource) ?? [],
     status: idea.status,
+    lastResearchAt: idea.lastResearchAt?.toISOString() ?? null,
     createdAt: idea.createdAt.toISOString()
   };
 }
@@ -206,15 +210,17 @@ export async function getDashboardData(): Promise<DashboardData> {
 }
 
 async function getCounts() {
-  const [all, newlyFound, saved, read, ignored, ideas, candidates, fullIdeas, old, hot] = await Promise.all([
+  const [all, newlyFound, saved, read, ignored, ideas, candidates, fullIdeas, savedIdeas, dismissedIdeas, old, hot] = await Promise.all([
     prisma.repository.count({ where: { isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "NEW", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "SAVED", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "READ", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "IGNORED" } }),
     prisma.idea.count(),
-    prisma.idea.count({ where: { status: "CANDIDATE" } }),
-    prisma.idea.count({ where: { status: { not: "CANDIDATE" } } }),
+    prisma.idea.count({ where: { status: IDEA_STATUS.CANDIDATE } }),
+    prisma.idea.count({ where: { status: { in: FULL_IDEA_STATUSES } } }),
+    prisma.idea.count({ where: { status: IDEA_STATUS.SAVED } }),
+    prisma.idea.count({ where: { status: IDEA_STATUS.DISMISSED } }),
     prisma.repository.count({ where: { isOldRepo: true, status: { not: "HOT" }, isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "HOT", isDeletedFromView: false } })
   ]);
@@ -228,9 +234,25 @@ async function getCounts() {
     ideas,
     candidates,
     fullIdeas,
+    savedIdeas,
+    dismissedIdeas,
     old,
     hot
   };
+}
+
+export async function updateIdeaStatus(ideaId: string, status: string) {
+  if (!isIdeaStatus(status)) {
+    throw new Error(`Unsupported idea status: ${status}`);
+  }
+
+  const nextStatus: IdeaStatus = status;
+  return prisma.idea.update({
+    where: { id: ideaId },
+    data: {
+      status: nextStatus
+    }
+  });
 }
 
 export async function updateRepositoryStatus(repoId: string, status: string, reason?: string) {

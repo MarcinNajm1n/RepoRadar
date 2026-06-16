@@ -146,7 +146,7 @@ export function getConfig(): AppConfig {
     minWeeklyStarGrowthPercent: readNumber("MIN_WEEKLY_STAR_GROWTH_PERCENT", 20),
     openAiDailyAnalysisLimit: readNumber("OPENAI_DAILY_ANALYSIS_LIMIT", 20),
     enableRedditSource: readBoolean("ENABLE_REDDIT_SOURCE", false),
-    enableHnSource: readBoolean("ENABLE_HN_SOURCE", false),
+    enableHnSource: readBoolean("ENABLE_HN_SOURCE", true),
     enableProductHuntSource: readBoolean("ENABLE_PRODUCT_HUNT_SOURCE", false),
     enableXSource: readBoolean("ENABLE_X_SOURCE", false),
     enableNotifications: readBoolean("ENABLE_NOTIFICATIONS", true),

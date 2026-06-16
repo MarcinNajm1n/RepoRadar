@@ -37,16 +37,23 @@ export function buildResearchQueries(context: MarketResearchContext) {
   const topicTerms = context.topics.slice(0, 4).join(" ");
   const descriptionTerms = tokenize(context.description).slice(0, 6).join(" ");
   const base = [repoName, topicTerms, descriptionTerms].filter(Boolean).join(" ");
+  const topic = topicTerms || repoName;
 
-  return [
+  const queries = [
     base,
-    `${repoName} user problems`,
+    `${repoName} problem pain`,
     `${repoName} alternatives pricing`,
-    `${topicTerms || repoName} developer workflow pain`,
-    `${topicTerms || repoName} SaaS automation`
-  ]
-    .map((query) => sanitizeExternalText(query, 180))
-    .filter((query): query is string => Boolean(query));
+    `${repoName} looking for tool`,
+    `${topic} developer workflow pain`,
+    `${topic} manual workflow`,
+    `${topic} how to automate`,
+    `${topic} SaaS automation time saving cost saving`
+  ];
+
+  return [...new Set(queries.map((query) => sanitizeExternalText(query, 180)).filter((query): query is string => Boolean(query)))].slice(
+    0,
+    8
+  );
 }
 
 export function buildPrimaryResearchQuery(context: MarketResearchContext) {

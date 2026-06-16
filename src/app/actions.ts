@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getEvidenceSourcesForReport, updateRepositoryStatus } from "@/lib/db/repositories";
+import { getEvidenceSourcesForReport, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
 import { runDailyScan } from "@/lib/github/scanner";
 import {
   generateFullReportForRepository,
   generateIdeaForRepository,
-  generateOpportunityCandidateForRepository
+  generateOpportunityCandidateForRepository,
+  promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
@@ -43,8 +44,8 @@ export async function generateReportAction(repoId: string, force = false) {
   };
 }
 
-export async function generateIdeaAction(repoId: string) {
-  const idea = await generateIdeaForRepository(repoId);
+export async function generateIdeaAction(repoId: string, force = false) {
+  const idea = await generateIdeaForRepository(repoId, force);
   revalidatePath("/");
   return {
     id: idea.id,
@@ -52,10 +53,25 @@ export async function generateIdeaAction(repoId: string) {
   };
 }
 
-export async function generateOpportunityCandidateAction(repoId: string) {
-  const result = await generateOpportunityCandidateForRepository(repoId);
+export async function generateOpportunityCandidateAction(repoId: string, force = false) {
+  const result = await generateOpportunityCandidateForRepository(repoId, force);
   revalidatePath("/");
   return result;
+}
+
+export async function promoteCandidateToFullIdeaAction(ideaId: string, force = false) {
+  const idea = await promoteCandidateToFullIdea(ideaId, force);
+  revalidatePath("/");
+  return {
+    id: idea.id,
+    title: idea.title
+  };
+}
+
+export async function updateIdeaStatusAction(ideaId: string, status: string) {
+  await updateIdeaStatus(ideaId, status);
+  revalidatePath("/");
+  return { ok: true };
 }
 
 export async function createWeeklyReportAction() {

@@ -33,13 +33,29 @@ export type OpportunityScoreInput = {
   >;
 };
 
+export type OpportunityScoreBreakdown = {
+  sourcePoints: number;
+  confidencePoints: number;
+  b2bFitPoints: number;
+  problemClarityPoints: number;
+  timeSavingPoints: number;
+  mvpFeasibilityPoints: number;
+  competitionPenalty: number;
+  customerAcquisitionPenalty: number;
+};
+
 function keywordScore(text: string, keywords: string[]) {
   const normalized = text.toLowerCase();
   const hits = keywords.filter((keyword) => normalized.includes(keyword)).length;
   return clamp(hits / 4, 0, 1);
 }
 
-export function calculateOpportunityScore(input: OpportunityScoreInput) {
+function penaltyScore(text: string, keywords: string[]) {
+  const normalized = text.toLowerCase();
+  return keywords.filter((keyword) => normalized.includes(keyword)).length;
+}
+
+export function calculateOpportunityScoreWithBreakdown(input: OpportunityScoreInput) {
   const evidenceText = [
     input.research.summary,
     ...input.research.signals,
@@ -51,20 +67,54 @@ export function calculateOpportunityScore(input: OpportunityScoreInput) {
   const confidenceScore = clamp((input.research.confidenceScore ?? 1) / 5, 0, 1);
   const problemScore = clamp(input.research.userProblems.length / 4, 0, 1);
   const demandScore = clamp(input.research.demandEvidence.length / 4, 0, 1);
-  const repoScore = clamp((input.trendScore * 0.6 + input.relevanceScore * 0.4) / 100, 0, 1);
   const businessFitScore = keywordScore(evidenceText, BUSINESS_KEYWORDS);
   const savingsScore = keywordScore(evidenceText, SAVINGS_KEYWORDS);
-
-  return Math.round(
-    100 *
-      (0.18 * repoScore +
-        0.18 * sourceCountScore +
-        0.18 * confidenceScore +
-        0.16 * problemScore +
-        0.14 * demandScore +
-        0.1 * businessFitScore +
-        0.06 * savingsScore)
+  const mvpFeasibilityScore = keywordScore(evidenceText, [
+    "mvp",
+    "prototype",
+    "internal",
+    "simple",
+    "workflow",
+    "automation",
+    "api",
+    "dashboard"
+  ]);
+  const competitionPenalty = -Math.min(
+    10,
+    penaltyScore(evidenceText, ["crowded", "saturated", "competition", "competitor", "alternative", "alternatives"]) * 3
   );
+  const customerAcquisitionPenalty = -Math.min(
+    8,
+    penaltyScore(evidenceText, ["unclear buyer", "hard to sell", "no budget", "consumer", "hobby"]) * 4
+  );
+  const breakdown: OpportunityScoreBreakdown = {
+    sourcePoints: Math.round(18 * sourceCountScore),
+    confidencePoints: Math.round(18 * confidenceScore),
+    b2bFitPoints: Math.round(15 * businessFitScore),
+    problemClarityPoints: Math.round(16 * problemScore),
+    timeSavingPoints: Math.round(14 * savingsScore),
+    mvpFeasibilityPoints: Math.round(12 * Math.max(mvpFeasibilityScore, demandScore * 0.6)),
+    competitionPenalty,
+    customerAcquisitionPenalty
+  };
+  const total =
+    breakdown.sourcePoints +
+    breakdown.confidencePoints +
+    breakdown.b2bFitPoints +
+    breakdown.problemClarityPoints +
+    breakdown.timeSavingPoints +
+    breakdown.mvpFeasibilityPoints +
+    breakdown.competitionPenalty +
+    breakdown.customerAcquisitionPenalty;
+
+  return {
+    score: Math.round(clamp(total, 0, 100)),
+    breakdown
+  };
+}
+
+export function calculateOpportunityScore(input: OpportunityScoreInput) {
+  return calculateOpportunityScoreWithBreakdown(input).score;
 }
 
 export function isExcellentOpportunity(input: { opportunityScore: number | null; confidenceScore: number | null; sourceCount: number; text: string }) {

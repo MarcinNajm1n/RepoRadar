@@ -78,6 +78,7 @@ export type IdeaListItem = {
   riskScore: number;
   confidenceScore: number | null;
   opportunityScore: number | null;
+  opportunityBreakdown: Record<string, number>;
   applicationSummary: string | null;
   businessRationale: string | null;
   researchMode: string;
@@ -87,6 +88,7 @@ export type IdeaListItem = {
   evidenceIds: string[];
   evidenceSources: EvidenceSourceItem[];
   status: string;
+  lastResearchAt: string | null;
   createdAt: string;
 };
 
@@ -116,6 +118,8 @@ export type DashboardData = {
     ideas: number;
     candidates: number;
     fullIdeas: number;
+    savedIdeas: number;
+    dismissedIdeas: number;
     old: number;
     hot: number;
   };

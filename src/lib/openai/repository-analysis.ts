@@ -18,8 +18,9 @@ import {
   attachResearchRunsToReport,
   getMarketResearchForRepository
 } from "@/lib/market-research/service";
-import { buildOpportunityFallback, calculateOpportunityScore } from "@/lib/market-research/opportunity";
+import { buildOpportunityFallback, calculateOpportunityScoreWithBreakdown } from "@/lib/market-research/opportunity";
 import type { MarketResearchMode } from "@/lib/market-research/types";
+import { ACTIVE_IDEA_STATUSES, IDEA_STATUS, isActiveIdeaStatus } from "@/types/idea-status";
 
 function topicsFromJson(value: string) {
   return safeJsonParse<string[]>(value, []);
@@ -198,7 +199,32 @@ function extractJsonObject(value: string) {
   return "{}";
 }
 
-export async function generateIdeaForRepository(repoId: string) {
+function mergeEvidenceIds(existingJson: string | null | undefined, nextIds: string[] | undefined) {
+  const existing = safeJsonParse<string[]>(existingJson, []);
+  return [...new Set([...existing, ...(nextIds ?? [])])];
+}
+
+async function findActiveIdeaForRepository(repoId: string) {
+  return prisma.idea.findFirst({
+    where: {
+      sourceRepoId: repoId,
+      status: { in: ACTIVE_IDEA_STATUSES }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function generateIdeaForRepository(repoId: string, force = false) {
+  if (!force) {
+    const existing = await findActiveIdeaForRepository(repoId);
+    if (existing && existing.status !== IDEA_STATUS.CANDIDATE) {
+      return existing;
+    }
+    if (existing?.status === IDEA_STATUS.CANDIDATE) {
+      return promoteCandidateToFullIdea(existing.id);
+    }
+  }
+
   const repository = await getRepositoryForReport(repoId);
   const config = getConfig();
   const context = buildRepositoryContext({
@@ -207,7 +233,8 @@ export async function generateIdeaForRepository(repoId: string) {
     snapshots: repository.snapshots
   });
   const hash = inputHash("idea", context);
-  const cached = await getCachedOpenAiOutput("idea", repoId, hash, config.openAiModel);
+  const ideaCacheKind = "idea:v2";
+  const cached = await getCachedOpenAiOutput(ideaCacheKind, repoId, hash, config.openAiModel);
   const research = cached
     ? null
     : await (async () => {
@@ -223,7 +250,7 @@ export async function generateIdeaForRepository(repoId: string) {
   const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext));
 
   if (!cached) {
-    await saveOpenAiOutput("idea", repoId, hash, config.openAiModel, content);
+    await saveOpenAiOutput(ideaCacheKind, repoId, hash, config.openAiModel, content);
   }
 
   const parsed = safeJsonParse<{
@@ -244,6 +271,14 @@ export async function generateIdeaForRepository(repoId: string) {
     suggestedStack?: string;
     firstSteps?: string[];
   }>(extractJsonObject(content), {});
+  const opportunity = research
+    ? calculateOpportunityScoreWithBreakdown({
+        trendScore: repository.trendScore,
+        relevanceScore: repository.relevanceScore,
+        starsCurrent: repository.starsCurrent,
+        research
+      })
+    : null;
 
   const idea = await prisma.idea.create({
     data: {
@@ -262,11 +297,14 @@ export async function generateIdeaForRepository(repoId: string) {
       evidenceIdsJson: JSON.stringify(research?.sourceIds ?? []),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
       opportunityScore:
-        parsed.opportunityScore === undefined ? null : Math.round(clamp(Number(parsed.opportunityScore), 0, 100)),
+        opportunity?.score ??
+        (parsed.opportunityScore === undefined ? null : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
+      opportunityBreakdownJson: JSON.stringify(opportunity?.breakdown ?? {}),
       applicationSummary: parsed.applicationSummary ?? null,
       businessRationale: parsed.businessRationale ?? null,
       researchMode: "full",
-      status: "FULL",
+      status: IDEA_STATUS.FULL,
+      lastResearchAt: research ? new Date() : null,
       firstStepsJson: JSON.stringify(parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"])
     }
   });
@@ -284,8 +322,40 @@ function scoreToFive(score: number) {
   return Math.max(1, Math.min(5, Math.round(score / 20)));
 }
 
-export async function generateOpportunityCandidateForRepository(repoId: string) {
+export async function generateOpportunityCandidateForRepository(repoId: string, force = false) {
   const repository = await getRepositoryForReport(repoId);
+  const activeExisting = await findActiveIdeaForRepository(repoId);
+  if (activeExisting && !force) {
+    return {
+      created: false,
+      existing: true,
+      ideaId: activeExisting.id,
+      opportunityScore: activeExisting.opportunityScore,
+      confidenceScore: activeExisting.confidenceScore,
+      sourceCount: safeJsonParse<string[]>(activeExisting.evidenceIdsJson, []).length,
+      reason: "Aktywny kandydat albo pomysl juz istnieje dla tego repo."
+    };
+  }
+
+  const latestExisting = await prisma.idea.findFirst({
+    where: {
+      sourceRepoId: repoId
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  if (latestExisting?.status === IDEA_STATUS.DISMISSED && !force) {
+    return {
+      created: false,
+      existing: true,
+      ideaId: latestExisting.id,
+      opportunityScore: latestExisting.opportunityScore,
+      confidenceScore: latestExisting.confidenceScore,
+      sourceCount: safeJsonParse<string[]>(latestExisting.evidenceIdsJson, []).length,
+      reason: "Kandydat zostal odrzucony. Uzyj force=true, zeby odswiezyc research."
+    };
+  }
+  const existing = force && activeExisting && isActiveIdeaStatus(activeExisting.status) ? activeExisting : latestExisting;
+
   const config = getConfig();
   const context = buildRepositoryContext({
     ...repository,
@@ -295,12 +365,13 @@ export async function generateOpportunityCandidateForRepository(repoId: string) 
   const research = await getMarketResearchForRepository(
     buildResearchContext("opportunity-candidate", repository, context, "light")
   );
-  const opportunityScore = calculateOpportunityScore({
+  const opportunity = calculateOpportunityScoreWithBreakdown({
     trendScore: repository.trendScore,
     relevanceScore: repository.relevanceScore,
     starsCurrent: repository.starsCurrent,
     research
   });
+  const opportunityScore = opportunity.score;
 
   if (opportunityScore < config.opportunityCandidateMinScore || research.sources.length < 2) {
     return {
@@ -313,14 +384,6 @@ export async function generateOpportunityCandidateForRepository(repoId: string) 
   }
 
   const fallback = buildOpportunityFallback({ fullName: repository.fullName, research });
-  const existing = await prisma.idea.findFirst({
-    where: {
-      sourceRepoId: repoId,
-      status: "CANDIDATE",
-      researchMode: "light"
-    },
-    orderBy: { createdAt: "desc" }
-  });
   const firstSteps = [
     "Sprawdz 3 rozmowy/dyskusje ze zrodel evidence.",
     "Opisz bol uzytkownika w jednym zdaniu.",
@@ -345,13 +408,15 @@ export async function generateOpportunityCandidateForRepository(repoId: string) 
     evidenceIdsJson: JSON.stringify(research.sourceIds),
     confidenceScore: research.confidenceScore,
     opportunityScore,
+    opportunityBreakdownJson: JSON.stringify(opportunity.breakdown),
     applicationSummary: fallback.applicationSummary,
     businessRationale: fallback.businessRationale,
     researchMode: "light",
-    status: "CANDIDATE"
+    status: IDEA_STATUS.CANDIDATE,
+    lastResearchAt: new Date()
   };
 
-  const idea = existing
+  const idea = existing && force
     ? await prisma.idea.update({
         where: { id: existing.id },
         data
@@ -370,4 +435,140 @@ export async function generateOpportunityCandidateForRepository(repoId: string) 
     sourceCount: research.sources.length,
     reason: "Kandydat zostal zapisany w Pomysly > Kandydaci."
   };
+}
+
+export async function promoteCandidateToFullIdea(ideaId: string, force = false) {
+  const candidate = await prisma.idea.findUniqueOrThrow({ where: { id: ideaId } });
+  if (candidate.status === IDEA_STATUS.FULL && !force) {
+    return candidate;
+  }
+  if (candidate.status === IDEA_STATUS.DISMISSED && !force) {
+    throw new Error("Odrzucony kandydat wymaga przywrocenia albo force=true przed rozwinieciem do pelnego pomyslu.");
+  }
+  if (!isActiveIdeaStatus(candidate.status) && !force) {
+    throw new Error("Ten rekord pomyslu nie jest aktywnym kandydatem do rozwiniecia.");
+  }
+
+  const existingFull = await prisma.idea.findFirst({
+    where: {
+      sourceRepoId: candidate.sourceRepoId,
+      status: IDEA_STATUS.FULL,
+      id: { not: candidate.id }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  if (existingFull && !force) {
+    return existingFull;
+  }
+
+  const repository = await getRepositoryForReport(candidate.sourceRepoId);
+  const config = getConfig();
+  const context = buildRepositoryContext({
+    ...repository,
+    topics: topicsFromJson(repository.topicsJson),
+    snapshots: repository.snapshots
+  });
+  const hash = inputHash(
+    "idea-promote",
+    [context, candidate.id, candidate.evidenceIdsJson, candidate.lastResearchAt?.toISOString() ?? ""].join("\n")
+  );
+  const cached = await getCachedOpenAiOutput("idea-promote", candidate.sourceRepoId, hash, config.openAiModel);
+  const research = cached
+    ? null
+    : await (async () => {
+        await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+        return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
+      })();
+  const ideaContext = [
+    context,
+    "Existing candidate:",
+    [
+      candidate.title,
+      candidate.problem,
+      candidate.applicationSummary,
+      candidate.businessRationale,
+      candidate.marketSummary
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    research ? ["Market research:", formatMarketResearchForPrompt(research)].join("\n\n") : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  if (!cached) {
+    await ensureOpenAiBudget();
+  }
+  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext));
+  if (!cached) {
+    await saveOpenAiOutput("idea-promote", candidate.sourceRepoId, hash, config.openAiModel, content);
+  }
+
+  const parsed = safeJsonParse<{
+    title?: string;
+    problem?: string;
+    proposedSolution?: string;
+    targetUser?: string;
+    mvpScope?: string;
+    monetizationPotential?: string;
+    difficulty?: number;
+    usefulnessScore?: number;
+    riskScore?: number;
+    confidenceScore?: number;
+    opportunityScore?: number;
+    applicationSummary?: string;
+    businessRationale?: string;
+    marketSummary?: string;
+    suggestedStack?: string;
+    firstSteps?: string[];
+  }>(extractJsonObject(content), {});
+  const opportunity = research
+    ? calculateOpportunityScoreWithBreakdown({
+        trendScore: repository.trendScore,
+        relevanceScore: repository.relevanceScore,
+        starsCurrent: repository.starsCurrent,
+        research
+      })
+    : null;
+  const evidenceIds = mergeEvidenceIds(candidate.evidenceIdsJson, research?.sourceIds);
+
+  const idea = await prisma.idea.update({
+    where: { id: candidate.id },
+    data: {
+      title: parsed.title ?? candidate.title,
+      problem: parsed.problem ?? candidate.problem,
+      proposedSolution: parsed.proposedSolution ?? candidate.proposedSolution,
+      targetUser: parsed.targetUser ?? candidate.targetUser,
+      mvpScope: parsed.mvpScope ?? candidate.mvpScope,
+      monetizationPotential: parsed.monetizationPotential ?? candidate.monetizationPotential,
+      difficulty: parsed.difficulty ?? candidate.difficulty,
+      usefulnessScore: parsed.usefulnessScore ?? candidate.usefulnessScore,
+      riskScore: parsed.riskScore ?? candidate.riskScore,
+      suggestedStack: parsed.suggestedStack ?? candidate.suggestedStack,
+      firstStepsJson: JSON.stringify(parsed.firstSteps ?? safeJsonParse<string[]>(candidate.firstStepsJson, [])),
+      marketSummary: (parsed.marketSummary ?? research?.summary ?? candidate.marketSummary) || null,
+      evidenceIdsJson: JSON.stringify(evidenceIds),
+      confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? candidate.confidenceScore,
+      opportunityScore:
+        opportunity?.score ??
+        (parsed.opportunityScore === undefined
+          ? candidate.opportunityScore
+          : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
+      opportunityBreakdownJson: JSON.stringify(
+        opportunity?.breakdown ?? safeJsonParse(candidate.opportunityBreakdownJson, {})
+      ),
+      applicationSummary: parsed.applicationSummary ?? candidate.applicationSummary,
+      businessRationale: parsed.businessRationale ?? candidate.businessRationale,
+      researchMode: "full",
+      status: IDEA_STATUS.FULL,
+      lastResearchAt: research ? new Date() : candidate.lastResearchAt
+    }
+  });
+  await attachResearchRunsToIdea(research?.runIds ?? (research?.runId ? [research.runId] : []), idea.id);
+
+  await prisma.repository.update({
+    where: { id: candidate.sourceRepoId },
+    data: { status: "IDEA" }
+  });
+
+  return idea;
 }

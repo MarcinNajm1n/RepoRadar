@@ -1,4 +1,5 @@
 import { getConfig } from "@/lib/config";
+import type { AppConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
 import { getCachedOpenAiOutput, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { stableHash } from "@/lib/hash";
@@ -39,28 +40,33 @@ function cacheKind(context: MarketResearchContext, provider: string) {
   return `market-research:${context.kind}:${context.mode ?? getConfig().marketResearchMode}:${provider}`;
 }
 
-function providersForConfig(context: MarketResearchContext): MarketResearchProvider[] {
-  const config = getConfig();
+export function selectMarketResearchProviders(
+  context: MarketResearchContext,
+  config: AppConfig = getConfig()
+): MarketResearchProvider[] {
   const providers: MarketResearchProvider[] = [];
+  const mode = context.mode ?? config.marketResearchMode;
 
   if (!config.marketResearchEnabled || config.marketResearchProvider === "none") {
     return providers;
   }
 
   if (config.marketResearchProvider === "mcp") {
-    return [mcpWebResearchProvider];
+    return mode === "full" && config.mcpWebResearchServerUrl ? [mcpWebResearchProvider] : [];
   }
 
   if (config.marketResearchProvider === "openai") {
-    return [openAiWebSearchProvider];
+    return config.openAiApiKey ? [openAiWebSearchProvider] : [];
   }
 
   if (config.marketResearchProvider === "reddit") {
-    return [redditProvider];
+    return mode === "full" && config.enableRedditSource && config.redditClientId && config.redditClientSecret
+      ? [redditProvider]
+      : [];
   }
 
   if (config.marketResearchProvider === "bluesky") {
-    return [blueskyProvider];
+    return mode === "full" && config.enableBlueskySource ? [blueskyProvider] : [];
   }
 
   if (config.enableHnSource) {
@@ -72,13 +78,13 @@ function providersForConfig(context: MarketResearchContext): MarketResearchProvi
   if (config.enableOpenAiWebSearchSource && config.openAiApiKey) {
     providers.push(openAiWebSearchProvider);
   }
-  if (context.mode === "full" && config.enableRedditSource && config.redditClientId && config.redditClientSecret) {
+  if (mode === "full" && config.enableRedditSource && config.redditClientId && config.redditClientSecret) {
     providers.push(redditProvider);
   }
-  if (context.mode === "full" && config.enableBlueskySource) {
+  if (mode === "full" && config.enableBlueskySource) {
     providers.push(blueskyProvider);
   }
-  if (providers.length === 0 && context.mode === "full" && config.mcpWebResearchServerUrl) {
+  if (providers.length === 0 && mode === "full" && config.mcpWebResearchServerUrl) {
     providers.push(mcpWebResearchProvider);
   }
 
@@ -288,7 +294,7 @@ export async function getMarketResearchForRepository(context: MarketResearchCont
   }
 
   const researchContext = { ...context, mode: context.mode ?? config.marketResearchMode };
-  const providers = providersForConfig(researchContext);
+  const providers = selectMarketResearchProviders(researchContext);
   if (!providers.length) {
     return emptyMarketResearch("UNAVAILABLE", "No market research provider is configured");
   }

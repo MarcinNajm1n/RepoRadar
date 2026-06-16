@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateOpportunityScore, isExcellentOpportunity } from "../../src/lib/market-research/opportunity";
+import {
+  calculateOpportunityScore,
+  calculateOpportunityScoreWithBreakdown,
+  isExcellentOpportunity
+} from "../../src/lib/market-research/opportunity";
 
 describe("opportunity scoring", () => {
   it("rewards evidence, confidence, business fit and savings signals", () => {
@@ -44,5 +48,35 @@ describe("opportunity scoring", () => {
         text: "B2B devtools automation saves time and cost for teams"
       })
     ).toBe(false);
+  });
+
+  it("returns a stable 0-100 score with business-focused breakdown", () => {
+    const result = calculateOpportunityScoreWithBreakdown({
+      trendScore: 10,
+      relevanceScore: 10,
+      starsCurrent: 50,
+      research: {
+        summary: "B2B team has manual workflow pain and wants to save cost.",
+        signals: ["internal automation request"],
+        userProblems: ["manual reporting is slow"],
+        demandEvidence: ["teams compare alternatives pricing"],
+        validationRisks: ["crowded alternatives"],
+        confidenceScore: 4,
+        sentiment: "mixed",
+        sources: [
+          { sourceType: "hn", title: "HN", url: "https://news.ycombinator.com/item?id=2", snippet: "manual workflow pain", relevanceScore: 90 },
+          { sourceType: "rss", title: "RSS", url: "https://example.com/rss", snippet: "save time", relevanceScore: 80 },
+          { sourceType: "web", title: "Web", url: "https://example.com/web", snippet: "B2B automation", relevanceScore: 70 }
+        ]
+      }
+    });
+
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+    expect(result.breakdown.sourcePoints).toBeGreaterThan(0);
+    expect(result.breakdown.confidencePoints).toBeGreaterThan(0);
+    expect(result.breakdown.b2bFitPoints).toBeGreaterThan(0);
+    expect(result.breakdown.timeSavingPoints).toBeGreaterThan(0);
+    expect(result.breakdown.competitionPenalty).toBeLessThanOrEqual(0);
   });
 });

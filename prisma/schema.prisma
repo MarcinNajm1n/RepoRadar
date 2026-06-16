@@ -120,10 +120,12 @@ model Idea {
   evidenceIdsJson       String   @default("[]")
   confidenceScore       Int?
   opportunityScore      Int?
+  opportunityBreakdownJson String @default("{}")
   applicationSummary    String?
   businessRationale     String?
   researchMode          String   @default("full")
   status                String   @default("NEW")
+  lastResearchAt        DateTime?
   createdAt             DateTime @default(now())
 
   repository            Repository             @relation(fields: [sourceRepoId], references: [id], onDelete: Cascade)
