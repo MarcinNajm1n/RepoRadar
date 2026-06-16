@@ -4,13 +4,18 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bell,
   BookOpen,
   Brain,
+  CalendarClock,
   CheckCircle2,
+  ClipboardList,
+  Download,
   ExternalLink,
   FileText,
   Flame,
   Github,
+  Moon,
   RefreshCw,
   Search,
   Settings,
@@ -19,14 +24,26 @@ import {
   Trash2
 } from "lucide-react";
 import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem } from "@/types/repository";
+import type { ActionItemListItem } from "@/types/action-item";
+import { formatActionItemStatus, formatActionItemType } from "@/types/action-item";
 import { REPOSITORY_STATUSES, formatStatus } from "@/types/status";
 import {
+  clearExpiredExternalCacheAction,
+  clearOldNotificationLogsAction,
+  completeActionItemAction,
+  createActionItemAction,
+  dismissActionItemAction,
+  exportIdeasCsvAction,
+  generateDailyBriefingAction,
   createWeeklyReportAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
   promoteCandidateToFullIdeaAction,
+  pruneOldSnapshotsAction,
   generateReportAction,
   runScanAction,
+  snoozeActionItemAction,
+  testNotificationAction,
   updateIdeaStatusAction,
   updateSettingAction,
   updateStatusAction
@@ -35,11 +52,13 @@ import { IDEA_STATUS, isFullIdeaStatus } from "@/types/idea-status";
 import { cn, formatCompactNumber, formatDate, sanitizeExternalUrl } from "@/lib/utils";
 
 type TabKey =
+  | "radar"
   | "library"
   | "new"
   | "saved"
   | "read"
   | "ignored"
+  | "tasks"
   | "candidates"
   | "ideas"
   | "savedIdeas"
@@ -51,11 +70,13 @@ type TabKey =
 type SectionKey = "repo" | "ideas";
 
 const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
+  { key: "radar", label: "Radar dzisiaj", icon: Bell, section: "repo" },
   { key: "library", label: "Biblioteka", icon: Github, section: "repo" },
   { key: "new", label: "Nowo znalezione", icon: Sparkles, section: "repo" },
   { key: "saved", label: "Zapisane", icon: Star, section: "repo" },
   { key: "read", label: "Przeczytane", icon: BookOpen, section: "repo" },
   { key: "ignored", label: "Ignorowane", icon: Trash2, section: "repo" },
+  { key: "tasks", label: "Zadania", icon: ClipboardList, section: "repo" },
   { key: "ideas", label: "Pomysły", icon: Brain },
   { key: "candidates", label: "Kandydaci", icon: Search, section: "ideas" },
   { key: "savedIdeas", label: "Zapisane", icon: Star, section: "ideas" },
@@ -186,10 +207,14 @@ function repoMatchesQuery(repo: RepositoryListItem, query: string) {
     .some((value) => value!.toLowerCase().includes(normalized));
 }
 
+function getTomorrowIso() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+}
+
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<SectionKey>("repo");
-  const [activeTab, setActiveTab] = useState<TabKey>("library");
+  const [activeTab, setActiveTab] = useState<TabKey>("radar");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [languageFilter, setLanguageFilter] = useState("ALL");
@@ -271,6 +296,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => isFullIdeaStatus(idea.status)), [initialData.ideas]);
   const savedIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.SAVED), [initialData.ideas]);
   const dismissedIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.DISMISSED), [initialData.ideas]);
+  const activeActionItemCount = useMemo(
+    () => initialData.actionItems.filter((item) => item.status !== "DONE" && item.status !== "DISMISSED").length,
+    [initialData.actionItems]
+  );
 
   function runAction<T>(action: () => Promise<T>, success: string) {
     setMessage(null);
@@ -307,6 +336,76 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     setExpandedRepoId(expandedRepoId === repoId ? null : repoId);
   }
 
+  function createRepoTask(repo: RepositoryListItem, type: string, title: string, success: string, priority = 1) {
+    runAction(
+      () =>
+        createActionItemAction({
+          type,
+          title,
+          repoId: repo.id,
+          priority,
+          dedupeKey: `repo:${repo.id}:${type.toLowerCase()}`
+        }),
+      success
+    );
+  }
+
+  function createManualTask() {
+    runAction(
+      () =>
+        createActionItemAction({
+          type: "CUSTOM",
+          title: "Reczne zadanie do doprecyzowania",
+          priority: 0
+        }),
+      "Zadanie dodane."
+    );
+  }
+
+  function snoozeUntilTomorrow(itemId: string) {
+    runAction(() => snoozeActionItemAction(itemId, getTomorrowIso()), "Zadanie odlozone do jutra.");
+  }
+
+  function openDailyBriefing() {
+    runAction(async () => {
+      const generated = await generateDailyBriefingAction();
+      setReport({
+        title: generated.title,
+        content: generated.contentMarkdown,
+        path: generated.markdownPath,
+        evidenceSources: []
+      });
+    }, "Briefing dzienny utworzony.");
+  }
+
+  function downloadIdeasCsv() {
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        const exported = await exportIdeasCsvAction();
+        const blob = new Blob([exported.content], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = exported.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setMessage("CSV pomyslow przygotowany.");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Eksport CSV nie powiodl sie.");
+      }
+    });
+  }
+
+  function pruneSnapshotsWithConfirmation() {
+    if (!window.confirm("Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.")) {
+      return;
+    }
+    runAction(() => pruneOldSnapshotsAction({ daysToKeep: 180, confirmed: true }), "Stare snapshoty wyczyszczone.");
+  }
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto flex w-full max-w-[1500px] gap-5 px-5 py-5">
@@ -331,7 +430,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   )}
                   onClick={() => {
                     setActiveSection(section);
-                    setActiveTab(section === "repo" ? "library" : "candidates");
+                    setActiveTab(section === "repo" ? "radar" : "candidates");
                   }}
                 >
                   {section === "repo" ? "Repo" : "Pomysly"}
@@ -359,6 +458,11 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                         {initialData.counts.new}
                       </span>
                     ) : null}
+                    {tab.key === "tasks" && activeActionItemCount > 0 ? (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                        {activeActionItemCount}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -378,7 +482,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   )}
                   onClick={() => {
                     setActiveSection(section);
-                    setActiveTab(section === "repo" ? "library" : "candidates");
+                    setActiveTab(section === "repo" ? "radar" : "candidates");
                   }}
                 >
                   {section === "repo" ? "Repo" : "Pomysly"}
@@ -410,6 +514,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                   <Badge>Pelne pomysly: {initialData.counts.fullIdeas}</Badge>
                   <Badge>Zapisane pomysly: {initialData.counts.savedIdeas}</Badge>
                   <Badge>Odrzucone: {initialData.counts.dismissedIdeas}</Badge>
+                  <Badge>Zadania: {activeActionItemCount}</Badge>
                 </div>
                 <h2 className="text-2xl font-semibold">{getTabLabel(tabs.find((tab) => tab.key === activeTab) ?? tabs[0])}</h2>
                 <p className="text-sm text-muted-foreground">
@@ -429,6 +534,22 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 </Button>
                 <Button
                   variant="secondary"
+                  onClick={openDailyBriefing}
+                  disabled={isPending}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Briefing dzienny
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={downloadIdeasCsv}
+                  disabled={isPending}
+                >
+                  <Download className="h-4 w-4" />
+                  Eksport CSV
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => runAction(() => createWeeklyReportAction(), "Raport tygodniowy utworzony.")}
                   disabled={isPending}
                 >
@@ -444,7 +565,184 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             ) : null}
           </header>
 
-          {activeTab !== "ideas" &&
+          {activeTab === "radar" ? (
+            <section className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-4">
+                <Metric label="Top repo" value={initialData.radarToday.topRepositories.length} />
+                <Metric label="Kandydaci" value={initialData.radarToday.businessCandidates.length} />
+                <Metric label="Zadania" value={initialData.radarToday.actionItems.length} />
+                <Metric label="Alerty" value={initialData.radarToday.alerts.length} />
+              </div>
+
+              {initialData.radarToday.alerts.length ? (
+                <section className="grid gap-3 md:grid-cols-2">
+                  {initialData.radarToday.alerts.map((alert) => (
+                    <article
+                      key={alert.id}
+                      className={cn(
+                        "rounded-lg border bg-card p-4 shadow-soft",
+                        alert.level === "critical" && "border-red-300 bg-red-50 text-red-950",
+                        alert.level === "warning" && "border-amber-300 bg-amber-50 text-amber-950",
+                        alert.level === "info" && "border-blue-200 bg-blue-50 text-blue-950"
+                      )}
+                    >
+                      <div className="font-semibold">{alert.title}</div>
+                      <p className="mt-1 text-sm">{alert.message}</p>
+                    </article>
+                  ))}
+                </section>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold">Repo do sprawdzenia</h3>
+                    <Button variant="ghost" onClick={() => setActiveTab("library")}>
+                      Biblioteka
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {initialData.radarToday.topRepositories.length ? (
+                      initialData.radarToday.topRepositories.map((repo) => (
+                        <article key={repo.id} className="rounded-md border border-border bg-background p-3">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-semibold">{repo.fullName}</h4>
+                                <Badge>{formatStatus(repo.status)}</Badge>
+                                <Badge>Trend {repo.trendScore}</Badge>
+                                <Badge>Initial {repo.initialMomentumScore}</Badge>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">{repo.shortSummaryPl ?? repo.description ?? "Brak opisu."}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button variant="secondary" onClick={() => openReport(repo.id)} disabled={isPending}>
+                                <FileText className="h-4 w-4" /> Raport
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
+                                disabled={isPending}
+                              >
+                                <BookOpen className="h-4 w-4" /> README
+                              </Button>
+                              <SafeRepoLink url={repo.url} />
+                            </div>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <EmptyState title="Brak repo na dzisiaj" text="Uruchom scan albo sprawdz filtry w Bibliotece." />
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold">Zadania teraz</h3>
+                    <Button variant="secondary" onClick={createManualTask} disabled={isPending}>
+                      <ClipboardList className="h-4 w-4" /> Dodaj zadanie
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {initialData.radarToday.actionItems.length ? (
+                      initialData.radarToday.actionItems.map((item) => (
+                        <ActionItemCard
+                          key={item.id}
+                          item={item}
+                          isPending={isPending}
+                          onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
+                          onSnooze={() => snoozeUntilTomorrow(item.id)}
+                          onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
+                        />
+                      ))
+                    ) : (
+                      <EmptyState title="Brak aktywnych zadan" text="Dodaj zadanie z repo albo utworz reczne zadanie." />
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-3">
+                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
+                  <h3 className="text-lg font-semibold">Kandydaci biznesowi</h3>
+                  <div className="mt-3 space-y-3">
+                    {initialData.radarToday.businessCandidates.length ? (
+                      initialData.radarToday.businessCandidates.map((idea) => (
+                        <article key={idea.id} className="rounded-md border border-border bg-background p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-semibold">{idea.title}</h4>
+                            {idea.opportunityScore !== null ? <Badge>{idea.opportunityScore}/100</Badge> : null}
+                            {idea.confidenceScore !== null ? <Badge>Conf {idea.confidenceScore}/5</Badge> : null}
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">{idea.applicationSummary ?? idea.problem}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button variant="secondary" onClick={() => setIdeaDetail(idea)}>
+                              Szczegoly
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={(event) => repoAction(event, () => promoteCandidateToFullIdeaAction(idea.id), "Pelny pomysl zostal utworzony.")}
+                              disabled={isPending}
+                            >
+                              <Brain className="h-4 w-4" /> Rozwin pomysl
+                            </Button>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <EmptyState title="Brak kandydatow" text="Uzyj light research przy repo, ktore wyglada obiecujaco." />
+                    )}
+                  </div>
+                </section>
+
+                <RadarRepoCompactSection
+                  title="Nowe perelki"
+                  repositories={initialData.radarToday.newGems}
+                  empty="Brak nowych perelek."
+                />
+                <RadarRepoCompactSection
+                  title="High initial momentum"
+                  repositories={initialData.radarToday.highInitialMomentum}
+                  empty="Brak repo z mocnym initial momentum."
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === "tasks" ? (
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 shadow-soft">
+                <div>
+                  <h3 className="text-lg font-semibold">Zadania</h3>
+                  <p className="text-sm text-muted-foreground">Kolejka decyzji, researchu i recznego sprawdzenia repo.</p>
+                </div>
+                <Button variant="secondary" onClick={createManualTask} disabled={isPending}>
+                  <ClipboardList className="h-4 w-4" /> Dodaj zadanie
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {initialData.actionItems.length ? (
+                  initialData.actionItems.map((item) => (
+                    <ActionItemCard
+                      key={item.id}
+                      item={item}
+                      isPending={isPending}
+                      onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
+                      onSnooze={() => snoozeUntilTomorrow(item.id)}
+                      onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
+                    />
+                  ))
+                ) : (
+                  <EmptyState title="Brak zadan" text="Dodaj zadanie reczne albo skorzystaj z quick actions przy repo." />
+                )}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab !== "radar" &&
+          activeTab !== "tasks" &&
+          activeTab !== "ideas" &&
           activeTab !== "candidates" &&
           activeTab !== "savedIdeas" &&
           activeTab !== "dismissedIdeas" &&
@@ -631,6 +929,36 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                               disabled={isPending}
                             >
                               <Search className="h-4 w-4" /> Znajdz problemy / Research
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                createRepoTask(repo, "CLONE_LATER", `Clone later: ${repo.fullName}`, "Zadanie clone later dodane.", 1);
+                              }}
+                              disabled={isPending}
+                            >
+                              <ClipboardList className="h-4 w-4" /> Clone later
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                createRepoTask(repo, "CHECK_DEMO", `Sprawdz demo: ${repo.fullName}`, "Zadanie demo dodane.", 2);
+                              }}
+                              disabled={isPending}
+                            >
+                              <ExternalLink className="h-4 w-4" /> Sprawdz demo
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                createRepoTask(repo, "VALIDATE_MARKET", `Zweryfikuj rynek: ${repo.fullName}`, "Zadanie walidacji rynku dodane.", 3);
+                              }}
+                              disabled={isPending}
+                            >
+                              <Search className="h-4 w-4" /> Zweryfikuj rynek
                             </Button>
                             <Button
                               variant="danger"
@@ -892,6 +1220,82 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 GitHub token: Fine-grained PAT, read-only public repositories. OpenAI: pełne raporty i pomysły tylko na żądanie.
                 Windows Task Scheduler: `scripts/register-windows-task.ps1`.
               </div>
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                <section className="rounded-md border border-border p-4">
+                  <h4 className="font-semibold">Status konfiguracji</h4>
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                    <Info label="GitHub token" value={initialData.settingsSummary.githubTokenConfigured ? "skonfigurowany" : "brak"} />
+                    <Info label="OpenAI key" value={initialData.settingsSummary.openAiConfigured ? "skonfigurowany" : "brak"} />
+                    <Info label="Discord webhook" value={initialData.settingsSummary.discordWebhookConfigured ? "skonfigurowany" : "brak"} />
+                    <Info label="DB settings" value={String(initialData.settingsSummary.persistedSettingCount)} />
+                  </div>
+                  <p className="mt-3 rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">
+                    Sekrety nie sa zapisywane w SQLite. Zmieniaj je recznie w `.env`; UI pokazuje tylko status.
+                  </p>
+                </section>
+
+                <section className="rounded-md border border-border p-4">
+                  <h4 className="font-semibold">Ogólne</h4>
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                    <Info label="UI" value="Polski, desktop-first" />
+                    <Info label="Dark mode" value="system preference" />
+                    <Info label="Reports dir" value={initialData.settingsSummary.reportsDir} />
+                    <Info label="Scheduler" value="scripts/register-windows-task.ps1" />
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-muted p-3 text-sm">
+                    <Moon className="h-4 w-4" />
+                    Ciemny motyw korzysta z ustawien systemu.
+                  </div>
+                </section>
+
+                <section className="rounded-md border border-border p-4">
+                  <h4 className="font-semibold">Business Research</h4>
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                    <Info label="Market research" value={String(initialData.settingsSummary.marketResearchEnabled)} />
+                    <Info label="Tryb" value={initialData.settingsSummary.marketResearchMode} />
+                    <Info label="Auto opportunity" value={String(initialData.settingsSummary.autoOpportunityResearchEnabled)} />
+                    <Info label="Market daily limit" value={String(initialData.settingsSummary.marketResearchDailyLimit)} />
+                    <Info label="OpenAI daily limit" value={String(initialData.settingsSummary.openAiDailyAnalysisLimit)} />
+                  </div>
+                </section>
+
+                <section className="rounded-md border border-border p-4">
+                  <h4 className="font-semibold">Evidence, cache i notyfikacje</h4>
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                    <Info label="Cache TTL" value={`${initialData.settingsSummary.externalResearchCacheTtlHours}h`} />
+                    <Info label="Sent 24h" value={String(initialData.notificationSummary.sent24h)} />
+                    <Info label="Failed 24h" value={String(initialData.notificationSummary.failed24h)} />
+                    <Info label="Skipped 24h" value={String(initialData.notificationSummary.skipped24h)} />
+                    <Info label="Windows" value={String(initialData.settingsSummary.windowsNotificationsEnabled)} />
+                    <Info label="Discord" value={initialData.settingsSummary.discordWebhookConfigured ? "configured" : "missing"} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={() => runAction(() => clearExpiredExternalCacheAction(), "Wygasly cache wyczyszczony.")} disabled={isPending}>
+                      Wyczysc cache
+                    </Button>
+                    <Button variant="secondary" onClick={() => runAction(() => clearOldNotificationLogsAction(30), "Stare logi powiadomien wyczyszczone.")} disabled={isPending}>
+                      Wyczysc logi 30d+
+                    </Button>
+                    <Button variant="secondary" onClick={() => runAction(() => testNotificationAction(), "Test notification wykonany.")} disabled={isPending}>
+                      <Bell className="h-4 w-4" /> Test notification
+                    </Button>
+                  </div>
+                </section>
+              </div>
+              <section className="mt-4 rounded-md border border-border p-4">
+                <h4 className="font-semibold">Dane i maintenance</h4>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={openDailyBriefing} disabled={isPending}>
+                    <CalendarClock className="h-4 w-4" /> Daily briefing
+                  </Button>
+                  <Button variant="secondary" onClick={downloadIdeasCsv} disabled={isPending}>
+                    <Download className="h-4 w-4" /> Export ideas CSV
+                  </Button>
+                  <Button variant="danger" onClick={pruneSnapshotsWithConfirmation} disabled={isPending}>
+                    Prune snapshots 180d+
+                  </Button>
+                </div>
+              </section>
             </section>
           ) : null}
         </section>
@@ -1205,6 +1609,86 @@ function ReportViewer({ content, sources }: { content: string; sources: Evidence
         </section>
       </article>
     </div>
+  );
+}
+
+function ActionItemCard({
+  item,
+  isPending,
+  onComplete,
+  onSnooze,
+  onDismiss
+}: {
+  item: ActionItemListItem;
+  isPending: boolean;
+  onComplete: () => void;
+  onSnooze: () => void;
+  onDismiss: () => void;
+}) {
+  const target = item.repoFullName ?? item.ideaTitle ?? item.reportTitle ?? "bez powiazania";
+
+  return (
+    <article className="rounded-md border border-border bg-background p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-semibold">{item.title}</h4>
+            <Badge>{formatActionItemType(item.type)}</Badge>
+            <Badge>{formatActionItemStatus(item.status)}</Badge>
+            {item.priority ? <Badge>Priority {item.priority}</Badge> : null}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{target}</p>
+          {item.description ? <p className="mt-2 text-sm">{item.description}</p> : null}
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {item.dueAt ? <span>Due: {formatDate(item.dueAt)}</span> : null}
+            {item.snoozedUntil ? <span>Snooze: {formatDate(item.snoozedUntil)}</span> : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onComplete} disabled={isPending || item.status === "DONE"}>
+            <CheckCircle2 className="h-4 w-4" /> Done
+          </Button>
+          <Button variant="secondary" onClick={onSnooze} disabled={isPending || item.status === "DONE" || item.status === "DISMISSED"}>
+            <CalendarClock className="h-4 w-4" /> Jutro
+          </Button>
+          <Button variant="danger" onClick={onDismiss} disabled={isPending || item.status === "DISMISSED"}>
+            <Trash2 className="h-4 w-4" /> Odrzuc
+          </Button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RadarRepoCompactSection({
+  title,
+  repositories,
+  empty
+}: {
+  title: string;
+  repositories: RepositoryListItem[];
+  empty: string;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <div className="mt-3 space-y-3">
+        {repositories.length ? (
+          repositories.map((repo) => (
+            <article key={repo.id} className="rounded-md border border-border bg-background p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="font-semibold">{repo.fullName}</h4>
+                <Badge>Trend {repo.trendScore}</Badge>
+                <Badge>{formatCompactNumber(repo.starsCurrent)} stars</Badge>
+              </div>
+              <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{repo.shortSummaryPl ?? repo.description ?? "Brak opisu."}</p>
+            </article>
+          ))
+        ) : (
+          <p className="rounded-md border border-dashed border-border bg-muted p-3 text-sm text-muted-foreground">{empty}</p>
+        )}
+      </div>
+    </section>
   );
 }
 
