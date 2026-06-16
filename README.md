@@ -15,12 +15,15 @@ GitHub is full of useful AI/devtools repositories, but it is hard to track which
 - Repository metric snapshots for 24h and 7d growth.
 - Deterministic `trend_score` from growth, age, stars, forks, activity, topics, README quality, and AI/LLM relevance.
 - Polish UI labels and Polish OpenAI-generated summaries/reports.
+- `Radar dzisiaj` first screen for daily decisions.
+- Action queue for read, demo, clone later, market validation, report, MVP planning, and custom tasks.
 - On-demand full repo report on double click.
 - On-demand evidence-backed market research for full reports and ideas.
 - Separate "Pomysły" tab for repo-based side hustle/MVP ideas.
 - Optional Windows and Discord scan notifications for high-value repositories.
-- Daily and weekly markdown reports in `reports/`.
-- Required tabs: Biblioteka, Nowo znalezione, Zapisane, Przeczytane, Ignorowane, Pomysły, Raporty tygodniowe, Stare repo, Ustawienia.
+- Deterministic daily briefing, daily markdown reports, and weekly markdown reports in `reports/`.
+- CSV export for ideas and print-friendly report views.
+- Required tabs include Radar dzisiaj, Biblioteka, Nowo znalezione, Zapisane, Przeczytane, Ignorowane, Zadania, Pomysły, Raporty tygodniowe, Stare repo, Ustawienia.
 - Ignored repositories stay in storage so they are not rediscovered as new.
 - Demo seed data for portfolio screenshots.
 
@@ -45,10 +48,21 @@ Place portfolio screenshots in `docs/screenshots/` after running the app with se
 Suggested shots:
 
 - Library list with filters.
+- Radar dzisiaj decision view.
+- Action queue.
 - Expanded repository row.
 - Full Polish report modal.
 - Pomysły tab.
 - Weekly report tab.
+
+## Documentation
+
+- Product spec: `docs/PRODUCT_SPEC.md`
+- Stage 4 implementation plan: `docs/STAGE_4_IMPLEMENTATION_PLAN.md`
+- User guide: `docs/USER_GUIDE.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Security: `docs/SECURITY.md`
+- Roadmap: `docs/ROADMAP.md`
 
 ## Local Setup
 
@@ -184,12 +198,12 @@ npm run dev
 
 Then:
 
-1. Open Biblioteka.
-2. Expand a repo.
-3. Mark it as saved/read/ignored.
-4. Generate a full report if `OPENAI_API_KEY` is configured.
-5. Create an idea from a repo.
-6. Generate a weekly report.
+1. Open Radar dzisiaj.
+2. Review top repo, business candidates, alerts, and active tasks.
+3. Expand a repo in Biblioteka and add quick tasks such as Clone later or Sprawdź demo.
+4. Generate a full report only if `OPENAI_API_KEY` is configured.
+5. Create or promote an idea from a repo.
+6. Generate a daily briefing and weekly report.
 
 ## Tests
 
@@ -198,6 +212,12 @@ npm run typecheck
 npm run test
 npm run test:ui
 ```
+
+`npm run test:ui` requires Playwright browsers. If they are missing locally, run `npx playwright install chromium`.
+
+## CI
+
+GitHub Actions runs on `windows-latest` without real secrets. The workflow installs dependencies, generates Prisma Client, migrates a local SQLite database, then runs typecheck, lint, Vitest, build, and the sensitive-file check.
 
 ## Commit Safety
 
