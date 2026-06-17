@@ -51,6 +51,8 @@ import {
 import { IDEA_STATUS, isFullIdeaStatus } from "@/types/idea-status";
 import { cn, formatCompactNumber, formatDate, sanitizeExternalUrl } from "@/lib/utils";
 import { TopBar } from "@/components/repo-radar/top-bar";
+import { RadarTodayView } from "@/components/repo-radar/radar-today-view";
+import { RepoListView } from "@/components/repo-radar/repo-list-view";
 import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
 
 const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
@@ -594,148 +596,46 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           </header>
 
           {activeTab === "radar" ? (
-            <section className="space-y-4">
-              <div className="grid gap-3 lg:grid-cols-4">
-                <Metric label="Top repo" value={initialData.radarToday.topRepositories.length} />
-                <Metric label="Kandydaci" value={initialData.radarToday.businessCandidates.length} />
-                <Metric label="Zadania" value={initialData.radarToday.actionItems.length} />
-                <Metric label="Alerty" value={initialData.radarToday.alerts.length} />
-              </div>
-
-              {initialData.radarToday.alerts.length ? (
-                <section className="grid gap-3 md:grid-cols-2">
-                  {initialData.radarToday.alerts.map((alert) => (
-                    <article
-                      key={alert.id}
-                      className={cn(
-                        "rounded-lg border bg-card p-4 shadow-soft",
-                        alert.level === "critical" && "border-red-300 bg-red-50 text-red-950",
-                        alert.level === "warning" && "border-amber-300 bg-amber-50 text-amber-950",
-                        alert.level === "info" && "border-blue-200 bg-blue-50 text-blue-950"
-                      )}
+            <RadarTodayView
+              radarToday={initialData.radarToday}
+              isPending={isPending}
+              onOpenLibrary={() => setActiveTab("library")}
+              onOpenReport={openReport}
+              onCreateReadmeTask={(repo) => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
+              onCreateManualTask={createManualTask}
+              renderActionItem={(item) => (
+                <ActionItemCard
+                  key={item.id}
+                  item={item}
+                  isPending={isPending}
+                  onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
+                  onSnooze={() => snoozeUntilTomorrow(item.id)}
+                  onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
+                />
+              )}
+              renderBusinessCandidate={(idea) => (
+                <article key={idea.id} className="rounded-md border border-border bg-background p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="font-semibold">{idea.title}</h4>
+                    {idea.opportunityScore !== null ? <Badge>{idea.opportunityScore}/100</Badge> : null}
+                    {idea.confidenceScore !== null ? <Badge>Conf {idea.confidenceScore}/5</Badge> : null}
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{idea.applicationSummary ?? idea.problem}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={() => setIdeaDetail(idea)}>
+                      Szczegoly
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={(event) => repoAction(event, () => promoteCandidateToFullIdeaAction(idea.id), "Pelny pomysl zostal utworzony.")}
+                      disabled={isPending}
                     >
-                      <div className="font-semibold">{alert.title}</div>
-                      <p className="mt-1 text-sm">{alert.message}</p>
-                    </article>
-                  ))}
-                </section>
-              ) : null}
-
-              <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-lg font-semibold">Repo do sprawdzenia</h3>
-                    <Button variant="ghost" onClick={() => setActiveTab("library")}>
-                      Biblioteka
+                      <Brain className="h-4 w-4" /> Rozwin pomysl
                     </Button>
                   </div>
-                  <div className="space-y-3">
-                    {initialData.radarToday.topRepositories.length ? (
-                      initialData.radarToday.topRepositories.map((repo) => (
-                        <article key={repo.id} className="rounded-md border border-border bg-background p-3">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h4 className="font-semibold">{repo.fullName}</h4>
-                                <Badge>{formatStatus(repo.status)}</Badge>
-                                <Badge>Trend {repo.trendScore}</Badge>
-                                <Badge>Initial {repo.initialMomentumScore}</Badge>
-                              </div>
-                              <p className="mt-1 text-sm text-muted-foreground">{repo.shortSummaryPl ?? repo.description ?? "Brak opisu."}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button variant="secondary" onClick={() => openReport(repo.id)} disabled={isPending}>
-                                <FileText className="h-4 w-4" /> Raport
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
-                                disabled={isPending}
-                              >
-                                <BookOpen className="h-4 w-4" /> README
-                              </Button>
-                              <SafeRepoLink url={repo.url} />
-                            </div>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <EmptyState title="Brak repo na dzisiaj" text="Uruchom scan albo sprawdz filtry w Bibliotece." />
-                    )}
-                  </div>
-                </section>
-
-                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-lg font-semibold">Zadania teraz</h3>
-                    <Button variant="secondary" onClick={createManualTask} disabled={isPending}>
-                      <ClipboardList className="h-4 w-4" /> Dodaj zadanie
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {initialData.radarToday.actionItems.length ? (
-                      initialData.radarToday.actionItems.map((item) => (
-                        <ActionItemCard
-                          key={item.id}
-                          item={item}
-                          isPending={isPending}
-                          onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
-                          onSnooze={() => snoozeUntilTomorrow(item.id)}
-                          onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
-                        />
-                      ))
-                    ) : (
-                      <EmptyState title="Brak aktywnych zadan" text="Dodaj zadanie z repo albo utworz reczne zadanie." />
-                    )}
-                  </div>
-                </section>
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-3">
-                <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
-                  <h3 className="text-lg font-semibold">Kandydaci biznesowi</h3>
-                  <div className="mt-3 space-y-3">
-                    {initialData.radarToday.businessCandidates.length ? (
-                      initialData.radarToday.businessCandidates.map((idea) => (
-                        <article key={idea.id} className="rounded-md border border-border bg-background p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="font-semibold">{idea.title}</h4>
-                            {idea.opportunityScore !== null ? <Badge>{idea.opportunityScore}/100</Badge> : null}
-                            {idea.confidenceScore !== null ? <Badge>Conf {idea.confidenceScore}/5</Badge> : null}
-                          </div>
-                          <p className="mt-2 text-sm text-muted-foreground">{idea.applicationSummary ?? idea.problem}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Button variant="secondary" onClick={() => setIdeaDetail(idea)}>
-                              Szczegoly
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={(event) => repoAction(event, () => promoteCandidateToFullIdeaAction(idea.id), "Pelny pomysl zostal utworzony.")}
-                              disabled={isPending}
-                            >
-                              <Brain className="h-4 w-4" /> Rozwin pomysl
-                            </Button>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <EmptyState title="Brak kandydatow" text="Uzyj light research przy repo, ktore wyglada obiecujaco." />
-                    )}
-                  </div>
-                </section>
-
-                <RadarRepoCompactSection
-                  title="Nowe perelki"
-                  repositories={initialData.radarToday.newGems}
-                  empty="Brak nowych perelek."
-                />
-                <RadarRepoCompactSection
-                  title="High initial momentum"
-                  repositories={initialData.radarToday.highInitialMomentum}
-                  empty="Brak repo z mocnym initial momentum."
-                />
-              </div>
-            </section>
+                </article>
+              )}
+            />
           ) : null}
 
           {activeTab === "tasks" ? (
@@ -838,7 +738,28 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 </div>
               </section>
 
-              <section className="space-y-3">
+              <RepoListView
+                repositories={visibleRepositories}
+                filterBar={null}
+                expandedRepoId={expandedRepoId}
+                isPending={isPending}
+                callbacks={{
+                  onToggle: (repoId) => setExpandedRepoId(expandedRepoId === repoId ? null : repoId),
+                  onOpenReport: (repoId) => openReport(repoId),
+                  onRegenerateReport: (repoId) => openReport(repoId, true),
+                  onSave: (repoId) => runAction(() => updateStatusAction(repoId, "SAVED"), "Repo zapisane."),
+                  onMarkRead: (repoId) => runAction(() => updateStatusAction(repoId, "READ"), "Repo oznaczone jako przeczytane."),
+                  onGenerateIdea: (repoId) => runAction(() => generateIdeaAction(repoId), "Pomysl zostal utworzony."),
+                  onResearch: (repoId) => runAction(() => generateOpportunityCandidateAction(repoId), "Research light zakonczony."),
+                  onAddCloneTask: (repo) => createRepoTask(repo, "CLONE_LATER", `Clone later: ${repo.fullName}`, "Zadanie clone later dodane.", 1),
+                  onAddDemoTask: (repo) => createRepoTask(repo, "CHECK_DEMO", `Sprawdz demo: ${repo.fullName}`, "Zadanie demo dodane.", 2),
+                  onValidateMarket: (repo) =>
+                    createRepoTask(repo, "VALIDATE_MARKET", `Zweryfikuj rynek: ${repo.fullName}`, "Zadanie walidacji rynku dodane.", 3),
+                  onIgnore: (repoId) => runAction(() => updateStatusAction(repoId, "IGNORED"), "Repo przeniesione do ignorowanych.")
+                }}
+              />
+
+              <section className="hidden">
                 {visibleRepositories.length ? (
                   visibleRepositories.map((repo) => (
                     <article
@@ -1685,38 +1606,6 @@ function ActionItemCard({
         </div>
       </div>
     </article>
-  );
-}
-
-function RadarRepoCompactSection({
-  title,
-  repositories,
-  empty
-}: {
-  title: string;
-  repositories: RepositoryListItem[];
-  empty: string;
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-card p-4 shadow-soft">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <div className="mt-3 space-y-3">
-        {repositories.length ? (
-          repositories.map((repo) => (
-            <article key={repo.id} className="rounded-md border border-border bg-background p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-semibold">{repo.fullName}</h4>
-                <Badge>Trend {repo.trendScore}</Badge>
-                <Badge>{formatCompactNumber(repo.starsCurrent)} stars</Badge>
-              </div>
-              <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{repo.shortSummaryPl ?? repo.description ?? "Brak opisu."}</p>
-            </article>
-          ))
-        ) : (
-          <p className="rounded-md border border-dashed border-border bg-muted p-3 text-sm text-muted-foreground">{empty}</p>
-        )}
-      </div>
-    </section>
   );
 }
 
