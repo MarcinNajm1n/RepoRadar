@@ -24,8 +24,6 @@ import {
   Trash2
 } from "lucide-react";
 import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem } from "@/types/repository";
-import type { ActionItemListItem } from "@/types/action-item";
-import { formatActionItemStatus, formatActionItemType } from "@/types/action-item";
 import { REPOSITORY_STATUSES, formatStatus } from "@/types/status";
 import {
   clearExpiredExternalCacheAction,
@@ -53,6 +51,10 @@ import { cn, formatCompactNumber, formatDate, sanitizeExternalUrl } from "@/lib/
 import { TopBar } from "@/components/repo-radar/top-bar";
 import { RadarTodayView } from "@/components/repo-radar/radar-today-view";
 import { RepoListView } from "@/components/repo-radar/repo-list-view";
+import { ActionItemCard as RepoActionItemCard } from "@/components/repo-radar/action-item-card";
+import { TasksView } from "@/components/repo-radar/tasks-view";
+import { IdeasView } from "@/components/repo-radar/ideas-view";
+import { IdeaDetailDialog } from "@/components/repo-radar/idea-detail-dialog";
 import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
 
 const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
@@ -604,7 +606,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               onCreateReadmeTask={(repo) => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
               onCreateManualTask={createManualTask}
               renderActionItem={(item) => (
-                <ActionItemCard
+                <RepoActionItemCard
                   key={item.id}
                   item={item}
                   isPending={isPending}
@@ -639,33 +641,14 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           ) : null}
 
           {activeTab === "tasks" ? (
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 shadow-soft">
-                <div>
-                  <h3 className="text-lg font-semibold">Zadania</h3>
-                  <p className="text-sm text-muted-foreground">Kolejka decyzji, researchu i recznego sprawdzenia repo.</p>
-                </div>
-                <Button variant="secondary" onClick={createManualTask} disabled={isPending}>
-                  <ClipboardList className="h-4 w-4" /> Dodaj zadanie
-                </Button>
-              </div>
-              <div className="space-y-3">
-                {initialData.actionItems.length ? (
-                  initialData.actionItems.map((item) => (
-                    <ActionItemCard
-                      key={item.id}
-                      item={item}
-                      isPending={isPending}
-                      onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
-                      onSnooze={() => snoozeUntilTomorrow(item.id)}
-                      onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
-                    />
-                  ))
-                ) : (
-                  <EmptyState title="Brak zadan" text="Dodaj zadanie reczne albo skorzystaj z quick actions przy repo." />
-                )}
-              </div>
-            </section>
+            <TasksView
+              items={initialData.actionItems}
+              isPending={isPending}
+              onCreateManualTask={createManualTask}
+              onComplete={(itemId) => runAction(() => completeActionItemAction(itemId), "Zadanie zakonczone.")}
+              onSnooze={snoozeUntilTomorrow}
+              onDismiss={(itemId) => runAction(() => dismissActionItemAction(itemId), "Zadanie odrzucone.")}
+            />
           ) : null}
 
           {activeTab !== "radar" &&
@@ -935,7 +918,20 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           ) : null}
 
           {activeTab === "candidates" ? (
-            <section className="space-y-3">
+            <>
+              <IdeasView
+                mode="candidates"
+                ideas={candidates}
+                isPending={isPending}
+                emptyTitle="Brak kandydatow"
+                emptyText="Uzyj akcji Znajdz okazje przy repo albo wlacz auto opportunity research w .env."
+                onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+                onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Kandydat zapisany.")}
+                onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Kandydat odrzucony.")}
+                onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
+                onOpenDetail={setIdeaDetail}
+              />
+              <section className="hidden">
               {candidates.length ? (
                 candidates.map((idea) => (
                   <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft">
@@ -984,11 +980,25 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               ) : (
                 <EmptyState title="Brak kandydatow" text="Uzyj akcji Znajdz okazje przy repo albo wlacz auto opportunity research w .env." />
               )}
-            </section>
+              </section>
+            </>
           ) : null}
 
           {activeTab === "savedIdeas" ? (
-            <section className="space-y-3">
+            <>
+              <IdeasView
+                mode="saved"
+                ideas={savedIdeas}
+                isPending={isPending}
+                emptyTitle="Brak zapisanych pomyslow"
+                emptyText="Zapisane kandydaty i pomysly pojawia sie tutaj."
+                onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+                onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
+                onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
+                onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
+                onOpenDetail={setIdeaDetail}
+              />
+              <section className="hidden">
               {savedIdeas.length ? (
                 savedIdeas.map((idea) => (
                   <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft">
@@ -1017,11 +1027,25 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               ) : (
                 <EmptyState title="Brak zapisanych pomyslow" text="Zapisane kandydaty i pomysly pojawia sie tutaj." />
               )}
-            </section>
+              </section>
+            </>
           ) : null}
 
           {activeTab === "dismissedIdeas" ? (
-            <section className="space-y-3">
+            <>
+              <IdeasView
+                mode="dismissed"
+                ideas={dismissedIdeas}
+                isPending={isPending}
+                emptyTitle="Brak odrzuconych pomyslow"
+                emptyText="Odrzucone kandydaty nie beda automatycznie odtwarzane bez force."
+                onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+                onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
+                onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
+                onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
+                onOpenDetail={setIdeaDetail}
+              />
+              <section className="hidden">
               {dismissedIdeas.length ? (
                 dismissedIdeas.map((idea) => (
                   <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft opacity-80">
@@ -1048,11 +1072,26 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               ) : (
                 <EmptyState title="Brak odrzuconych pomyslow" text="Odrzucone kandydaty nie beda automatycznie odtwarzane bez force." />
               )}
-            </section>
+              </section>
+            </>
           ) : null}
 
           {activeTab === "ideas" ? (
-            <section className="space-y-3">
+            <>
+              <IdeasView
+                mode="full"
+                ideas={fullIdeas}
+                isPending={isPending}
+                emptyTitle="Brak pomyslow"
+                emptyText="Uzyj akcji Utworz pomysl z repo przy wybranym repozytorium."
+                onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+                onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
+                onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
+                onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
+                onOpenDetail={setIdeaDetail}
+                renderEvidence={(idea) => <EvidenceSources sources={idea.evidenceSources} emptyText="Brak zapisanych zrodel dla tego pomyslu." />}
+              />
+              <section className="hidden">
               {fullIdeas.length ? (
                 fullIdeas.map((idea) => (
                   <article key={idea.id} className="rounded-lg border border-border bg-card p-4 shadow-soft">
@@ -1096,7 +1135,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               ) : (
                 <EmptyState title="Brak pomysłów" text="Użyj akcji “Utwórz pomysł z repo” przy wybranym repozytorium." />
               )}
-            </section>
+              </section>
+            </>
           ) : null}
 
           {activeTab === "weekly" ? (
@@ -1251,67 +1291,15 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       </div>
 
       {ideaDetail ? (
-        <div className="fixed inset-0 z-50 bg-black/40 p-4" onClick={() => setIdeaDetail(null)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="mx-auto max-h-[92vh] max-w-4xl overflow-auto rounded-lg border border-border bg-card p-5 shadow-soft"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-border bg-card pb-4">
-              <div>
-                <h2 className="text-xl font-semibold">{ideaDetail.title}</h2>
-                <p className="text-sm text-muted-foreground">{ideaDetail.sourceRepoName}</p>
-              </div>
-              <Button variant="secondary" onClick={() => setIdeaDetail(null)}>
-                Zamknij
-              </Button>
-            </div>
-            <div className="grid gap-3 text-sm md:grid-cols-3">
-              <Info label="Opportunity" value={ideaDetail.opportunityScore === null ? "brak" : `${ideaDetail.opportunityScore}/100`} />
-              <Info label="Confidence" value={ideaDetail.confidenceScore === null ? "brak" : `${ideaDetail.confidenceScore}/5`} />
-              <Info label="Status" value={ideaDetail.status} />
-            </div>
-            <div className="mt-4 space-y-3 text-sm leading-6">
-              <p>{ideaDetail.problem}</p>
-              <p>{ideaDetail.proposedSolution}</p>
-              {ideaDetail.businessRationale ? <p>{ideaDetail.businessRationale}</p> : null}
-              {ideaDetail.marketSummary ? <p className="rounded-md border border-border bg-muted p-3">{ideaDetail.marketSummary}</p> : null}
-            </div>
-            <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-              <Info label="Target user" value={ideaDetail.targetUser} />
-              <Info label="MVP" value={ideaDetail.mvpScope} />
-              <Info label="Monetyzacja" value={ideaDetail.monetizationPotential} />
-              <Info label="Stack" value={ideaDetail.suggestedStack} />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {ideaDetail.status !== IDEA_STATUS.DISMISSED ? (
-                <Button
-                  variant="secondary"
-                  onClick={(event) => repoAction(event, () => promoteCandidateToFullIdeaAction(ideaDetail.id), "Pelny pomysl zostal utworzony.")}
-                  disabled={isPending || ideaDetail.status === IDEA_STATUS.FULL}
-                >
-                  <Brain className="h-4 w-4" /> Rozwin pelny pomysl
-                </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                onClick={(event) => repoAction(event, () => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
-                disabled={isPending}
-              >
-                <Star className="h-4 w-4" /> Zapisz
-              </Button>
-              <Button
-                variant="danger"
-                onClick={(event) => repoAction(event, () => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
-                disabled={isPending}
-              >
-                <Trash2 className="h-4 w-4" /> Odrzuc
-              </Button>
-            </div>
-            <EvidenceSources sources={ideaDetail.evidenceSources} emptyText="Brak zapisanych zrodel dla tego kandydata." />
-          </div>
-        </div>
+        <IdeaDetailDialog
+          idea={ideaDetail}
+          isPending={isPending}
+          evidence={<EvidenceSources sources={ideaDetail.evidenceSources} emptyText="Brak zapisanych zrodel dla tego kandydata." />}
+          onClose={() => setIdeaDetail(null)}
+          onPromote={() => runAction(() => promoteCandidateToFullIdeaAction(ideaDetail.id), "Pelny pomysl zostal utworzony.")}
+          onSave={() => runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
+          onDismiss={() => runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
+        />
       ) : null}
 
       {report ? (
@@ -1558,54 +1546,6 @@ function ReportViewer({ content, sources }: { content: string; sources: Evidence
         </section>
       </article>
     </div>
-  );
-}
-
-function ActionItemCard({
-  item,
-  isPending,
-  onComplete,
-  onSnooze,
-  onDismiss
-}: {
-  item: ActionItemListItem;
-  isPending: boolean;
-  onComplete: () => void;
-  onSnooze: () => void;
-  onDismiss: () => void;
-}) {
-  const target = item.repoFullName ?? item.ideaTitle ?? item.reportTitle ?? "bez powiazania";
-
-  return (
-    <article className="rounded-md border border-border bg-background p-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-semibold">{item.title}</h4>
-            <Badge>{formatActionItemType(item.type)}</Badge>
-            <Badge>{formatActionItemStatus(item.status)}</Badge>
-            {item.priority ? <Badge>Priority {item.priority}</Badge> : null}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{target}</p>
-          {item.description ? <p className="mt-2 text-sm">{item.description}</p> : null}
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            {item.dueAt ? <span>Due: {formatDate(item.dueAt)}</span> : null}
-            {item.snoozedUntil ? <span>Snooze: {formatDate(item.snoozedUntil)}</span> : null}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onComplete} disabled={isPending || item.status === "DONE"}>
-            <CheckCircle2 className="h-4 w-4" /> Done
-          </Button>
-          <Button variant="secondary" onClick={onSnooze} disabled={isPending || item.status === "DONE" || item.status === "DISMISSED"}>
-            <CalendarClock className="h-4 w-4" /> Jutro
-          </Button>
-          <Button variant="danger" onClick={onDismiss} disabled={isPending || item.status === "DISMISSED"}>
-            <Trash2 className="h-4 w-4" /> Odrzuc
-          </Button>
-        </div>
-      </div>
-    </article>
   );
 }
 
