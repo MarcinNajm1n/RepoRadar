@@ -50,24 +50,8 @@ import {
 } from "@/app/actions";
 import { IDEA_STATUS, isFullIdeaStatus } from "@/types/idea-status";
 import { cn, formatCompactNumber, formatDate, sanitizeExternalUrl } from "@/lib/utils";
-
-type TabKey =
-  | "radar"
-  | "library"
-  | "new"
-  | "saved"
-  | "read"
-  | "ignored"
-  | "tasks"
-  | "candidates"
-  | "ideas"
-  | "savedIdeas"
-  | "dismissedIdeas"
-  | "weekly"
-  | "old"
-  | "settings";
-
-type SectionKey = "repo" | "ideas";
+import { TopBar } from "@/components/repo-radar/top-bar";
+import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
 
 const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
   { key: "radar", label: "Radar dzisiaj", icon: Bell, section: "repo" },
@@ -406,6 +390,19 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     runAction(() => pruneOldSnapshotsAction({ daysToKeep: 180, confirmed: true }), "Stare snapshoty wyczyszczone.");
   }
 
+  const topBarStats = [
+    { label: "Nowe", value: initialData.counts.new },
+    { label: "Hot", value: initialData.counts.hot },
+    { label: "Kandydaci", value: initialData.counts.candidates },
+    { label: "Pelne pomysly", value: initialData.counts.fullIdeas },
+    { label: "Zadania", value: activeActionItemCount },
+    { label: "Alerty", value: initialData.radarToday.alerts.length }
+  ];
+  const lastScanDescription = initialData.lastScan
+    ? `Ostatni scan: ${formatDate(initialData.lastScan.startedAt)} | ${initialData.lastScan.status} | ${initialData.lastScan.reposUpdated} repo`
+    : "Ostatni scan: brak skanu";
+  const currentTab = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto flex w-full max-w-[1500px] gap-5 px-5 py-5">
@@ -502,7 +499,38 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             </select>
           </div>
 
-          <header className="mb-4 rounded-lg border border-border bg-card p-4 shadow-soft">
+          <TopBar
+            title={getTabLabel(currentTab)}
+            description={lastScanDescription}
+            message={message}
+            stats={topBarStats}
+            actions={
+              <>
+                <Button onClick={() => runAction(() => runScanAction(), "Scan zakonczony.")} disabled={isPending}>
+                  <RefreshCw className={cn("h-4 w-4", isPending && "animate-spin")} />
+                  Uruchom scan
+                </Button>
+                <Button variant="secondary" onClick={openDailyBriefing} disabled={isPending}>
+                  <CalendarClock className="h-4 w-4" />
+                  Briefing dzienny
+                </Button>
+                <Button variant="secondary" onClick={downloadIdeasCsv} disabled={isPending}>
+                  <Download className="h-4 w-4" />
+                  Eksport CSV
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => runAction(() => createWeeklyReportAction(), "Raport tygodniowy utworzony.")}
+                  disabled={isPending}
+                >
+                  <FileText className="h-4 w-4" />
+                  Raport tygodniowy
+                </Button>
+              </>
+            }
+          />
+
+          <header className="hidden">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
