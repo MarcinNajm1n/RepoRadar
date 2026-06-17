@@ -402,6 +402,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           orderBy: { capturedAt: "desc" },
           take: 1,
           select: {
+            capturedAt: true,
             growth24h: true,
             growth7d: true,
             growthPercent7d: true
