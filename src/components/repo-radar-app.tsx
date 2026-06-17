@@ -56,6 +56,7 @@ import { TasksView } from "@/components/repo-radar/tasks-view";
 import { IdeasView } from "@/components/repo-radar/ideas-view";
 import { IdeaDetailDialog } from "@/components/repo-radar/idea-detail-dialog";
 import { EvidencePanel } from "@/components/repo-radar/evidence-panel";
+import { ReportView } from "@/components/repo-radar/report-view";
 import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
 
 const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; section?: SectionKey }> = [
@@ -1151,9 +1152,12 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                     </div>
                     <p className="text-sm text-muted-foreground">{weeklyReport.summary}</p>
                     {weeklyReport.markdownPath ? <p className="mt-2 text-sm">Plik: {weeklyReport.markdownPath}</p> : null}
-                    <pre className="mt-3 max-h-[420px] overflow-auto rounded-md bg-muted p-3 text-xs leading-5">
-                      {weeklyReport.contentMarkdown}
-                    </pre>
+                    <details className="mt-3 rounded-md border border-border bg-muted p-3">
+                      <summary className="cursor-pointer text-sm font-semibold">Surowy raport tygodniowy</summary>
+                      <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5">
+                        {weeklyReport.contentMarkdown}
+                      </pre>
+                    </details>
                   </article>
                 ))
               ) : (
@@ -1323,7 +1327,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 Zamknij
               </Button>
             </div>
-            <ReportViewer content={report.content} sources={report.evidenceSources} />
+            <ReportView content={report.content} sources={report.evidenceSources} />
           </div>
         </div>
       ) : null}
@@ -1331,68 +1335,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   );
 }
 
-function parseReportSections(content: string) {
-  const lines = content.split(/\r?\n/);
-  const sections: Array<{ title: string; body: string }> = [];
-  let currentTitle = "Raport";
-  let currentBody: string[] = [];
-
-  for (const line of lines) {
-    const match = line.match(/^#{1,3}\s+(.+)$/);
-    if (match) {
-      if (currentBody.join("\n").trim()) {
-        sections.push({ title: currentTitle, body: currentBody.join("\n").trim() });
-      }
-      currentTitle = match[1].trim();
-      currentBody = [];
-    } else {
-      currentBody.push(line);
-    }
-  }
-
-  if (currentBody.join("\n").trim()) {
-    sections.push({ title: currentTitle, body: currentBody.join("\n").trim() });
-  }
-
-  return sections.length ? sections : [{ title: "Raport", body: content }];
-}
-
 function EvidenceSources({ sources, emptyText }: { sources: EvidenceSourceItem[]; emptyText: string }) {
   return <EvidencePanel sources={sources} emptyText={emptyText} />;
-}
-
-function ReportViewer({ content, sources }: { content: string; sources: EvidenceSourceItem[] }) {
-  const sections = parseReportSections(content);
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <aside className="hidden rounded-md border border-border bg-muted p-3 text-sm lg:block">
-        <div className="mb-2 font-semibold">Sekcje</div>
-        <nav className="space-y-1">
-          {sections.slice(0, 18).map((section, index) => (
-            <a key={`${section.title}-${index}`} href={`#report-section-${index}`} className="block rounded px-2 py-1 text-muted-foreground hover:bg-card hover:text-foreground">
-              {section.title}
-            </a>
-          ))}
-        </nav>
-      </aside>
-      <article className="min-w-0 space-y-3">
-        {sections.map((section, index) => (
-          <section id={`report-section-${index}`} key={`${section.title}-${index}`} className="rounded-md border border-border bg-muted p-4">
-            <h3 className="text-base font-semibold">{section.title}</h3>
-            <pre className="repo-report mt-2 whitespace-pre-wrap break-words text-sm leading-6">{section.body}</pre>
-          </section>
-        ))}
-        <section className="rounded-md border border-border bg-card p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold">Zrodla i dowody</h3>
-            {sources.length ? <Badge>{sources.length} sources</Badge> : null}
-          </div>
-          <EvidenceSources sources={sources} emptyText="Ten raport nie ma zapisanych zrodel market research." />
-        </section>
-      </article>
-    </div>
-  );
 }
 
 function ScoreBreakdownPanel({ repo }: { repo: RepositoryListItem }) {
