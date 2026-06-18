@@ -331,6 +331,13 @@ Generate ideas through OpenAI only when the user clicks “Utwórz pomysł z rep
 
 # UI Direction
 
+## RepoRadar design skills policy
+
+- For product UI, dashboard, filters, repository cards, search results, empty states, loading states and layout consistency, use `interface-design` first.
+- Use `impeccable` after `interface-design` for critique, polish, hardening, responsive adaptation, typography and final UI quality.
+- Use StyleSeed skills only as secondary review/audit helpers. They must not override the design direction, tokens or `.interface-design/system.md` unless explicitly asked.
+- Use `web-design-reviewer` only when the dev server or preview URL is available, mainly for visual QA at mobile 375px, tablet 768px, desktop 1280px and wide 1920px.
+- Do not run multiple design-generation skills at the same time. Establish direction with `interface-design`, then refine with one secondary skill.
 Build a clean, modern, portfolio-ready UI.
 
 Prioritize:
