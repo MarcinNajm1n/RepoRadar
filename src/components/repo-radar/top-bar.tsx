@@ -1,22 +1,25 @@
+"use client";
+
 import type React from "react";
 import { StatStrip } from "./stat-strip";
 import type { StatStripItem } from "./stat-strip";
+import { FeedbackBanner, type FeedbackState } from "./ui";
 
 export function TopBar({
   title,
   description,
   actions,
-  message,
+  feedback,
   stats
 }: {
   title: string;
   description: string;
   actions: React.ReactNode;
-  message: string | null;
+  feedback: FeedbackState | null;
   stats: StatStripItem[];
 }) {
   return (
-    <header className="mb-4 rounded-lg border border-border bg-card p-4 shadow-soft">
+    <header className="sticky top-4 z-20 mb-4 rounded-lg border border-border-subtle bg-surface-panel/95 p-4 shadow-soft backdrop-blur">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold">{title}</h2>
@@ -27,11 +30,7 @@ export function TopBar({
       <div className="mt-4">
         <StatStrip items={stats} />
       </div>
-      {message ? (
-        <div className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
-          {message}
-        </div>
-      ) : null}
+      <FeedbackBanner feedback={feedback} />
     </header>
   );
 }

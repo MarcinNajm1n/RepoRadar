@@ -12,11 +12,11 @@ export type BadgeProps = {
 };
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: "border-border bg-muted text-muted-foreground",
-  info: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200",
-  warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200",
-  danger: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200",
+  neutral: "border-border-subtle bg-surface-inset text-muted-foreground",
+  info: "border-info/30 bg-info/10 text-info",
+  success: "border-success/30 bg-success/10 text-success",
+  warning: "border-warning/40 bg-warning/15 text-warning-foreground",
+  danger: "border-destructive/30 bg-destructive/10 text-destructive",
   accent: "border-primary/30 bg-primary/10 text-foreground"
 };
 

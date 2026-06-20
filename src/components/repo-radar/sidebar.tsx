@@ -1,6 +1,8 @@
+"use client";
+
 import { Github } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { defaultTabForSection, getTabLabel, getTabSection, navigationGroups, tabs } from "./navigation";
+import { defaultTabForSection, getTabLabel, getTabsForSection, navigationGroups } from "./navigation";
 import type { SectionKey, TabKey } from "./navigation";
 
 export function Sidebar({
@@ -16,9 +18,11 @@ export function Sidebar({
   onSectionChange: (section: SectionKey) => void;
   onTabChange: (tab: TabKey) => void;
 }) {
+  const sectionTabs = getTabsForSection(activeSection);
+
   return (
-    <aside className="hidden w-72 shrink-0 lg:block">
-      <div className="sticky top-5 rounded-lg border border-border bg-card p-4 shadow-soft">
+    <aside className="hidden w-72 shrink-0 lg:block" aria-label="Nawigacja RepoRadar">
+      <div className="sticky top-5 rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
         <div className="mb-5 flex items-center gap-3 px-1">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Github className="h-5 w-5" />
@@ -34,22 +38,24 @@ export function Sidebar({
             <button
               key={section}
               className={cn(
-                "rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted",
-                activeSection === section && "border-primary/30 bg-primary/10 text-foreground"
+                "rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-sm font-medium transition duration-fast ease-interface hover:bg-surface-inset",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                activeSection === section && "border-primary/30 bg-accent text-accent-foreground"
               )}
               onClick={() => {
                 onSectionChange(section);
                 onTabChange(defaultTabForSection(section));
               }}
+              aria-pressed={activeSection === section}
             >
-              {section === "repo" ? "Repo" : "Pomysly"}
+              {section === "repo" ? "Repo" : "Pomysły"}
             </button>
           ))}
         </div>
 
-        <nav className="space-y-5">
+        <nav className="space-y-5" aria-label="Widoki RepoRadar">
           {navigationGroups.map((group) => {
-            const groupTabs = tabs.filter((tab) => tab.group === group.key && getTabSection(tab) === activeSection);
+            const groupTabs = sectionTabs.filter((tab) => tab.group === group.key);
             if (!groupTabs.length) {
               return null;
             }
@@ -67,17 +73,18 @@ export function Sidebar({
                       <button
                         key={tab.key}
                         className={cn(
-                          "relative flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left text-sm font-medium text-muted-foreground transition",
-                          "hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                          isActive && "border-primary/20 bg-primary/10 text-foreground"
+                          "relative flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left text-sm font-medium text-muted-foreground transition duration-fast ease-interface",
+                          "hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
+                          isActive && "border-primary/20 bg-accent text-accent-foreground"
                         )}
                         onClick={() => onTabChange(tab.key)}
+                        aria-current={isActive ? "page" : undefined}
                       >
                         <span className="flex min-w-0 items-center gap-3">
                           <Icon className="h-4 w-4 shrink-0" />
                           <span className="truncate">{getTabLabel(tab)}</span>
                         </span>
-                        {count > 0 ? <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">{count}</span> : null}
+                        {count > 0 ? <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground tabular-nums">{count}</span> : null}
                       </button>
                     );
                   })}

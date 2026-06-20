@@ -120,6 +120,7 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
     githubTokenConfigured: true,
     openAiConfigured: true,
     discordWebhookConfigured: false,
+    autoGenerateWeeklyIdeas: false,
     notificationsEnabled: true,
     windowsNotificationsEnabled: true,
     marketResearchEnabled: true,

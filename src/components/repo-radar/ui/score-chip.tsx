@@ -2,15 +2,15 @@ import { cn } from "@/lib/utils";
 
 function scoreTone(score: number | null | undefined) {
   if (score === null || score === undefined) {
-    return "border-border bg-muted text-muted-foreground";
+    return "border-border-subtle bg-surface-inset text-muted-foreground";
   }
   if (score >= 80) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200";
+    return "border-success/30 bg-success/10 text-success";
   }
   if (score >= 60) {
-    return "border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/40 dark:bg-teal-500/10 dark:text-teal-200";
+    return "border-primary/30 bg-primary/10 text-primary";
   }
-  return "border-border bg-muted text-muted-foreground";
+  return "border-border-subtle bg-surface-inset text-muted-foreground";
 }
 
 export function ScoreChip({ label, score, suffix = "/100", className }: { label: string; score: number | null | undefined; suffix?: string; className?: string }) {

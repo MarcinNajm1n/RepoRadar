@@ -15,7 +15,7 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-lg border border-border bg-card p-4 shadow-soft", className)}>
+    <section className={cn("rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft", className)}>
       {title || description || action ? (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

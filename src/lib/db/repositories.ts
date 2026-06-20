@@ -5,7 +5,7 @@ import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
 import type { IdeaStatus } from "@/types/idea-status";
 import { getActionItems } from "./action-items";
-import { getAllSettings } from "./settings";
+import { getAllSettings, parseBooleanSetting } from "./settings";
 import type { ActionItemListItem } from "@/types/action-item";
 import type {
   DashboardData,
@@ -351,7 +351,8 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     githubTokenConfigured: Boolean(config.githubToken),
     openAiConfigured: Boolean(config.openAiApiKey),
     discordWebhookConfigured: Boolean(config.discordWebhookUrl),
-    notificationsEnabled: config.enableNotifications,
+    autoGenerateWeeklyIdeas: parseBooleanSetting(persistedSettings.auto_generate_weekly_ideas, false),
+    notificationsEnabled: parseBooleanSetting(persistedSettings.enable_local_notifications, config.enableNotifications),
     windowsNotificationsEnabled: config.enableWindowsNotifications,
     marketResearchEnabled: config.marketResearchEnabled,
     marketResearchMode: config.marketResearchMode,

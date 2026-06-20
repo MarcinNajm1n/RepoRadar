@@ -11,8 +11,8 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "border-primary bg-primary text-primary-foreground hover:brightness-95",
-  secondary: "border-border bg-card text-foreground hover:bg-muted",
-  ghost: "border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+  secondary: "border-border-subtle bg-surface-panel text-foreground hover:bg-surface-inset",
+  ghost: "border-transparent bg-transparent text-muted-foreground hover:bg-surface-inset hover:text-foreground",
   danger: "border-destructive bg-destructive text-destructive-foreground hover:brightness-95",
   link: "h-auto border-transparent bg-transparent px-0 text-primary underline-offset-4 hover:underline"
 };
@@ -28,8 +28,8 @@ export function Button({ children, variant = "primary", size = "md", className, 
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-md border font-medium transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "inline-flex items-center justify-center gap-2 rounded-md border font-medium transition duration-fast ease-interface",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:pointer-events-none disabled:opacity-50",
         variantClasses[variant],
         sizeClasses[size],

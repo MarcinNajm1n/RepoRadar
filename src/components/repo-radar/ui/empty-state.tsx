@@ -15,7 +15,7 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-lg border border-dashed border-border bg-muted p-5 text-sm", className)}>
+    <div className={cn("rounded-lg border border-dashed border-border-subtle bg-surface-inset p-5 text-sm", className)}>
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
       <p className="mt-1 max-w-2xl text-muted-foreground">{text}</p>
       {primaryAction || secondaryAction ? (

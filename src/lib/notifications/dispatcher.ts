@@ -1,5 +1,6 @@
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
+import { getBooleanSetting } from "@/lib/db/settings";
 import { truncateText } from "@/lib/utils";
 import { isExcellentOpportunity } from "@/lib/market-research/opportunity";
 import { IDEA_STATUS } from "@/types/idea-status";
@@ -24,9 +25,10 @@ async function saveNotificationLog(result: NotificationResult) {
 
 async function sendAndLog(payload: NotificationPayload) {
   const config = getConfig();
+  const notificationsEnabled = await getBooleanSetting("enable_local_notifications", config.enableNotifications);
   const results: NotificationResult[] = [];
 
-  if (!config.enableNotifications) {
+  if (!notificationsEnabled) {
     results.push(await sendNoopNotification(payload));
   } else {
     results.push(await sendWindowsNotification(payload));

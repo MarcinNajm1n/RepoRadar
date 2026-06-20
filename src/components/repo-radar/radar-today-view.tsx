@@ -1,9 +1,11 @@
+"use client";
+
 import type React from "react";
-import { BookOpen, ClipboardList, FileText } from "lucide-react";
+import { Activity, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar } from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
 import type { IdeaListItem, RadarTodayData, RepositoryListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
-import { formatGrowth, formatStars } from "@/lib/display/formatters";
+import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
 import { Badge, Button, EmptyState, MetricPill, ScoreChip, SectionCard, TextClamp } from "./ui";
 
@@ -14,8 +16,9 @@ export function RadarTodayView({
   onOpenReport,
   onCreateReadmeTask,
   onCreateManualTask,
-  renderActionItem,
-  renderBusinessCandidate
+  onOpenCandidate,
+  onPromoteCandidate,
+  renderActionItem
 }: {
   radarToday: RadarTodayData;
   isPending: boolean;
@@ -23,17 +26,39 @@ export function RadarTodayView({
   onOpenReport: (repoId: string) => void;
   onCreateReadmeTask: (repo: RepositoryListItem) => void;
   onCreateManualTask: () => void;
+  onOpenCandidate: (idea: IdeaListItem) => void;
+  onPromoteCandidate: (ideaId: string) => void;
   renderActionItem: (item: ActionItemListItem) => React.ReactNode;
-  renderBusinessCandidate: (idea: IdeaListItem) => React.ReactNode;
 }) {
+  const latestScan = radarToday.scanChanges.lastScan;
+
   return (
     <section className="space-y-4">
-      <div className="grid gap-3 lg:grid-cols-4">
-        <MetricPill label="Top repo" value={radarToday.topRepositories.length} className="bg-card" />
-        <MetricPill label="Kandydaci" value={radarToday.businessCandidates.length} className="bg-card" />
-        <MetricPill label="Zadania" value={radarToday.actionItems.length} className="bg-card" />
-        <MetricPill label="Alerty" value={radarToday.alerts.length} className="bg-card" />
-      </div>
+      <section className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <Radar className="h-4 w-4" />
+              Radar dzisiaj
+            </div>
+            <h2 className="mt-2 text-xl font-semibold">Sygnaly do decyzji</h2>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Wygenerowano: {formatDisplayDate(radarToday.generatedAt)}
+              {latestScan ? ` | ostatni scan: ${formatDisplayDate(latestScan.startedAt)} | ${latestScan.reposUpdated} repo` : ""}
+            </p>
+          </div>
+          <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-auto xl:min-w-[520px]">
+            <MetricPill label="Top repo" value={radarToday.topRepositories.length} />
+            <MetricPill label="Kandydaci" value={radarToday.businessCandidates.length} />
+            <MetricPill label="Zadania" value={radarToday.actionItems.length} />
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <MetricPill label="Nowe perelki" value={radarToday.newGems.length} />
+          <MetricPill label="Initial momentum" value={radarToday.highInitialMomentum.length} />
+          <MetricPill label="Alerty" value={radarToday.alerts.length} />
+        </div>
+      </section>
 
       {radarToday.alerts.length ? (
         <section className="grid gap-3 md:grid-cols-2">
@@ -41,34 +66,43 @@ export function RadarTodayView({
             <article
               key={alert.id}
               className={cn(
-                "rounded-lg border bg-card p-4 shadow-soft",
-                alert.level === "critical" && "border-red-300 bg-red-50 text-red-950",
-                alert.level === "warning" && "border-amber-300 bg-amber-50 text-amber-950",
-                alert.level === "info" && "border-blue-200 bg-blue-50 text-blue-950"
+                "rounded-lg border p-4 shadow-soft",
+                alert.level === "critical" && "border-destructive/30 bg-destructive/10",
+                alert.level === "warning" && "border-warning/40 bg-warning/10",
+                alert.level === "info" && "border-info/30 bg-info/10"
               )}
             >
-              <div className="font-semibold">{cleanDisplayText(alert.title, { maxLength: 120 })}</div>
-              <p className="mt-1 text-sm">{cleanDisplayText(alert.message, { maxLength: 220 })}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold">{cleanDisplayText(alert.title, { maxLength: 120 })}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">{cleanDisplayText(alert.message, { maxLength: 220 })}</p>
+                </div>
+                <Badge tone={alert.level === "critical" ? "danger" : alert.level === "warning" ? "warning" : "info"}>
+                  {alert.level}
+                </Badge>
+              </div>
             </article>
           ))}
         </section>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.75fr)]">
         <SectionCard
           title="Repo do sprawdzenia"
+          description="Najmocniejsze sygnaly z lokalnych snapshotow."
           action={
-            <Button variant="ghost" onClick={onOpenLibrary}>
+            <Button variant="ghost" size="sm" onClick={onOpenLibrary}>
               Biblioteka
             </Button>
           }
         >
           <div className="space-y-3">
             {radarToday.topRepositories.length ? (
-              radarToday.topRepositories.map((repo) => (
+              radarToday.topRepositories.map((repo, index) => (
                 <RadarRepositoryCard
                   key={repo.id}
                   repo={repo}
+                  rank={index + 1}
                   isPending={isPending}
                   onOpenReport={() => onOpenReport(repo.id)}
                   onCreateReadmeTask={() => onCreateReadmeTask(repo)}
@@ -81,10 +115,11 @@ export function RadarTodayView({
         </SectionCard>
 
         <SectionCard
-          title="Zadania teraz"
+          title="Kolejka teraz"
+          description="Najblizsze decyzje i sprawdzenia."
           action={
-            <Button variant="secondary" onClick={onCreateManualTask} disabled={isPending}>
-              <ClipboardList className="h-4 w-4" /> Dodaj zadanie
+            <Button variant="secondary" size="sm" onClick={onCreateManualTask} disabled={isPending}>
+              <ClipboardList className="h-4 w-4" /> Dodaj
             </Button>
           }
         >
@@ -98,17 +133,30 @@ export function RadarTodayView({
         </SectionCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Kandydaci biznesowi">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <SectionCard title="Kandydaci biznesowi" description="Szybka ocena przed rozwinieciem.">
           <div className="space-y-3">
             {radarToday.businessCandidates.length ? (
-              radarToday.businessCandidates.map((idea) => renderBusinessCandidate(idea))
+              radarToday.businessCandidates.map((idea) => (
+                <RadarBusinessCandidateCard
+                  key={idea.id}
+                  idea={idea}
+                  isPending={isPending}
+                  onOpenDetail={() => onOpenCandidate(idea)}
+                  onPromote={() => onPromoteCandidate(idea.id)}
+                />
+              ))
             ) : (
               <EmptyState title="Brak kandydatow" text="Uzyj light research przy repo, ktore wyglada obiecujaco." />
             )}
           </div>
         </SectionCard>
 
+        <RadarIdeaCompactSection title="Pomysly do rozwiniecia" ideas={radarToday.ideasToDevelop} onOpenDetail={onOpenCandidate} />
+        <RadarRepoCompactSection title="Zmiany ze skanu" repositories={radarToday.scanChanges.latestRepositories} empty="Brak nowych zmian ze skanu." />
+      </div>
+
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         <RadarRepoCompactSection title="Nowe perelki" repositories={radarToday.newGems} empty="Brak nowych perelek." />
         <RadarRepoCompactSection
           title="High initial momentum"
@@ -122,11 +170,13 @@ export function RadarTodayView({
 
 function RadarRepositoryCard({
   repo,
+  rank,
   isPending,
   onOpenReport,
   onCreateReadmeTask
 }: {
   repo: RepositoryListItem;
+  rank: number;
   isPending: boolean;
   onOpenReport: () => void;
   onCreateReadmeTask: () => void;
@@ -134,28 +184,33 @@ function RadarRepositoryCard({
   const safeUrl = sanitizeExternalUrl(repo.url);
 
   return (
-    <article className="rounded-md border border-border bg-background p-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <article className="rounded-lg border border-border-subtle bg-surface-raised p-3">
+      <div className="grid gap-3 lg:grid-cols-[2rem_minmax(0,1fr)_auto]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-sm font-semibold tabular-nums text-primary">
+          {rank}
+        </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="break-words font-semibold">{repo.fullName}</h4>
-            <Badge>{repo.status}</Badge>
+            <h4 className="break-words font-semibold">{cleanDisplayText(repo.fullName, { maxLength: 140 })}</h4>
+            <Badge variant="status">{repo.status}</Badge>
+            {repo.primaryLanguage ? <Badge variant="source">{repo.primaryLanguage}</Badge> : null}
             <ScoreChip label="Trend" score={repo.trendScore} />
             <ScoreChip label="Initial" score={repo.initialMomentumScore} />
           </div>
           <TextClamp lines={2} className="mt-2">
-            {cleanDisplayText(repo.shortSummaryPl ?? repo.description ?? "Brak opisu.", { maxLength: 220 })}
+            {cleanDisplayText(repo.shortSummaryPl ?? repo.description ?? "Brak opisu.", { maxLength: 240 })}
           </TextClamp>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <MetricPill label="Stars" value={formatStars(repo.starsCurrent)} />
             <MetricPill label="Growth 7d" value={formatGrowth(repo.growth7d)} />
+            <MetricPill label="Freshness" value={repo.pushedAt ? formatDisplayDate(repo.pushedAt) : "brak"} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onOpenReport} disabled={isPending}>
+        <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+          <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
             <FileText className="h-4 w-4" /> Raport
           </Button>
-          <Button variant="secondary" onClick={onCreateReadmeTask} disabled={isPending}>
+          <Button variant="secondary" size="sm" onClick={onCreateReadmeTask} disabled={isPending}>
             <BookOpen className="h-4 w-4" /> README
           </Button>
           {safeUrl && safeUrl.startsWith("https://github.com/") ? (
@@ -163,14 +218,84 @@ function RadarRepositoryCard({
               href={safeUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition duration-fast ease-interface hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              GitHub
+              <ExternalLink className="h-4 w-4" /> GitHub
             </a>
           ) : null}
         </div>
       </div>
     </article>
+  );
+}
+
+function RadarBusinessCandidateCard({
+  idea,
+  isPending,
+  onOpenDetail,
+  onPromote
+}: {
+  idea: IdeaListItem;
+  isPending: boolean;
+  onOpenDetail: () => void;
+  onPromote: () => void;
+}) {
+  return (
+    <article className="rounded-lg border border-border-subtle bg-surface-raised p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="break-words font-semibold">{cleanDisplayText(idea.title, { maxLength: 120 })}</h4>
+        <ScoreChip label="Opp" score={idea.opportunityScore} />
+        <ScoreChip label="Conf" score={idea.confidenceScore} suffix="/5" />
+      </div>
+      <TextClamp lines={3} className="mt-2">
+        {cleanDisplayText(idea.applicationSummary ?? idea.problem, { maxLength: 260 })}
+      </TextClamp>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" onClick={onOpenDetail}>
+          Szczegoly
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onPromote} disabled={isPending}>
+          <Brain className="h-4 w-4" /> Rozwin
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function RadarIdeaCompactSection({
+  title,
+  ideas,
+  onOpenDetail
+}: {
+  title: string;
+  ideas: IdeaListItem[];
+  onOpenDetail: (idea: IdeaListItem) => void;
+}) {
+  return (
+    <SectionCard title={title}>
+      <div className="space-y-3">
+        {ideas.length ? (
+          ideas.map((idea) => (
+            <article key={idea.id} className="rounded-md border border-border-subtle bg-surface-raised p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="break-words font-semibold">{cleanDisplayText(idea.title, { maxLength: 120 })}</h4>
+                <ScoreChip label="Conf" score={idea.confidenceScore} suffix="/5" />
+              </div>
+              <TextClamp lines={3} className="mt-2">
+                {cleanDisplayText(idea.applicationSummary ?? idea.problem, { maxLength: 260 })}
+              </TextClamp>
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => onOpenDetail(idea)}>
+                Szczegoly
+              </Button>
+            </article>
+          ))
+        ) : (
+          <p className="rounded-md border border-dashed border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+            Brak pomyslow do rozwiniecia.
+          </p>
+        )}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -188,11 +313,12 @@ function RadarRepoCompactSection({
       <div className="space-y-3">
         {repositories.length ? (
           repositories.map((repo) => (
-            <article key={repo.id} className="rounded-md border border-border bg-background p-3">
+            <article key={repo.id} className="rounded-md border border-border-subtle bg-surface-raised p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="break-words font-semibold">{repo.fullName}</h4>
+                <Activity className="h-4 w-4 text-primary" />
+                <h4 className="break-words font-semibold">{cleanDisplayText(repo.fullName, { maxLength: 130 })}</h4>
                 <ScoreChip label="Trend" score={repo.trendScore} />
-                <Badge>{formatStars(repo.starsCurrent)} stars</Badge>
+                <Badge variant="score">{formatStars(repo.starsCurrent)} stars</Badge>
               </div>
               <TextClamp lines={3} className="mt-2">
                 {cleanDisplayText(repo.shortSummaryPl ?? repo.description ?? "Brak opisu.", { maxLength: 260 })}
@@ -200,7 +326,7 @@ function RadarRepoCompactSection({
             </article>
           ))
         ) : (
-          <p className="rounded-md border border-dashed border-border bg-muted p-3 text-sm text-muted-foreground">{empty}</p>
+          <p className="rounded-md border border-dashed border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">{empty}</p>
         )}
       </div>
     </SectionCard>

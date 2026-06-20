@@ -124,6 +124,7 @@ export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
   discordWebhookConfigured: boolean;
+  autoGenerateWeeklyIdeas: boolean;
   notificationsEnabled: boolean;
   windowsNotificationsEnabled: boolean;
   marketResearchEnabled: boolean;
