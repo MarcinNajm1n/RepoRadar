@@ -41,6 +41,32 @@ function actionTimestamp(action: RepositoryTimelineRecord["actionItems"][number]
   return action.completedAt ?? action.dismissedAt ?? action.createdAt;
 }
 
+function reportTimelineTitle(report: RepositoryTimelineRecord["reports"][number]) {
+  if (report.type === "repo_quick_brief") {
+    return "Quick brief";
+  }
+  if (report.type === "scoring_snapshot") {
+    return "Snapshot scoringu";
+  }
+  if (report.type === "decision_log") {
+    return "Decyzja uzytkownika";
+  }
+  return report.title;
+}
+
+function reportTimelineDetail(report: RepositoryTimelineRecord["reports"][number]) {
+  if (report.type === "repo_quick_brief") {
+    return "Szybki brief przed pelnym raportem.";
+  }
+  if (report.type === "scoring_snapshot") {
+    return "Zapisany stan scoringu i metryk w momencie decyzji.";
+  }
+  if (report.type === "decision_log") {
+    return "Zapis lokalnej decyzji lub akcji uzytkownika.";
+  }
+  return "Raport zapisany w lokalnej historii.";
+}
+
 export function buildRepositoryTimelineItems(repository: RepositoryTimelineRecord): RepositoryTimelineItem[] {
   const items: RepositoryTimelineItem[] = [
     {
@@ -97,8 +123,8 @@ export function buildRepositoryTimelineItems(repository: RepositoryTimelineRecor
     items.push({
       id: `report:${report.id}`,
       type: "report",
-      title: report.type === "repo_quick_brief" ? "Quick brief" : report.title,
-      detail: report.type === "repo_quick_brief" ? "Szybki brief przed pelnym raportem." : "Raport zapisany w lokalnej historii.",
+      title: reportTimelineTitle(report),
+      detail: reportTimelineDetail(report),
       timestamp: toTimelineDate(report.createdAt),
       tone: "positive"
     });
@@ -146,9 +172,9 @@ export async function getRepositoryTimeline(repoId: string): Promise<RepositoryT
         }
       },
       reports: {
-        where: { type: { in: ["repo", "repo_quick_brief"] } },
+        where: { type: { in: ["repo", "repo_quick_brief", "scoring_snapshot", "decision_log"] } },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 10,
         select: {
           id: true,
           type: true,

@@ -8,6 +8,7 @@ import { getActionItems } from "./action-items";
 import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary } from "./ai-jobs";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
+import { recordRepositoryStatusAudit } from "./repository-audit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import type { ActionItemListItem } from "@/types/action-item";
 import type {
@@ -27,7 +28,7 @@ import type {
   SettingsSummary
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Repository } from "@prisma/client";
 
 const DEFAULT_REPOSITORY_PAGE = 1;
 const DEFAULT_REPOSITORY_PAGE_SIZE = 100;
@@ -859,8 +860,17 @@ export async function updateRepositoryStatus(repoId: string, status: string, rea
     throw new Error(`Unsupported repository status: ${status}`);
   }
 
-  const repository = await prisma.repository.findUniqueOrThrow({ where: { id: repoId } });
+  const repository = await prisma.repository.findUniqueOrThrow({
+    where: { id: repoId },
+    include: {
+      snapshots: {
+        orderBy: { capturedAt: "desc" },
+        take: 1
+      }
+    }
+  });
   const nextStatus: RepositoryStatus = status;
+  let updatedRepository: Repository;
 
   if (nextStatus === "IGNORED") {
     await prisma.ignoredRepository.upsert({
@@ -879,28 +889,40 @@ export async function updateRepositoryStatus(repoId: string, status: string, rea
       }
     });
 
-    return prisma.repository.update({
+    updatedRepository = await prisma.repository.update({
       where: { id: repoId },
       data: {
         status: nextStatus,
         isDeletedFromView: true
       }
     });
+  } else {
+    await prisma.ignoredRepository.deleteMany({
+      where: {
+        OR: [{ repoId }, { fullName: repository.fullName }]
+      }
+    });
+
+    updatedRepository = await prisma.repository.update({
+      where: { id: repoId },
+      data: {
+        status: nextStatus,
+        isDeletedFromView: false
+      }
+    });
   }
 
-  await prisma.ignoredRepository.deleteMany({
-    where: {
-      OR: [{ repoId }, { fullName: repository.fullName }]
-    }
+  await recordRepositoryStatusAudit({
+    repository: {
+      ...repository,
+      status: updatedRepository.status
+    },
+    previousStatus: repository.status,
+    nextStatus,
+    reason
   });
 
-  return prisma.repository.update({
-    where: { id: repoId },
-    data: {
-      status: nextStatus,
-      isDeletedFromView: false
-    }
-  });
+  return updatedRepository;
 }
 
 export async function getRepositoryForReport(repoId: string) {
