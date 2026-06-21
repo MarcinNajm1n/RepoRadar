@@ -7,6 +7,10 @@ export type FeedbackTone = "success" | "error" | "info";
 export type FeedbackState = {
   tone: FeedbackTone;
   message: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 };
 
 const toneClasses: Record<FeedbackTone, string> = {
@@ -41,6 +45,15 @@ export function FeedbackBanner({ feedback, className }: { feedback: FeedbackStat
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0">{feedback.message}</span>
+      {feedback.action ? (
+        <button
+          type="button"
+          className="ml-auto shrink-0 rounded-md border border-current/30 px-2 py-1 text-xs font-semibold transition hover:bg-current/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+          onClick={feedback.action.onClick}
+        >
+          {feedback.action.label}
+        </button>
+      ) : null}
     </div>
   );
 }

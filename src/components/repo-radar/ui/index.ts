@@ -9,6 +9,7 @@ export type { FeedbackState, FeedbackTone } from "./feedback-banner";
 export { MetricPill } from "./metric-pill";
 export { ScoreChip } from "./score-chip";
 export { SectionCard } from "./section-card";
+export { SkeletonBlock, SkeletonText } from "./skeleton";
 export { StatusChip } from "./status-chip";
 export { Switch } from "./switch";
 export type { SwitchProps } from "./switch";
