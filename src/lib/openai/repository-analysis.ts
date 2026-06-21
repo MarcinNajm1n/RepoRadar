@@ -13,6 +13,7 @@ import {
   formatMarketResearchForPrompt
 } from "./prompts";
 import { generateOpenAiText } from "./client";
+import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets";
 import {
   attachResearchRunsToIdea,
   attachResearchRunsToReport,
@@ -95,7 +96,11 @@ export async function generateShortSummaryForRepository(repoId: string, force = 
   }
 
   await ensureOpenAiBudget();
-  const content = await generateOpenAiText(buildSummaryPrompt(), context);
+  const content = await generateOpenAiText(
+    buildSummaryPrompt(),
+    applyOpenAiActionBudget(context, "summary"),
+    getOpenAiActionOptions("summary")
+  );
   await saveOpenAiOutput("summary", repoId, hash, config.openAiModel, content);
   await prisma.repository.update({
     where: { id: repoId },
@@ -151,10 +156,13 @@ export async function generateFullReportForRepository(repoId: string, force = fa
 
   await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
   const research = await getMarketResearchForRepository(buildResearchContext("repo-report", repository, context, "full"));
-  const reportContext = [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n");
+  const reportContext = applyOpenAiActionBudget(
+    [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n"),
+    "repo-report"
+  );
   await ensureOpenAiBudget();
 
-  const content = await generateOpenAiText(buildRepoReportPrompt(), reportContext);
+  const content = await generateOpenAiText(buildRepoReportPrompt(), reportContext, getOpenAiActionOptions("repo-report"));
   await saveOpenAiOutput("repo-report", repoId, hash, config.openAiModel, content);
   const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), content);
 
@@ -241,13 +249,14 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
         await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
         return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
       })();
-  const ideaContext = research
-    ? [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n")
-    : context;
+  const ideaContext = applyOpenAiActionBudget(
+    research ? [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n") : context,
+    "idea"
+  );
   if (!cached) {
     await ensureOpenAiBudget();
   }
-  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext));
+  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext, getOpenAiActionOptions("idea")));
 
   if (!cached) {
     await saveOpenAiOutput(ideaCacheKind, repoId, hash, config.openAiModel, content);
@@ -479,26 +488,29 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
         await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
         return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
       })();
-  const ideaContext = [
-    context,
-    "Existing candidate:",
+  const ideaContext = applyOpenAiActionBudget(
     [
-      candidate.title,
-      candidate.problem,
-      candidate.applicationSummary,
-      candidate.businessRationale,
-      candidate.marketSummary
+      context,
+      "Existing candidate:",
+      [
+        candidate.title,
+        candidate.problem,
+        candidate.applicationSummary,
+        candidate.businessRationale,
+        candidate.marketSummary
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      research ? ["Market research:", formatMarketResearchForPrompt(research)].join("\n\n") : ""
     ]
       .filter(Boolean)
-      .join("\n"),
-    research ? ["Market research:", formatMarketResearchForPrompt(research)].join("\n\n") : ""
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+      .join("\n\n"),
+    "idea-promote"
+  );
   if (!cached) {
     await ensureOpenAiBudget();
   }
-  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext));
+  const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext, getOpenAiActionOptions("idea-promote")));
   if (!cached) {
     await saveOpenAiOutput("idea-promote", candidate.sourceRepoId, hash, config.openAiModel, content);
   }

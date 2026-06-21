@@ -44,6 +44,7 @@ export type GenerateOpenAiTextOptions = {
   tools?: OpenAiResponsesTool[];
   toolChoice?: "auto" | "required";
   include?: string[];
+  maxOutputTokens?: number;
 };
 
 function collectOutputText(response: OpenAiResponse) {
@@ -70,6 +71,7 @@ export function buildOpenAiResponsesBody(
     instructions,
     input,
     store: false,
+    ...(options.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
     ...(options.tools ? { tools: options.tools } : {}),
     ...(options.toolChoice ? { tool_choice: options.toolChoice } : {}),
     ...(options.include ? { include: options.include } : {})

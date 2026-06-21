@@ -1,12 +1,11 @@
 import type { AiCostSummary } from "@/types/ai-cost";
+import { formatOpenAiBudgetLabel } from "./token-budgets";
 
 export function estimateOpenAiNextActions(marketResearchEnabled: boolean): AiCostSummary["estimatedNextActions"] {
-  const research = marketResearchEnabled ? "0-1 call, zależnie od providera/cache" : "0 calls";
-
   return {
-    summary: "1 call",
-    report: marketResearchEnabled ? "1-2 calls" : "1 call",
-    idea: marketResearchEnabled ? "1-2 calls" : "1 call",
-    research
+    summary: formatOpenAiBudgetLabel("summary"),
+    report: marketResearchEnabled ? formatOpenAiBudgetLabel("repo-report") : "1 call, max 2400 output tokens",
+    idea: marketResearchEnabled ? formatOpenAiBudgetLabel("idea") : "1 call, max 1600 output tokens",
+    research: marketResearchEnabled ? formatOpenAiBudgetLabel("opportunity-research") : "0 calls"
   };
 }
