@@ -1,5 +1,6 @@
 import { prisma } from "./client";
 import { ACTION_ITEM_STATUSES, isActionItemStatus, isActionItemType } from "@/types/action-item";
+import { recordActionItemDecision } from "./repository-audit";
 import type {
   ActionItemListItem,
   ActionItemStatus,
@@ -195,6 +196,8 @@ export async function createActionItem(input: CreateActionItemInput) {
         data,
         include
       });
+
+  await recordActionItemDecision(item);
 
   return mapActionItem(item);
 }
