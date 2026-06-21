@@ -24,6 +24,7 @@ import {
   promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
 import { createDailyBriefing } from "@/lib/reports/briefing";
+import { createPortfolioBrief } from "@/lib/reports/portfolio-brief";
 import { createRepoQuickBrief } from "@/lib/reports/repo-quick-brief";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
@@ -130,6 +131,17 @@ export async function createWeeklyReportAction() {
     id: report.id,
     title: report.title,
     markdownPath: report.markdownPath
+  };
+}
+
+export async function createPortfolioBriefAction() {
+  const report = await createPortfolioBrief();
+  revalidatePath("/");
+  return {
+    id: report.id,
+    title: report.title,
+    markdownPath: report.markdownPath,
+    contentMarkdown: report.contentMarkdown
   };
 }
 
