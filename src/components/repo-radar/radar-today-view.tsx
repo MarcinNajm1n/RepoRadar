@@ -14,6 +14,7 @@ export function RadarTodayView({
   isPending,
   onOpenLibrary,
   onOpenReport,
+  onOpenQuickBrief,
   onCreateReadmeTask,
   onCreateManualTask,
   onOpenCandidate,
@@ -24,6 +25,7 @@ export function RadarTodayView({
   isPending: boolean;
   onOpenLibrary: () => void;
   onOpenReport: (repoId: string) => void;
+  onOpenQuickBrief: (repoId: string) => void;
   onCreateReadmeTask: (repo: RepositoryListItem) => void;
   onCreateManualTask: () => void;
   onOpenCandidate: (idea: IdeaListItem) => void;
@@ -104,6 +106,7 @@ export function RadarTodayView({
                   repo={repo}
                   rank={index + 1}
                   isPending={isPending}
+                  onOpenQuickBrief={() => onOpenQuickBrief(repo.id)}
                   onOpenReport={() => onOpenReport(repo.id)}
                   onCreateReadmeTask={() => onCreateReadmeTask(repo)}
                 />
@@ -173,12 +176,14 @@ function RadarRepositoryCard({
   rank,
   isPending,
   onOpenReport,
+  onOpenQuickBrief,
   onCreateReadmeTask
 }: {
   repo: RepositoryListItem;
   rank: number;
   isPending: boolean;
   onOpenReport: () => void;
+  onOpenQuickBrief: () => void;
   onCreateReadmeTask: () => void;
 }) {
   const safeUrl = sanitizeExternalUrl(repo.url);
@@ -207,6 +212,9 @@ function RadarRepositoryCard({
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+          <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
+            <FileText className="h-4 w-4" /> Brief
+          </Button>
           <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
             <FileText className="h-4 w-4" /> Raport
           </Button>

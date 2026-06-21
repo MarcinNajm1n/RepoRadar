@@ -12,6 +12,7 @@ import {
   dismissActionItemAction,
   exportIdeasCsvAction,
   getRepositoryPageAction,
+  generateQuickBriefAction,
   generateDailyBriefingAction,
   createWeeklyReportAction,
   generateIdeaAction,
@@ -189,6 +190,18 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     }, force ? "Raport zostal zregenerowany." : "Raport jest gotowy.", force ? "Regeneruje raport..." : "Generuje raport...");
   }
 
+  function openQuickBrief(repoId: string) {
+    runAction(async () => {
+      const generated = await generateQuickBriefAction(repoId);
+      setReport({
+        title: generated.title,
+        content: generated.contentMarkdown,
+        path: generated.markdownPath,
+        evidenceSources: []
+      });
+    }, "Quick brief jest gotowy.", "Tworze quick brief...");
+  }
+
   function createRepoTask(repo: RepositoryListItem, type: string, title: string, success: string, priority = 1) {
     runAction(
       () =>
@@ -360,6 +373,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           isPending={isPending}
           onOpenLibrary={() => setActiveTab("library")}
           onOpenReport={openReport}
+          onOpenQuickBrief={openQuickBrief}
           onCreateReadmeTask={(repo) => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
           onCreateManualTask={createManualTask}
           onOpenCandidate={setIdeaDetail}
@@ -431,6 +445,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             onRegenerateReport: (repoId) => openReport(repoId, true),
             onSave: (repoId) => runAction(() => updateStatusAction(repoId, "SAVED"), "Repo zapisane."),
             onMarkRead: (repoId) => runAction(() => updateStatusAction(repoId, "READ"), "Repo oznaczone jako przeczytane."),
+            onOpenQuickBrief: (repoId) => openQuickBrief(repoId),
             onGenerateIdea: (repoId) => runAction(() => generateIdeaAction(repoId), "Pomysl zostal utworzony.", "Tworze pomysl z repo..."),
             onResearch: (repoId) => runAction(() => generateOpportunityCandidateAction(repoId), "Research light zakonczony.", "Research light w toku..."),
             onAddCloneTask: (repo) => createRepoTask(repo, "CLONE_LATER", `Clone later: ${repo.fullName}`, "Zadanie clone later dodane.", 1),

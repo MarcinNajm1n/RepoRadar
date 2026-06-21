@@ -16,6 +16,7 @@ type RepoCardProps = {
   onRegenerateReport: () => void;
   onSave: () => void;
   onMarkRead: () => void;
+  onOpenQuickBrief: () => void;
   onGenerateIdea: () => void;
   onResearch: () => void;
   onAddCloneTask: () => void;
@@ -33,6 +34,7 @@ export function RepoCard({
   onRegenerateReport,
   onSave,
   onMarkRead,
+  onOpenQuickBrief,
   onGenerateIdea,
   onResearch,
   onAddCloneTask,
@@ -123,6 +125,7 @@ export function RepoCard({
             isPending={isPending}
             onSave={onSave}
             onMarkRead={onMarkRead}
+            onOpenQuickBrief={onOpenQuickBrief}
             onOpenReport={onOpenReport}
             onRegenerateReport={onRegenerateReport}
             onGenerateIdea={onGenerateIdea}

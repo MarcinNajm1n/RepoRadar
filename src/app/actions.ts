@@ -23,6 +23,7 @@ import {
   promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
 import { createDailyBriefing } from "@/lib/reports/briefing";
+import { createRepoQuickBrief } from "@/lib/reports/repo-quick-brief";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
 
@@ -63,6 +64,19 @@ export async function generateReportAction(repoId: string, force = false) {
     markdownPath: report.markdownPath,
     createdAt: report.createdAt.toISOString(),
     evidenceSources
+  };
+}
+
+export async function generateQuickBriefAction(repoId: string) {
+  const report = await createRepoQuickBrief(repoId);
+  revalidatePath("/");
+  return {
+    id: report.id,
+    title: report.title,
+    contentMarkdown: report.contentMarkdown,
+    markdownPath: report.markdownPath,
+    createdAt: report.createdAt.toISOString(),
+    evidenceSources: []
   };
 }
 

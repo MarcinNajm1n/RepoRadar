@@ -13,6 +13,7 @@ export type RepoCardCallbacks = {
   onRegenerateReport: (repoId: string) => void;
   onSave: (repoId: string) => void;
   onMarkRead: (repoId: string) => void;
+  onOpenQuickBrief: (repoId: string) => void;
   onGenerateIdea: (repoId: string) => void;
   onResearch: (repoId: string) => void;
   onAddCloneTask: (repo: RepositoryListItem) => void;
@@ -70,6 +71,7 @@ export function RepoListView({
                 onRegenerateReport={() => callbacks.onRegenerateReport(repo.id)}
                 onSave={() => callbacks.onSave(repo.id)}
                 onMarkRead={() => callbacks.onMarkRead(repo.id)}
+                onOpenQuickBrief={() => callbacks.onOpenQuickBrief(repo.id)}
                 onGenerateIdea={() => callbacks.onGenerateIdea(repo.id)}
                 onResearch={() => callbacks.onResearch(repo.id)}
                 onAddCloneTask={() => callbacks.onAddCloneTask(repo)}

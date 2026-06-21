@@ -13,6 +13,7 @@ export type RepoDetailsPanelProps = {
   onRegenerateReport: () => void;
   onSave: () => void;
   onMarkRead: () => void;
+  onOpenQuickBrief: () => void;
   onGenerateIdea: () => void;
   onResearch: () => void;
   onAddCloneTask: () => void;
@@ -28,6 +29,7 @@ export function RepoDetailsPanel({
   onRegenerateReport,
   onSave,
   onMarkRead,
+  onOpenQuickBrief,
   onGenerateIdea,
   onResearch,
   onAddCloneTask,
@@ -119,6 +121,7 @@ export function RepoDetailsPanel({
           isPending={isPending}
           onSave={onSave}
           onMarkRead={onMarkRead}
+          onOpenQuickBrief={onOpenQuickBrief}
           onOpenReport={onOpenReport}
           onRegenerateReport={onRegenerateReport}
           onGenerateIdea={onGenerateIdea}

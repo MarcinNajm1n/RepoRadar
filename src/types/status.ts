@@ -16,6 +16,7 @@ export const REPORT_TYPES = {
   DAILY: "daily",
   DAILY_BRIEFING: "daily_briefing",
   WEEKLY: "weekly",
+  REPO_QUICK_BRIEF: "repo_quick_brief",
   REPO: "repo"
 } as const;
 

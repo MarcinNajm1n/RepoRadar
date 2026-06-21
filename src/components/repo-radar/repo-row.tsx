@@ -19,6 +19,7 @@ export type RepoRowProps = {
   onRegenerateReport: () => void;
   onSave: () => void;
   onMarkRead: () => void;
+  onOpenQuickBrief: () => void;
   onGenerateIdea: () => void;
   onResearch: () => void;
   onAddCloneTask: () => void;
@@ -36,6 +37,7 @@ export function RepoRow({
   onRegenerateReport,
   onSave,
   onMarkRead,
+  onOpenQuickBrief,
   onGenerateIdea,
   onResearch,
   onAddCloneTask,
@@ -147,6 +149,7 @@ export function RepoRow({
           onRegenerateReport={onRegenerateReport}
           onSave={onSave}
           onMarkRead={onMarkRead}
+          onOpenQuickBrief={onOpenQuickBrief}
           onGenerateIdea={onGenerateIdea}
           onResearch={onResearch}
           onAddCloneTask={onAddCloneTask}

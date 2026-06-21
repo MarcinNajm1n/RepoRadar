@@ -7,6 +7,7 @@ export type RepoCardActionsProps = {
   isPending: boolean;
   onSave: () => void;
   onMarkRead: () => void;
+  onOpenQuickBrief: () => void;
   onOpenReport: () => void;
   onRegenerateReport: () => void;
   onGenerateIdea: () => void;
@@ -22,6 +23,7 @@ export function RepoCardActions({
   isPending,
   onSave,
   onMarkRead,
+  onOpenQuickBrief,
   onOpenReport,
   onRegenerateReport,
   onGenerateIdea,
@@ -40,6 +42,9 @@ export function RepoCardActions({
       </Button>
       <Button variant="secondary" size="sm" onClick={onMarkRead} disabled={isPending}>
         <BookOpen className="h-4 w-4" /> Przeczytane
+      </Button>
+      <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
+        <FileText className="h-4 w-4" /> Brief
       </Button>
       <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
         <FileText className="h-4 w-4" /> Raport
