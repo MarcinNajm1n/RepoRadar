@@ -122,6 +122,18 @@ export type DashboardAlert = {
   message: string;
 };
 
+export type RadarNextAction = {
+  id: string;
+  kind: "alert" | "task" | "repo" | "idea" | "scan";
+  title: string;
+  description: string;
+  reason: string;
+  actionLabel: string;
+  repoId: string | null;
+  ideaId: string | null;
+  taskId: string | null;
+};
+
 export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
@@ -178,6 +190,7 @@ export type DashboardLastScan = {
 
 export type RadarTodayData = {
   generatedAt: string;
+  nextAction: RadarNextAction;
   topRepositories: RepositoryListItem[];
   newGems: RepositoryListItem[];
   highInitialMomentum: RepositoryListItem[];

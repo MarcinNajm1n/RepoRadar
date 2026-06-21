@@ -378,6 +378,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           onCreateManualTask={createManualTask}
           onOpenCandidate={setIdeaDetail}
           onPromoteCandidate={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+          onOpenTasks={() => setActiveTab("tasks")}
+          onOpenSettings={() => setActiveTab("settings")}
+          onRunScan={() => runAction(() => runScanAction(), "Scan zakonczony.", "Scan jest w toku...")}
           renderActionItem={(item) => (
             <RepoActionItemCard
               key={item.id}

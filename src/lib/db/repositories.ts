@@ -17,6 +17,7 @@ import type {
   IdeaListItem,
   NotificationLogItem,
   NotificationSummary,
+  RadarNextAction,
   RepositoryFilterOptions,
   RadarTodayData,
   ReportListItem,
@@ -264,6 +265,87 @@ function isActionItemVisibleNow(item: ActionItemListItem, now: Date) {
   return !item.snoozedUntil || new Date(item.snoozedUntil).getTime() <= now.getTime();
 }
 
+function buildNextAction(input: {
+  alerts: RadarTodayData["alerts"];
+  actionItems: ActionItemListItem[];
+  topRepositories: RepositoryListItem[];
+  businessCandidates: IdeaListItem[];
+  latestRepositories: RepositoryListItem[];
+  lastScan: DashboardLastScan;
+}): RadarNextAction {
+  const blockingAlert = input.alerts.find((alert) => alert.level === "critical") ?? input.alerts.find((alert) => alert.level === "warning");
+  if (blockingAlert) {
+    return {
+      id: `alert:${blockingAlert.id}`,
+      kind: "alert",
+      title: blockingAlert.title,
+      description: blockingAlert.message,
+      reason: "Najpierw usun blokery operacyjne, bo moga falszowac jakosc radaru.",
+      actionLabel: "Sprawdz alert",
+      repoId: null,
+      ideaId: null,
+      taskId: null
+    };
+  }
+
+  const topTask = input.actionItems[0];
+  if (topTask) {
+    return {
+      id: `task:${topTask.id}`,
+      kind: "task",
+      title: topTask.title,
+      description: topTask.description ?? topTask.repoFullName ?? topTask.ideaTitle ?? "Zadanie bez dodatkowego opisu.",
+      reason: "To najwyzej ocenione aktywne zadanie w kolejce.",
+      actionLabel: "Przejdz do kolejki",
+      repoId: topTask.repoId,
+      ideaId: topTask.ideaId,
+      taskId: topTask.id
+    };
+  }
+
+  const topIdea = input.businessCandidates[0];
+  if (topIdea) {
+    return {
+      id: `idea:${topIdea.id}`,
+      kind: "idea",
+      title: topIdea.title,
+      description: topIdea.applicationSummary ?? topIdea.problem,
+      reason: "Najmocniejszy kandydat biznesowy czeka na decyzje: rozwinac, zapisac albo odrzucic.",
+      actionLabel: "Otworz kandydata",
+      repoId: topIdea.sourceRepoId,
+      ideaId: topIdea.id,
+      taskId: null
+    };
+  }
+
+  const topRepo = input.topRepositories[0] ?? input.latestRepositories[0];
+  if (topRepo) {
+    return {
+      id: `repo:${topRepo.id}`,
+      kind: "repo",
+      title: topRepo.fullName,
+      description: topRepo.shortSummaryPl ?? topRepo.description ?? "Repo wymaga szybkiego briefu przed pelnym raportem.",
+      reason: topRepo.growth7d === null ? "Brak historii 7d, wiec zacznij od szybkiego briefu i README." : "Najmocniejszy aktualny sygnal repozytorium.",
+      actionLabel: "Otworz brief",
+      repoId: topRepo.id,
+      ideaId: null,
+      taskId: null
+    };
+  }
+
+  return {
+    id: "scan:run",
+    kind: "scan",
+    title: input.lastScan ? "Odswiez radar" : "Uruchom pierwszy scan",
+    description: input.lastScan ? "Brak aktywnych decyzji. Nowy scan moze dostarczyc swieze sygnaly." : "Radar nie ma jeszcze danych skanu.",
+    reason: "Bez swiezych danych nie ma wiarygodnej nastepnej decyzji.",
+    actionLabel: "Uruchom scan",
+    repoId: null,
+    ideaId: null,
+    taskId: null
+  };
+}
+
 export function buildRadarToday(
   input: {
     repositories: RepositoryListItem[];
@@ -349,9 +431,19 @@ export function buildRadarToday(
       message: `${input.notificationSummary.failed24h} powiadomien nie powiodlo sie w ostatnich 24h.`
     });
   }
+  const limitedAlerts = alerts.slice(0, limit);
+  const nextAction = buildNextAction({
+    alerts: limitedAlerts,
+    actionItems,
+    topRepositories,
+    businessCandidates,
+    latestRepositories,
+    lastScan: input.lastScan
+  });
 
   return {
     generatedAt: now.toISOString(),
+    nextAction,
     topRepositories,
     newGems,
     highInitialMomentum,
@@ -362,7 +454,7 @@ export function buildRadarToday(
       lastScan: input.lastScan,
       latestRepositories
     },
-    alerts: alerts.slice(0, limit)
+    alerts: limitedAlerts
   };
 }
 

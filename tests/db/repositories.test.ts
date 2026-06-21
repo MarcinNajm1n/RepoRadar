@@ -239,6 +239,7 @@ describe("buildRadarToday", () => {
     expect(radar.topRepositories.map((repo) => repo.fullName)).toEqual(["owner/a", "owner/b"]);
     expect(radar.highInitialMomentum.map((repo) => repo.fullName)).toContain("owner/b");
     expect(radar.topRepositories).toHaveLength(2);
+    expect(radar.nextAction).toMatchObject({ kind: "repo", repoId: "repo_a" });
   });
 
   it("sorts business candidates and filters snoozed action items", () => {
@@ -264,6 +265,7 @@ describe("buildRadarToday", () => {
 
     expect(radar.businessCandidates.map((idea) => idea.id)).toEqual(["idea_high", "idea_low"]);
     expect(radar.actionItems.map((item) => item.id)).toEqual(["open"]);
+    expect(radar.nextAction).toMatchObject({ kind: "task", taskId: "open" });
   });
 
   it("adds operational alerts from scan, config, and notification state", () => {
@@ -298,5 +300,6 @@ describe("buildRadarToday", () => {
       "auto-research-enabled",
       "notification-failures"
     ]);
+    expect(radar.nextAction).toMatchObject({ kind: "alert", id: "alert:last-scan-failed" });
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { Activity, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar } from "lucide-react";
+import { Activity, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar, Sparkles } from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
 import type { IdeaListItem, RadarTodayData, RepositoryListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
@@ -19,6 +19,9 @@ export function RadarTodayView({
   onCreateManualTask,
   onOpenCandidate,
   onPromoteCandidate,
+  onOpenTasks,
+  onOpenSettings,
+  onRunScan,
   renderActionItem
 }: {
   radarToday: RadarTodayData;
@@ -30,9 +33,15 @@ export function RadarTodayView({
   onCreateManualTask: () => void;
   onOpenCandidate: (idea: IdeaListItem) => void;
   onPromoteCandidate: (ideaId: string) => void;
+  onOpenTasks: () => void;
+  onOpenSettings: () => void;
+  onRunScan: () => void;
   renderActionItem: (item: ActionItemListItem) => React.ReactNode;
 }) {
   const latestScan = radarToday.scanChanges.lastScan;
+  const nextActionIdea = [...radarToday.businessCandidates, ...radarToday.ideasToDevelop].find(
+    (idea) => idea.id === radarToday.nextAction.ideaId
+  );
 
   return (
     <section className="space-y-4">
@@ -59,6 +68,37 @@ export function RadarTodayView({
           <MetricPill label="Nowe perelki" value={radarToday.newGems.length} />
           <MetricPill label="Initial momentum" value={radarToday.highInitialMomentum.length} />
           <MetricPill label="Alerty" value={radarToday.alerts.length} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-primary/30 bg-primary/10 p-4 shadow-soft">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-primary">
+              <Sparkles className="h-4 w-4" />
+              Najlepsza nastepna akcja
+              <Badge tone="info">{radarToday.nextAction.kind}</Badge>
+            </div>
+            <h3 className="mt-2 break-words text-lg font-semibold text-foreground">
+              {cleanDisplayText(radarToday.nextAction.title, { maxLength: 140 })}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-foreground">
+              {cleanDisplayText(radarToday.nextAction.description, { maxLength: 260 })}
+            </p>
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              {cleanDisplayText(radarToday.nextAction.reason, { maxLength: 220 })}
+            </p>
+          </div>
+          <NextActionButton
+            radarToday={radarToday}
+            nextActionIdea={nextActionIdea}
+            isPending={isPending}
+            onOpenQuickBrief={onOpenQuickBrief}
+            onOpenCandidate={onOpenCandidate}
+            onOpenTasks={onOpenTasks}
+            onOpenSettings={onOpenSettings}
+            onRunScan={onRunScan}
+          />
         </div>
       </section>
 
@@ -168,6 +208,66 @@ export function RadarTodayView({
         />
       </div>
     </section>
+  );
+}
+
+function NextActionButton({
+  radarToday,
+  nextActionIdea,
+  isPending,
+  onOpenQuickBrief,
+  onOpenCandidate,
+  onOpenTasks,
+  onOpenSettings,
+  onRunScan
+}: {
+  radarToday: RadarTodayData;
+  nextActionIdea?: IdeaListItem;
+  isPending: boolean;
+  onOpenQuickBrief: (repoId: string) => void;
+  onOpenCandidate: (idea: IdeaListItem) => void;
+  onOpenTasks: () => void;
+  onOpenSettings: () => void;
+  onRunScan: () => void;
+}) {
+  const action = radarToday.nextAction;
+
+  if (action.kind === "repo" && action.repoId) {
+    return (
+      <Button variant="secondary" onClick={() => onOpenQuickBrief(action.repoId as string)} disabled={isPending}>
+        <FileText className="h-4 w-4" /> {action.actionLabel}
+      </Button>
+    );
+  }
+
+  if (action.kind === "idea" && nextActionIdea) {
+    return (
+      <Button variant="secondary" onClick={() => onOpenCandidate(nextActionIdea)} disabled={isPending}>
+        <Brain className="h-4 w-4" /> {action.actionLabel}
+      </Button>
+    );
+  }
+
+  if (action.kind === "task") {
+    return (
+      <Button variant="secondary" onClick={onOpenTasks} disabled={isPending}>
+        <ClipboardList className="h-4 w-4" /> {action.actionLabel}
+      </Button>
+    );
+  }
+
+  if (action.kind === "alert") {
+    return (
+      <Button variant="secondary" onClick={onOpenSettings} disabled={isPending}>
+        <Activity className="h-4 w-4" /> {action.actionLabel}
+      </Button>
+    );
+  }
+
+  return (
+    <Button variant="secondary" onClick={onRunScan} disabled={isPending}>
+      <Radar className="h-4 w-4" /> {action.actionLabel}
+    </Button>
   );
 }
 
