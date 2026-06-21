@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { getRepositoryForReport } from "@/lib/db/repositories";
-import { countOpenAiAnalysesToday, getCachedOpenAiOutput, saveOpenAiOutput } from "@/lib/db/openai-cache";
+import { countOpenAiAnalysesToday, getCachedOpenAiOutputByHashes, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
-import { stableHash } from "@/lib/hash";
 import { clamp, safeJsonParse } from "@/lib/utils";
 import { repoReportPath, writeMarkdownReport } from "@/lib/reports/writer";
 import {
@@ -13,6 +12,11 @@ import {
   formatMarketResearchForPrompt
 } from "./prompts";
 import { generateOpenAiText } from "./client";
+import {
+  buildLegacyOpenAiCacheInputHash,
+  buildOpenAiCacheInputHash,
+  buildRepositoryCacheFingerprint
+} from "./cache-keys";
 import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets";
 import {
   attachResearchRunsToIdea,
@@ -35,8 +39,15 @@ async function ensureOpenAiBudget(requiredCalls = 1) {
   }
 }
 
-function inputHash(kind: string, context: string) {
-  return stableHash(`${kind}\n${context}`);
+function inputHashes(kind: string, context: string, repository: Awaited<ReturnType<typeof getRepositoryForReport>>) {
+  const repositoryFingerprint = buildRepositoryCacheFingerprint(repository);
+  const current = buildOpenAiCacheInputHash({ kind, context, repositoryFingerprint });
+  const legacy = buildLegacyOpenAiCacheInputHash(kind, context);
+
+  return {
+    current,
+    lookup: current === legacy ? [current] : [current, legacy]
+  };
 }
 
 function requiredOpenAiCallsForOnDemandGeneration() {
@@ -82,10 +93,10 @@ export async function generateShortSummaryForRepository(repoId: string, force = 
     topics: topicsFromJson(repository.topicsJson),
     snapshots: repository.snapshots
   });
-  const hash = inputHash("summary", context);
+  const hashes = inputHashes("summary", context, repository);
 
   if (!force) {
-    const cached = await getCachedOpenAiOutput("summary", repoId, hash, config.openAiModel);
+    const cached = await getCachedOpenAiOutputByHashes("summary", repoId, hashes.lookup, config.openAiModel);
     if (cached) {
       await prisma.repository.update({
         where: { id: repoId },
@@ -101,7 +112,7 @@ export async function generateShortSummaryForRepository(repoId: string, force = 
     applyOpenAiActionBudget(context, "summary"),
     getOpenAiActionOptions("summary")
   );
-  await saveOpenAiOutput("summary", repoId, hash, config.openAiModel, content);
+  await saveOpenAiOutput("summary", repoId, hashes.current, config.openAiModel, content);
   await prisma.repository.update({
     where: { id: repoId },
     data: {
@@ -127,10 +138,10 @@ export async function generateFullReportForRepository(repoId: string, force = fa
     topics: topicsFromJson(repository.topicsJson),
     snapshots: repository.snapshots
   });
-  const hash = inputHash("repo-report", context);
+  const hashes = inputHashes("repo-report", context, repository);
 
   if (!force) {
-    const cached = await getCachedOpenAiOutput("repo-report", repoId, hash, config.openAiModel);
+    const cached = await getCachedOpenAiOutputByHashes("repo-report", repoId, hashes.lookup, config.openAiModel);
     if (cached) {
       const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), cached.content);
       const report = await prisma.report.create({
@@ -143,7 +154,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
           summary: repository.shortSummaryPl,
           repoCount: 1,
           topRepoIdsJson: JSON.stringify([repoId]),
-          inputHash: hash
+          inputHash: hashes.current
         }
       });
       await prisma.repository.update({
@@ -163,7 +174,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
   await ensureOpenAiBudget();
 
   const content = await generateOpenAiText(buildRepoReportPrompt(), reportContext, getOpenAiActionOptions("repo-report"));
-  await saveOpenAiOutput("repo-report", repoId, hash, config.openAiModel, content);
+  await saveOpenAiOutput("repo-report", repoId, hashes.current, config.openAiModel, content);
   const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), content);
 
   const report = await prisma.report.create({
@@ -176,7 +187,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
       summary: repository.shortSummaryPl,
       repoCount: 1,
       topRepoIdsJson: JSON.stringify([repoId]),
-      inputHash: hash
+      inputHash: hashes.current
     }
   });
   await attachResearchRunsToReport(research.runIds ?? (research.runId ? [research.runId] : []), report.id);
@@ -240,9 +251,9 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
     topics: topicsFromJson(repository.topicsJson),
     snapshots: repository.snapshots
   });
-  const hash = inputHash("idea", context);
+  const hashes = inputHashes("idea", context, repository);
   const ideaCacheKind = "idea:v2";
-  const cached = await getCachedOpenAiOutput(ideaCacheKind, repoId, hash, config.openAiModel);
+  const cached = await getCachedOpenAiOutputByHashes(ideaCacheKind, repoId, hashes.lookup, config.openAiModel);
   const research = cached
     ? null
     : await (async () => {
@@ -259,7 +270,7 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
   const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext, getOpenAiActionOptions("idea")));
 
   if (!cached) {
-    await saveOpenAiOutput(ideaCacheKind, repoId, hash, config.openAiModel, content);
+    await saveOpenAiOutput(ideaCacheKind, repoId, hashes.current, config.openAiModel, content);
   }
 
   const parsed = safeJsonParse<{
@@ -477,11 +488,18 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
     topics: topicsFromJson(repository.topicsJson),
     snapshots: repository.snapshots
   });
-  const hash = inputHash(
+  const promoteContext = [
+    context,
+    candidate.id,
+    candidate.evidenceIdsJson,
+    candidate.lastResearchAt?.toISOString() ?? ""
+  ].join("\n");
+  const hashes = inputHashes(
     "idea-promote",
-    [context, candidate.id, candidate.evidenceIdsJson, candidate.lastResearchAt?.toISOString() ?? ""].join("\n")
+    promoteContext,
+    repository
   );
-  const cached = await getCachedOpenAiOutput("idea-promote", candidate.sourceRepoId, hash, config.openAiModel);
+  const cached = await getCachedOpenAiOutputByHashes("idea-promote", candidate.sourceRepoId, hashes.lookup, config.openAiModel);
   const research = cached
     ? null
     : await (async () => {
@@ -512,7 +530,7 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
   }
   const content = cached?.content ?? (await generateOpenAiText(buildIdeaPrompt("full"), ideaContext, getOpenAiActionOptions("idea-promote")));
   if (!cached) {
-    await saveOpenAiOutput("idea-promote", candidate.sourceRepoId, hash, config.openAiModel, content);
+    await saveOpenAiOutput("idea-promote", candidate.sourceRepoId, hashes.current, config.openAiModel, content);
   }
 
   const parsed = safeJsonParse<{
