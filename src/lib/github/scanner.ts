@@ -9,6 +9,7 @@ import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } fro
 import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportunities";
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
+import { getAdaptiveGitHubConcurrency, runWithAdaptiveConcurrency } from "./concurrency";
 import { getLastGitHubRateLimitSnapshot } from "./rate-limit";
 import { saveGitHubRateLimitSnapshot } from "@/lib/db/github-rate-limit";
 import type { GitHubReadmeResult, GitHubRepositoryItem, GitHubSearchProfile } from "./types";
@@ -242,7 +243,8 @@ export async function runDailyScan(options: ScanOptions = {}) {
     let updated = 0;
     const itemErrors: string[] = [];
 
-    for (const [index, discovered] of filtered.entries()) {
+    const concurrency = getAdaptiveGitHubConcurrency(getLastGitHubRateLimitSnapshot());
+    await runWithAdaptiveConcurrency(filtered, concurrency, async (discovered, index) => {
       const item = discovered.item;
       try {
         const readme = await maybeFetchReadme(client, item, index < readmeLimit);
@@ -254,7 +256,7 @@ export async function runDailyScan(options: ScanOptions = {}) {
         const message = error instanceof Error ? error.message : "Unknown item error";
         itemErrors.push(`${fullName}: ${message.slice(0, 180)}`);
       }
-    }
+    });
 
     if (options.generateSummaries !== false) {
       await maybeGenerateSummaries();
