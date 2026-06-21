@@ -2,6 +2,7 @@
 
 import type { RepositoryListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
+import { buildRepositoryRadarReasons } from "@/lib/display/radar-reason";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { Badge, ScoreChip, TextClamp } from "./ui";
 import { RepoCardActions } from "./repo-card-actions";
@@ -76,7 +77,7 @@ export function RepoDetailsPanel({
             ) : null}
           </section>
 
-          <ScoreBreakdown repo={repo} />
+          <RadarReasonPanel repo={repo} />
         </div>
 
         <aside className="min-w-0 space-y-3">
@@ -145,7 +146,8 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ScoreBreakdown({ repo }: { repo: RepositoryListItem }) {
+function RadarReasonPanel({ repo }: { repo: RepositoryListItem }) {
+  const reasons = buildRepositoryRadarReasons(repo);
   const rows = [
     ["Growth abs", repo.scoreBreakdown.absoluteGrowthPoints],
     ["Growth %", repo.scoreBreakdown.percentageGrowthPoints],
@@ -161,16 +163,32 @@ function ScoreBreakdown({ repo }: { repo: RepositoryListItem }) {
   return (
     <section className="rounded-md border border-border-subtle bg-surface-panel p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-sm font-semibold text-foreground">Dlaczego taki score?</h4>
+        <h4 className="text-sm font-semibold text-foreground">Dlaczego radar to pokazuje?</h4>
+        <ScoreChip label="Trend" score={repo.trendScore} />
+        <ScoreChip label="Initial" score={repo.initialMomentumScore} />
         {repo.scoreBreakdown.usedInitialMomentumFallback ? (
           <Badge tone="warning">initial fallback</Badge>
         ) : null}
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        {reasons.map((reason) => (
+          <div key={reason.id} className="rounded-md border border-border-subtle bg-surface-inset px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={reason.tone === "positive" ? "success" : reason.tone === "warning" ? "warning" : "neutral"}>
+                {reason.tone}
+              </Badge>
+              <span className="text-sm font-semibold text-foreground">{reason.title}</span>
+            </div>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">{reason.detail}</p>
+          </div>
+        ))}
       </div>
       {repo.growth7d === null ? (
         <p className="mt-3 rounded-md border border-warning/40 bg-warning/15 px-3 py-2 text-sm text-warning-foreground">
           Brak lokalnej historii 7d. RepoRadar pokazuje initial momentum jako fallback i nie udaje realnego weekly growth.
         </p>
       ) : null}
+      <h5 className="mt-4 text-xs font-semibold uppercase text-muted-foreground">Breakdown scoringu</h5>
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-3 rounded-md border border-border-subtle bg-surface-inset px-3 py-2">
