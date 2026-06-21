@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { getConfig } from "@/lib/config";
+import { runAiJob } from "@/lib/db/ai-jobs";
 import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
 import { calculateGrowth } from "@/lib/scoring/growth";
 import { calculateTrendScore } from "@/lib/scoring/trend-score";
@@ -214,7 +215,11 @@ async function maybeGenerateSummaries() {
 
   for (const candidate of candidates) {
     try {
-      await generateShortSummaryForRepository(candidate.id);
+      await runAiJob(
+        { type: "SUMMARY", repoId: candidate.id, priority: candidate.trendScore, dedupeKey: `summary:${candidate.id}` },
+        () => generateShortSummaryForRepository(candidate.id),
+        () => ({ repoId: candidate.id })
+      );
     } catch {
       break;
     }

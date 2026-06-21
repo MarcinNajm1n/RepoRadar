@@ -131,6 +131,7 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
     externalResearchCacheTtlHours: 24,
     reportsDir: "reports",
     persistedSettingCount: 0,
+    aiJobSummary: { queued: 0, running: 0, done24h: 0, failed24h: 0 },
     githubRateLimit: null,
     ...overrides
   };

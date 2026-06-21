@@ -8,6 +8,7 @@ import {
   snoozeActionItem,
   updateActionItem
 } from "@/lib/db/action-items";
+import { runAiJob } from "@/lib/db/ai-jobs";
 import { getEvidenceSourcesForReport, getRepositoryPage, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
 import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
 import type { RepositoryPageInput } from "@/types/repository";
@@ -48,7 +49,11 @@ export async function getRepositoryPageAction(input: RepositoryPageInput) {
 }
 
 export async function generateReportAction(repoId: string, force = false) {
-  const report = await generateFullReportForRepository(repoId, force);
+  const report = await runAiJob(
+    { type: "REPORT", repoId, priority: force ? 80 : 60, dedupeKey: `report:${repoId}:${force ? "force" : "default"}` },
+    () => generateFullReportForRepository(repoId, force),
+    (value) => ({ reportId: value.id })
+  );
   const evidenceSources = await getEvidenceSourcesForReport(report.id);
   revalidatePath("/");
   return {
@@ -62,7 +67,11 @@ export async function generateReportAction(repoId: string, force = false) {
 }
 
 export async function generateIdeaAction(repoId: string, force = false) {
-  const idea = await generateIdeaForRepository(repoId, force);
+  const idea = await runAiJob(
+    { type: "IDEA", repoId, priority: force ? 80 : 50, dedupeKey: `idea:${repoId}:${force ? "force" : "default"}` },
+    () => generateIdeaForRepository(repoId, force),
+    (value) => ({ ideaId: value.id })
+  );
   revalidatePath("/");
   return {
     id: idea.id,
@@ -71,7 +80,11 @@ export async function generateIdeaAction(repoId: string, force = false) {
 }
 
 export async function generateOpportunityCandidateAction(repoId: string, force = false) {
-  const result = await generateOpportunityCandidateForRepository(repoId, force);
+  const result = await runAiJob(
+    { type: "RESEARCH", repoId, priority: force ? 70 : 40, dedupeKey: `research:${repoId}:${force ? "force" : "default"}` },
+    () => generateOpportunityCandidateForRepository(repoId, force),
+    (value) => ({ created: value.created, ideaId: value.ideaId ?? null, opportunityScore: value.opportunityScore ?? null })
+  );
   revalidatePath("/");
   return result;
 }

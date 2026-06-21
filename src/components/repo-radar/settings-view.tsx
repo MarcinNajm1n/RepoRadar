@@ -85,6 +85,7 @@ export function SettingsView({
             <InfoItem label="Auto opportunity" value={String(settingsSummary.autoOpportunityResearchEnabled)} />
             <InfoItem label="Market daily limit" value={String(settingsSummary.marketResearchDailyLimit)} />
             <InfoItem label="OpenAI daily limit" value={String(settingsSummary.openAiDailyAnalysisLimit)} />
+            <InfoItem label="AI jobs" value={formatAiJobSummary(settingsSummary.aiJobSummary)} />
           </div>
         </SettingsPanel>
 
@@ -218,4 +219,8 @@ function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
   const limit = rateLimit.limit ?? "?";
   const reset = rateLimit.resetAt ? new Date(rateLimit.resetAt).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?";
   return `${remaining}/${limit}, reset ${reset}`;
+}
+
+function formatAiJobSummary(summary: SettingsSummary["aiJobSummary"]) {
+  return `${summary.running} w toku, ${summary.done24h} OK / 24h, ${summary.failed24h} bledow / 24h`;
 }

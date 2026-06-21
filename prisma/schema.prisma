@@ -49,6 +49,7 @@ model Repository {
   reports               Report[]
   ideas                 Idea[]
   openaiCache           OpenAiCache[]
+  aiJobs                AiJob[]
   marketResearchRuns    MarketResearchRun[]
   marketResearchSources MarketResearchSource[]
   ignoredRecord         IgnoredRepository?
@@ -103,6 +104,7 @@ model Report {
   marketResearchRuns    MarketResearchRun[]
   marketResearchSources MarketResearchSource[]
   actionItems           ActionItem[]
+  aiJobs                AiJob[]
 
   @@index([type])
   @@index([createdAt])
@@ -139,6 +141,7 @@ model Idea {
   marketResearchRuns    MarketResearchRun[]
   marketResearchSources MarketResearchSource[]
   actionItems           ActionItem[]
+  aiJobs                AiJob[]
 
   @@index([sourceRepoId])
   @@index([status])
@@ -223,6 +226,35 @@ model OpenAiCache {
   @@unique([kind, repoId, inputHash, model])
   @@index([kind])
   @@index([createdAt])
+}
+
+model AiJob {
+  id         String    @id @default(cuid())
+  type       String
+  status     String    @default("RUNNING")
+  repoId     String?
+  ideaId     String?
+  reportId   String?
+  priority   Int       @default(0)
+  dedupeKey  String?
+  resultJson String    @default("{}")
+  error      String?
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  repository Repository? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  idea       Idea?       @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  report     Report?     @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([repoId])
+  @@index([ideaId])
+  @@index([reportId])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([dedupeKey])
 }
 
 model MarketResearchRun {
