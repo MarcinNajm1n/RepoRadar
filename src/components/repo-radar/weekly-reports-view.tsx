@@ -5,6 +5,34 @@ import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDate } from "@/lib/utils";
 import { Badge, EmptyState, MetricPill, SectionCard, TextClamp } from "./ui";
 
+export function extractWeeklyReportRepoNames(markdown: string) {
+  const names = new Set<string>();
+  const linkPattern = /^-\s+\[([^\]]+)\]\([^)]+\)/gm;
+  let match = linkPattern.exec(markdown);
+
+  while (match) {
+    names.add(match[1]);
+    match = linkPattern.exec(markdown);
+  }
+
+  return [...names].slice(0, 20);
+}
+
+export function buildWeeklyReportComparison(current: ReportListItem, previous: ReportListItem | null) {
+  const currentNames = extractWeeklyReportRepoNames(current.contentMarkdown);
+  const previousNames = previous ? extractWeeklyReportRepoNames(previous.contentMarkdown) : [];
+  const previousSet = new Set(previousNames);
+  const currentSet = new Set(currentNames);
+
+  return {
+    currentNames,
+    previousNames,
+    retained: currentNames.filter((name) => previousSet.has(name)),
+    added: currentNames.filter((name) => !previousSet.has(name)),
+    dropped: previousNames.filter((name) => !currentSet.has(name))
+  };
+}
+
 export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
   if (!reports.length) {
     return (
@@ -15,6 +43,8 @@ export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
   }
 
   const latestReport = reports[0];
+  const previousReport = reports[1] ?? null;
+  const comparison = buildWeeklyReportComparison(latestReport, previousReport);
 
   return (
     <section className="space-y-4">
@@ -23,6 +53,8 @@ export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
         <MetricPill label="Ostatni" value={formatDate(latestReport.createdAt)} />
         <MetricPill label="Repo w ostatnim" value={latestReport.repoCount} />
       </div>
+
+      <WeeklyComparisonPanel latest={latestReport} previous={previousReport} comparison={comparison} />
 
       <div className="space-y-3">
         {reports.map((weeklyReport) => (
@@ -57,5 +89,70 @@ export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function WeeklyComparisonPanel({
+  latest,
+  previous,
+  comparison
+}: {
+  latest: ReportListItem;
+  previous: ReportListItem | null;
+  comparison: ReturnType<typeof buildWeeklyReportComparison>;
+}) {
+  if (!previous) {
+    return (
+      <SectionCard title="Porownanie tydzien do tygodnia" description="Potrzebne sa co najmniej dwa raporty tygodniowe.">
+        <EmptyState
+          title="Brak poprzedniego raportu"
+          text="Wygeneruj kolejny raport tygodniowy, zeby zobaczyc repo, ktore zostaly, doszly albo wypadly z top list."
+        />
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard title="Porownanie tydzien do tygodnia" description={`${formatDate(latest.createdAt)} vs ${formatDate(previous.createdAt)}`}>
+      <div className="grid gap-3 md:grid-cols-3">
+        <MetricPill label="Zostaly w top" value={comparison.retained.length} />
+        <MetricPill label="Nowe w top" value={comparison.added.length} />
+        <MetricPill label="Wypadly" value={comparison.dropped.length} />
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <WeeklyRepoGroup title="Nowe sygnaly" names={comparison.added} tone="success" empty="Brak nowych repo w top listach." />
+        <WeeklyRepoGroup title="Stabilne sygnaly" names={comparison.retained} tone="info" empty="Brak wspolnych repo w porownaniu." />
+        <WeeklyRepoGroup title="Slabsze niz poprzednio" names={comparison.dropped} tone="warning" empty="Nic nie wypadlo z top list." />
+      </div>
+    </SectionCard>
+  );
+}
+
+function WeeklyRepoGroup({
+  title,
+  names,
+  tone,
+  empty
+}: {
+  title: string;
+  names: string[];
+  tone: "success" | "info" | "warning";
+  empty: string;
+}) {
+  return (
+    <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {names.length ? (
+          names.slice(0, 8).map((name) => (
+            <Badge key={name} tone={tone}>
+              {cleanDisplayText(name, { maxLength: 44 })}
+            </Badge>
+          ))
+        ) : (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        )}
+      </div>
+    </div>
   );
 }
