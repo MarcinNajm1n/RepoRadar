@@ -5,6 +5,7 @@ import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
 import type { IdeaStatus } from "@/types/idea-status";
 import { getActionItems } from "./action-items";
+import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary } from "./ai-jobs";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
@@ -367,10 +368,11 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const [persistedSettings, githubRateLimit, aiJobSummary] = await Promise.all([
+  const [persistedSettings, githubRateLimit, aiJobSummary, aiCostSummary] = await Promise.all([
     getAllSettings(),
     getStoredGitHubRateLimitSnapshot(),
-    getAiJobSummary()
+    getAiJobSummary(),
+    getAiCostSummary()
   ]);
 
   return {
@@ -389,6 +391,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     reportsDir: config.reportsDir,
     persistedSettingCount: Object.keys(persistedSettings).length,
     aiJobSummary,
+    aiCostSummary,
     githubRateLimit
   };
 }

@@ -86,6 +86,10 @@ export function SettingsView({
             <InfoItem label="Market daily limit" value={String(settingsSummary.marketResearchDailyLimit)} />
             <InfoItem label="OpenAI daily limit" value={String(settingsSummary.openAiDailyAnalysisLimit)} />
             <InfoItem label="AI jobs" value={formatAiJobSummary(settingsSummary.aiJobSummary)} />
+            <InfoItem label="AI dzisiaj" value={String(settingsSummary.aiCostSummary.analysesToday)} />
+            <InfoItem label="AI tydzien" value={String(settingsSummary.aiCostSummary.analysesThisWeek)} />
+            <InfoItem label="AI all-time" value={String(settingsSummary.aiCostSummary.analysesAllTime)} />
+            <InfoItem label="Next full report" value={settingsSummary.aiCostSummary.estimatedNextActions.report} />
           </div>
         </SettingsPanel>
 

@@ -132,6 +132,17 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
     reportsDir: "reports",
     persistedSettingCount: 0,
     aiJobSummary: { queued: 0, running: 0, done24h: 0, failed24h: 0 },
+    aiCostSummary: {
+      analysesToday: 0,
+      analysesThisWeek: 0,
+      analysesAllTime: 0,
+      estimatedNextActions: {
+        summary: "1 call",
+        report: "1 call",
+        idea: "1 call",
+        research: "0 calls"
+      }
+    },
     githubRateLimit: null,
     ...overrides
   };

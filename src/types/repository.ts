@@ -1,4 +1,5 @@
 import type { ActionItemListItem } from "./action-item";
+import type { AiCostSummary } from "./ai-cost";
 import type { AiJobSummary } from "./ai-job";
 
 export type ScoreBreakdown = {
@@ -137,6 +138,7 @@ export type SettingsSummary = {
   reportsDir: string;
   persistedSettingCount: number;
   aiJobSummary: AiJobSummary;
+  aiCostSummary: AiCostSummary;
   githubRateLimit: {
     checkedAt: string;
     status: number;
