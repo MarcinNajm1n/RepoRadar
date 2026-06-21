@@ -172,6 +172,22 @@ export type ObservabilitySummary = {
   };
 };
 
+export type GraphifyMaintenanceSummary = {
+  status: "ready" | "partial" | "missing";
+  graphExists: boolean;
+  nodeCount: number;
+  edgeCount: number;
+  communityCount: number;
+  manifestFileCount: number;
+  graphSizeBytes: number;
+  reportSizeBytes: number;
+  lastUpdatedAt: string | null;
+  packageVersion: string | null;
+  skillVersion: string | null;
+  skillPath: string | null;
+  note: string;
+};
+
 export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
@@ -190,6 +206,7 @@ export type SettingsSummary = {
   aiJobSummary: AiJobSummary;
   aiCostSummary: AiCostSummary;
   observability: ObservabilitySummary;
+  graphify: GraphifyMaintenanceSummary;
   githubRateLimit: {
     checkedAt: string;
     status: number;

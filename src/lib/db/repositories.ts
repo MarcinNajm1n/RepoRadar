@@ -1,5 +1,6 @@
 import { prisma } from "./client";
 import { getConfig } from "@/lib/config";
+import { getGraphifyMaintenanceSummary } from "@/lib/graphify/status";
 import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
@@ -462,12 +463,13 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const [persistedSettings, githubRateLimit, aiJobSummary, aiCostSummary, observability] = await Promise.all([
+  const [persistedSettings, githubRateLimit, aiJobSummary, aiCostSummary, observability, graphify] = await Promise.all([
     getAllSettings(),
     getStoredGitHubRateLimitSnapshot(),
     getAiJobSummary(),
     getAiCostSummary(),
-    getObservabilitySummary()
+    getObservabilitySummary(),
+    getGraphifyMaintenanceSummary()
   ]);
 
   return {
@@ -488,6 +490,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     aiJobSummary,
     aiCostSummary,
     observability,
+    graphify,
     githubRateLimit
   };
 }

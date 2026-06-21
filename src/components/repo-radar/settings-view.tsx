@@ -158,6 +158,26 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
+      <SettingsPanel title="Graphify maintenance">
+        <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
+          <InfoItem label="Status grafu" value={settingsSummary.graphify.status} />
+          <InfoItem label="Nodes" value={String(settingsSummary.graphify.nodeCount)} />
+          <InfoItem label="Edges" value={String(settingsSummary.graphify.edgeCount)} />
+          <InfoItem label="Communities" value={String(settingsSummary.graphify.communityCount)} />
+          <InfoItem label="Manifest files" value={String(settingsSummary.graphify.manifestFileCount)} />
+          <InfoItem label="Last update" value={formatOptionalDateTime(settingsSummary.graphify.lastUpdatedAt)} />
+          <InfoItem label="Graph size" value={formatBytes(settingsSummary.graphify.graphSizeBytes)} />
+          <InfoItem label="Report size" value={formatBytes(settingsSummary.graphify.reportSizeBytes)} />
+          <InfoItem label="Package/cache" value={settingsSummary.graphify.packageVersion ?? "brak danych"} />
+          <InfoItem label="Skill" value={formatGraphifySkill(settingsSummary.graphify)} />
+          <InfoItem label="Skill path" value={settingsSummary.graphify.skillPath ?? "brak lokalnego skill"} />
+          <InfoItem label="Graph exists" value={String(settingsSummary.graphify.graphExists)} />
+        </div>
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          {settingsSummary.graphify.note} Panel czyta pliki lokalnie i nie uruchamia `graphify update` podczas renderowania UI.
+        </p>
+      </SettingsPanel>
+
       <SettingsPanel title="Dane i maintenance">
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onOpenDailyBriefing} disabled={isPending}>
@@ -286,4 +306,28 @@ function formatGitHubCacheStats(stats: SettingsSummary["observability"]["githubR
 
 function formatResearchCache(observability: SettingsSummary["observability"]) {
   return `${observability.externalResearchCacheEntries} total, ${observability.expiredExternalResearchCacheEntries} expired`;
+}
+
+function formatOptionalDateTime(value: string | null) {
+  return value ? new Date(value).toLocaleString("pl-PL") : "brak danych";
+}
+
+function formatBytes(value: number) {
+  if (value <= 0) {
+    return "0 B";
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${Math.round(value / 1024)} KiB`;
+  }
+
+  return `${(value / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+function formatGraphifySkill(graphify: SettingsSummary["graphify"]) {
+  return graphify.skillVersion ? `${graphify.skillVersion}` : "brak lokalnego skill";
 }

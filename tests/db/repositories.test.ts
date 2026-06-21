@@ -163,6 +163,21 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
         maxEntries: 200
       }
     },
+    graphify: {
+      status: "missing",
+      graphExists: false,
+      nodeCount: 0,
+      edgeCount: 0,
+      communityCount: 0,
+      manifestFileCount: 0,
+      graphSizeBytes: 0,
+      reportSizeBytes: 0,
+      lastUpdatedAt: null,
+      packageVersion: null,
+      skillVersion: null,
+      skillPath: null,
+      note: "Brak danych."
+    },
     githubRateLimit: null,
     ...overrides
   };
