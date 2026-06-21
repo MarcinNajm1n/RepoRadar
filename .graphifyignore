@@ -5,6 +5,10 @@ build/
 coverage/
 .git/
 graphify-out/
+.agents/
+.codex/
+.impeccable/
+.obsidian/
 reports/
 docs/
 *.md
