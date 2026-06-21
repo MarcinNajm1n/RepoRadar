@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useMemo } from "react";
-import type { RepositoryListItem } from "@/types/repository";
+import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { Button, EmptyState } from "./ui";
 import type { RepoSortKey } from "./repo-filter-bar";
 import { RepoRow } from "./repo-row";
@@ -30,6 +30,8 @@ export function RepoListView({
   hasMore,
   onLoadMore,
   expandedRepoId,
+  timelines,
+  loadingTimelineRepoId,
   isPending,
   callbacks
 }: {
@@ -40,6 +42,8 @@ export function RepoListView({
   hasMore: boolean;
   onLoadMore: () => void;
   expandedRepoId: string | null;
+  timelines: Record<string, RepositoryTimelineItem[]>;
+  loadingTimelineRepoId: string | null;
   isPending: boolean;
   callbacks: RepoCardCallbacks;
 }) {
@@ -65,6 +69,8 @@ export function RepoListView({
                 key={repo.id}
                 repo={repo}
                 isExpanded={expandedRepoId === repo.id}
+                timeline={timelines[repo.id] ?? []}
+                isTimelineLoading={loadingTimelineRepoId === repo.id}
                 isPending={isPending}
                 onToggle={() => callbacks.onToggle(repo.id)}
                 onOpenReport={() => callbacks.onOpenReport(repo.id)}

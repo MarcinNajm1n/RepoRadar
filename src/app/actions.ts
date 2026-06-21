@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/action-items";
 import { runAiJob } from "@/lib/db/ai-jobs";
 import { getEvidenceSourcesForReport, getRepositoryPage, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
+import { getRepositoryTimeline } from "@/lib/db/repository-timeline";
 import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
 import type { RepositoryPageInput } from "@/types/repository";
 import { runDailyScan } from "@/lib/github/scanner";
@@ -47,6 +48,10 @@ export async function updateStatusAction(repoId: string, status: string) {
 
 export async function getRepositoryPageAction(input: RepositoryPageInput) {
   return getRepositoryPage(input);
+}
+
+export async function getRepositoryTimelineAction(repoId: string) {
+  return getRepositoryTimeline(repoId);
 }
 
 export async function generateReportAction(repoId: string, force = false) {

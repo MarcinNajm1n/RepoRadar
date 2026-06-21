@@ -1,6 +1,6 @@
 "use client";
 
-import type { RepositoryListItem } from "@/types/repository";
+import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { buildRepositoryRadarReasons } from "@/lib/display/radar-reason";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
@@ -9,6 +9,8 @@ import { RepoCardActions } from "./repo-card-actions";
 
 export type RepoDetailsPanelProps = {
   repo: RepositoryListItem;
+  timeline: RepositoryTimelineItem[];
+  isTimelineLoading: boolean;
   isPending: boolean;
   onOpenReport: () => void;
   onRegenerateReport: () => void;
@@ -25,6 +27,8 @@ export type RepoDetailsPanelProps = {
 
 export function RepoDetailsPanel({
   repo,
+  timeline,
+  isTimelineLoading,
   isPending,
   onOpenReport,
   onRegenerateReport,
@@ -78,6 +82,7 @@ export function RepoDetailsPanel({
           </section>
 
           <RadarReasonPanel repo={repo} />
+          <RepositoryTimeline timeline={timeline} isLoading={isTimelineLoading} />
         </div>
 
         <aside className="min-w-0 space-y-3">
@@ -134,6 +139,41 @@ export function RepoDetailsPanel({
         />
       </div>
     </div>
+  );
+}
+
+function RepositoryTimeline({ timeline, isLoading }: { timeline: RepositoryTimelineItem[]; isLoading: boolean }) {
+  return (
+    <section className="rounded-md border border-border-subtle bg-surface-panel p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-foreground">Timeline repozytorium</h4>
+        <Badge tone="neutral">{isLoading ? "ladowanie" : `${timeline.length} zdarzen`}</Badge>
+      </div>
+      {isLoading ? (
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Pobieram snapshoty, raporty i akcje uzytkownika...
+        </p>
+      ) : timeline.length ? (
+        <ol className="mt-3 space-y-2">
+          {timeline.map((item) => (
+            <li key={item.id} className="rounded-md border border-border-subtle bg-surface-inset p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={item.tone === "positive" ? "success" : item.tone === "warning" ? "warning" : "neutral"}>
+                  {item.type}
+                </Badge>
+                <span className="text-sm font-semibold text-foreground">{cleanDisplayText(item.title, { maxLength: 120 })}</span>
+                <span className="text-xs text-muted-foreground">{formatDisplayDate(item.timestamp)}</span>
+              </div>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">{cleanDisplayText(item.detail, { maxLength: 220 })}</p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-3 rounded-md border border-dashed border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Brak dodatkowych zdarzen poza metadanymi repo.
+        </p>
+      )}
+    </section>
   );
 }
 

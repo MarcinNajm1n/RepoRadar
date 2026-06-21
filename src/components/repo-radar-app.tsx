@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Download, FileText, RefreshCw } from "lucide-react";
-import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem, RepositoryPage, RepositoryPageInput } from "@/types/repository";
+import type {
+  DashboardData,
+  EvidenceSourceItem,
+  IdeaListItem,
+  RepositoryListItem,
+  RepositoryPage,
+  RepositoryPageInput,
+  RepositoryTimelineItem
+} from "@/types/repository";
 import {
   clearExpiredExternalCacheAction,
   clearOldNotificationLogsAction,
@@ -12,6 +20,7 @@ import {
   dismissActionItemAction,
   exportIdeasCsvAction,
   getRepositoryPageAction,
+  getRepositoryTimelineAction,
   generateQuickBriefAction,
   generateDailyBriefingAction,
   createWeeklyReportAction,
@@ -75,6 +84,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [repositoryPage, setRepositoryPage] = useState<RepositoryPage>(initialData.repositoryPage);
   const [isRepositoryPageLoading, setIsRepositoryPageLoading] = useState(false);
   const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
+  const [repositoryTimelines, setRepositoryTimelines] = useState<Record<string, RepositoryTimelineItem[]>>({});
+  const [loadingTimelineRepoId, setLoadingTimelineRepoId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportState>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaListItem | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -223,6 +234,27 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     setDiscoveryProfileFilter("ALL");
     setMinTrend(0);
     setRepoSortKey("trend_desc");
+  }
+
+  function toggleRepositoryDetails(repoId: string) {
+    const shouldExpand = expandedRepoId !== repoId;
+    setExpandedRepoId(shouldExpand ? repoId : null);
+
+    if (!shouldExpand || repositoryTimelines[repoId]) {
+      return;
+    }
+
+    setLoadingTimelineRepoId(repoId);
+    void getRepositoryTimelineAction(repoId)
+      .then((timeline) => {
+        setRepositoryTimelines((current) => ({ ...current, [repoId]: timeline }));
+      })
+      .catch((error) => {
+        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac timeline repo." });
+      })
+      .finally(() => {
+        setLoadingTimelineRepoId((current) => (current === repoId ? null : current));
+      });
   }
 
   function loadMoreRepositories() {
@@ -441,9 +473,11 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           hasMore={repositoryPage.hasMore}
           onLoadMore={loadMoreRepositories}
           expandedRepoId={expandedRepoId}
+          timelines={repositoryTimelines}
+          loadingTimelineRepoId={loadingTimelineRepoId}
           isPending={isPending || isRepositoryPageLoading}
           callbacks={{
-            onToggle: (repoId) => setExpandedRepoId(expandedRepoId === repoId ? null : repoId),
+            onToggle: toggleRepositoryDetails,
             onOpenReport: (repoId) => openReport(repoId),
             onRegenerateReport: (repoId) => openReport(repoId, true),
             onSave: (repoId) => runAction(() => updateStatusAction(repoId, "SAVED"), "Repo zapisane."),

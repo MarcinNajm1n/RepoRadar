@@ -2,7 +2,7 @@
 
 import { Archive, ChevronDown, ExternalLink, FileText, Flame, GitFork } from "lucide-react";
 import type React from "react";
-import type { RepositoryListItem } from "@/types/repository";
+import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { getRepositoryStatusDisplay } from "@/lib/display/status-display";
@@ -13,6 +13,8 @@ import { RepoDetailsPanel } from "./repo-details-panel";
 export type RepoRowProps = {
   repo: RepositoryListItem;
   isExpanded: boolean;
+  timeline: RepositoryTimelineItem[];
+  isTimelineLoading: boolean;
   isPending: boolean;
   onToggle: () => void;
   onOpenReport: () => void;
@@ -31,6 +33,8 @@ export type RepoRowProps = {
 export function RepoRow({
   repo,
   isExpanded,
+  timeline,
+  isTimelineLoading,
   isPending,
   onToggle,
   onOpenReport,
@@ -144,6 +148,8 @@ export function RepoRow({
       {isExpanded ? (
         <RepoDetailsPanel
           repo={repo}
+          timeline={timeline}
+          isTimelineLoading={isTimelineLoading}
           isPending={isPending}
           onOpenReport={onOpenReport}
           onRegenerateReport={onRegenerateReport}

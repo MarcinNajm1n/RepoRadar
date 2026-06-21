@@ -122,6 +122,15 @@ export type DashboardAlert = {
   message: string;
 };
 
+export type RepositoryTimelineItem = {
+  id: string;
+  type: "scan" | "snapshot" | "report" | "status" | "action";
+  title: string;
+  detail: string;
+  timestamp: string;
+  tone: "neutral" | "positive" | "warning";
+};
+
 export type RadarNextAction = {
   id: string;
   kind: "alert" | "task" | "repo" | "idea" | "scan";
