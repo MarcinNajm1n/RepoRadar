@@ -122,7 +122,21 @@ Register a Windows daily task:
 powershell -ExecutionPolicy Bypass -File scripts/register-windows-task.ps1 -Time 09:00
 ```
 
+Preview the task action without registering it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/register-windows-task.ps1 -Time 09:00 -DryRun
+```
+
+Check or start the registered task manually:
+
+```powershell
+schtasks /Query /TN "RepoRadar Daily Scan" /V /FO LIST
+schtasks /Run /TN "RepoRadar Daily Scan"
+```
+
 If the computer is off, the local scan cannot run. The Windows task is configured with `StartWhenAvailable`.
+Scheduled scan logs are written to `logs/scans/*.log`.
 
 ## Scoring
 

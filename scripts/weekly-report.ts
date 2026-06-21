@@ -1,16 +1,23 @@
-import { createWeeklyReport } from "../src/lib/reports/weekly";
-import { prisma } from "../src/lib/db/client";
+import { loadCliEnv } from "./load-env";
+
+loadCliEnv();
 
 async function main() {
-  const report = await createWeeklyReport();
-  console.log(`Weekly report created: ${report.markdownPath ?? report.title}`);
+  const [{ createWeeklyReport }, { prisma }] = await Promise.all([
+    import("../src/lib/reports/weekly"),
+    import("../src/lib/db/client")
+  ]);
+
+  try {
+    const report = await createWeeklyReport();
+    console.log(`Weekly report created: ${report.markdownPath ?? report.title}`);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main()
   .catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });
