@@ -5,11 +5,21 @@ import type { DiscoveredGitHubRepository, GitHubReadmeResult, GitHubSearchQueryS
 import { mergeDiscoveredGitHubRepository } from "./dedupe";
 
 const GITHUB_API = "https://api.github.com";
+const MAX_GITHUB_RETRY_DELAY_MS = 30_000;
+const MAX_CONDITIONAL_CACHE_ENTRIES = 200;
 
 type RequestOptions = {
   accept?: string;
   retry?: number;
 };
+
+type CachedGitHubResponse = {
+  body: string;
+  etag: string | null;
+  lastModified: string | null;
+};
+
+const conditionalResponseCache = new Map<string, CachedGitHubResponse>();
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,7 +28,15 @@ function sleep(ms: number) {
 function getRetryDelay(response: Response, attempt: number) {
   const retryAfter = response.headers.get("retry-after");
   if (retryAfter) {
-    return Number(retryAfter) * 1000;
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) {
+      return seconds * 1000;
+    }
+
+    const retryAt = new Date(retryAfter).getTime();
+    if (Number.isFinite(retryAt)) {
+      return Math.max(1000, retryAt - Date.now());
+    }
   }
 
   const reset = response.headers.get("x-ratelimit-reset");
@@ -31,6 +49,50 @@ function getRetryDelay(response: Response, attempt: number) {
   return Math.min(60000, 1000 * 2 ** attempt);
 }
 
+function buildCacheKey(url: string, accept: string, authMode: string) {
+  return `${authMode}:${accept}:${url}`;
+}
+
+function readCachedResponse<T>(cached: CachedGitHubResponse, accept: string): T {
+  if (accept === "application/vnd.github.raw") {
+    return cached.body as T;
+  }
+
+  return JSON.parse(cached.body) as T;
+}
+
+function writeCachedResponse(cacheKey: string, response: Response, body: string) {
+  const etag = response.headers.get("etag");
+  const lastModified = response.headers.get("last-modified");
+
+  if (!etag && !lastModified) {
+    return;
+  }
+
+  if (conditionalResponseCache.size >= MAX_CONDITIONAL_CACHE_ENTRIES) {
+    const oldestKey = conditionalResponseCache.keys().next().value;
+    if (oldestKey) {
+      conditionalResponseCache.delete(oldestKey);
+    }
+  }
+
+  conditionalResponseCache.set(cacheKey, {
+    body,
+    etag,
+    lastModified
+  });
+}
+
+function formatRateLimitReset(response: Response) {
+  const reset = response.headers.get("x-ratelimit-reset");
+  if (!reset) {
+    return null;
+  }
+
+  const resetDate = new Date(Number(reset) * 1000);
+  return Number.isNaN(resetDate.getTime()) ? null : resetDate.toISOString();
+}
+
 export class GitHubClient {
   private readonly token?: string;
 
@@ -40,25 +102,37 @@ export class GitHubClient {
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const url = path.startsWith("http") ? path : `${GITHUB_API}${path}`;
+    const accept = options.accept ?? "application/vnd.github+json";
+    const cacheKey = buildCacheKey(url, accept, this.token ? "auth" : "anon");
+    const cached = conditionalResponseCache.get(cacheKey);
     const maxAttempts = options.retry ?? 3;
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const response = await fetch(url, {
         headers: {
-          Accept: options.accept ?? "application/vnd.github+json",
+          Accept: accept,
           "X-GitHub-Api-Version": "2022-11-28",
+          ...(cached?.etag ? { "If-None-Match": cached.etag } : {}),
+          ...(cached?.lastModified ? { "If-Modified-Since": cached.lastModified } : {}),
           ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
         },
         cache: "no-store"
       });
 
+      if (response.status === 304 && cached) {
+        return readCachedResponse<T>(cached, accept);
+      }
+
       if (response.ok) {
-        if (options.accept === "application/vnd.github.raw") {
-          return (await response.text()) as T;
+        const body = await response.text();
+        writeCachedResponse(cacheKey, response, body);
+
+        if (accept === "application/vnd.github.raw") {
+          return body as T;
         }
 
-        return (await response.json()) as T;
+        return JSON.parse(body) as T;
       }
 
       const rateLimited = response.status === 403 || response.status === 429;
@@ -66,7 +140,13 @@ export class GitHubClient {
       lastError = new Error(`GitHub API ${response.status}: ${body.slice(0, 240)}`);
 
       if (rateLimited && attempt < maxAttempts - 1) {
-        await sleep(getRetryDelay(response, attempt));
+        const delay = getRetryDelay(response, attempt);
+        if (delay > MAX_GITHUB_RETRY_DELAY_MS) {
+          const resetAt = formatRateLimitReset(response);
+          throw new Error(resetAt ? `GitHub API rate limit exhausted until ${resetAt}.` : "GitHub API rate limit exhausted.");
+        }
+
+        await sleep(delay);
         continue;
       }
 

@@ -7,6 +7,7 @@ const originalFetch = global.fetch;
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("GitHubClient", () => {
@@ -36,6 +37,52 @@ describe("GitHubClient", () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]));
     expect(url.searchParams.get("sort")).toBe("updated");
     expect(url.searchParams.get("order")).toBe("desc");
+  });
+
+  it("reuses cached GitHub responses after a 304", async () => {
+    const strongRepo = repo(1, "owner/strong", 120);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ total_count: 1, incomplete_results: false, items: [strongRepo] }), {
+          status: 200,
+          headers: { etag: '"search-v1"' }
+        })
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 304 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const client = new GitHubClient(undefined);
+    const first = await client.searchRepositories({ query: "cached query" });
+    const second = await client.searchRepositories({ query: "cached query" });
+
+    expect(first.items[0].full_name).toBe("owner/strong");
+    expect(second.items[0].full_name).toBe("owner/strong");
+    expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toMatchObject({
+      "If-None-Match": '"search-v1"'
+    });
+  });
+
+  it("honors date-form Retry-After headers without producing NaN delays", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-16T12:00:00Z"));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("rate limited", {
+          status: 429,
+          headers: { "retry-after": "Tue, 16 Jun 2026 12:00:02 GMT" }
+        })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ total_count: 0, incomplete_results: false, items: [] }), { status: 200 }));
+    const timeoutSpy = vi.spyOn(global, "setTimeout");
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const request = new GitHubClient(undefined).searchRepositories({ query: "rate limited" });
+    await vi.advanceTimersByTimeAsync(2000);
+    await request;
+
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
   });
 
   it("keeps only results that meet the matched profile minStars", async () => {
