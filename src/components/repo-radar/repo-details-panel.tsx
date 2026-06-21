@@ -82,6 +82,7 @@ export function RepoDetailsPanel({
           </section>
 
           <RadarReasonPanel repo={repo} />
+          <RepositoryTrendMiniChart repo={repo} timeline={timeline} isLoading={isTimelineLoading} />
           <RepositoryTimeline timeline={timeline} isLoading={isTimelineLoading} />
         </div>
 
@@ -139,6 +140,74 @@ export function RepoDetailsPanel({
         />
       </div>
     </div>
+  );
+}
+
+function RepositoryTrendMiniChart({
+  repo,
+  timeline,
+  isLoading
+}: {
+  repo: RepositoryListItem;
+  timeline: RepositoryTimelineItem[];
+  isLoading: boolean;
+}) {
+  const snapshots = timeline
+    .filter((item) => item.type === "snapshot")
+    .map((item) => {
+      const stars = Number(item.title.match(/^(\d+)/)?.[1]);
+      return Number.isFinite(stars) ? { id: item.id, stars, timestamp: item.timestamp } : null;
+    })
+    .filter((item): item is { id: string; stars: number; timestamp: string } => Boolean(item))
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const minStars = snapshots.length ? Math.min(...snapshots.map((item) => item.stars)) : repo.starsCurrent;
+  const maxStars = snapshots.length ? Math.max(...snapshots.map((item) => item.stars)) : repo.starsCurrent;
+
+  return (
+    <section className="rounded-md border border-border-subtle bg-surface-panel p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-foreground">Mini trend stars</h4>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge tone={repo.growth24h === null ? "warning" : "success"}>24h {formatGrowth(repo.growth24h)}</Badge>
+          <Badge tone={repo.growth7d === null ? "warning" : "success"}>7d {formatGrowth(repo.growth7d)}</Badge>
+          <Badge tone="neutral">30d brak historii</Badge>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Laduje snapshoty do mini wykresu...
+        </p>
+      ) : snapshots.length >= 2 ? (
+        <div className="mt-3">
+          <div className="flex h-24 items-end gap-1 rounded-md border border-border-subtle bg-surface-inset px-2 pb-2 pt-3">
+            {snapshots.map((snapshot) => {
+              const height = maxStars === minStars ? 48 : 18 + ((snapshot.stars - minStars) / Math.max(1, maxStars - minStars)) * 62;
+              return (
+                <div key={snapshot.id} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-t-sm bg-primary/80 transition duration-fast ease-interface"
+                    style={{ height: `${height}px` }}
+                    title={`${snapshot.stars} stars | ${formatDisplayDate(snapshot.timestamp)}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{formatDisplayDate(snapshots[0].timestamp)}</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatStars(minStars)} {"->"} {formatStars(maxStars)}
+            </span>
+            <span>{formatDisplayDate(snapshots[snapshots.length - 1].timestamp)}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md border border-dashed border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Za malo snapshotow do wykresu. RepoRadar pokaze trend po kolejnych scanach.
+        </p>
+      )}
+    </section>
   );
 }
 

@@ -1,13 +1,13 @@
 "use client";
 
 import type React from "react";
-import { Activity, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar, Sparkles } from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
 import type { IdeaListItem, RadarTodayData, RepositoryListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
-import { Badge, Button, EmptyState, MetricPill, ScoreChip, SectionCard, TextClamp } from "./ui";
+import { Badge, Button, EmptyState, MetricPill, ScoreChip, SectionCard, SkeletonBlock, SkeletonText, TextClamp } from "./ui";
 
 export function RadarTodayView({
   radarToday,
@@ -102,6 +102,12 @@ export function RadarTodayView({
         </div>
       </section>
 
+      {latestScan?.status === "FAILED" || latestScan?.errorMessage ? (
+        <ScanFailurePanel latestScan={latestScan} isPending={isPending} onRunScan={onRunScan} onOpenSettings={onOpenSettings} />
+      ) : null}
+
+      {isPending ? <RadarCardLoadingStrip /> : null}
+
       {radarToday.alerts.length ? (
         <section className="grid gap-3 md:grid-cols-2">
           {radarToday.alerts.map((alert) => (
@@ -152,7 +158,20 @@ export function RadarTodayView({
                 />
               ))
             ) : (
-              <EmptyState title="Brak repo na dzisiaj" text="Uruchom scan albo sprawdz filtry w Bibliotece." />
+              <EmptyState
+                title="Brak repo na dzisiaj"
+                text="Uruchom scan, a potem przejdz do Biblioteki, zeby zawezic wyniki filtrami."
+                primaryAction={
+                  <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
+                    Uruchom scan
+                  </Button>
+                }
+                secondaryAction={
+                  <Button variant="ghost" size="sm" onClick={onOpenLibrary}>
+                    Biblioteka
+                  </Button>
+                }
+              />
             )}
           </div>
         </SectionCard>
@@ -170,7 +189,20 @@ export function RadarTodayView({
             {radarToday.actionItems.length ? (
               radarToday.actionItems.map((item) => renderActionItem(item))
             ) : (
-              <EmptyState title="Brak aktywnych zadan" text="Dodaj zadanie z repo albo utworz reczne zadanie." />
+              <EmptyState
+                title="Brak aktywnych zadan"
+                text="Dodaj zadanie z repo albo utworz reczne zadanie, zeby kolejka decyzji nie byla pusta."
+                primaryAction={
+                  <Button variant="secondary" size="sm" onClick={onCreateManualTask} disabled={isPending}>
+                    Dodaj zadanie
+                  </Button>
+                }
+                secondaryAction={
+                  <Button variant="ghost" size="sm" onClick={onOpenLibrary}>
+                    Biblioteka
+                  </Button>
+                }
+              />
             )}
           </div>
         </SectionCard>
@@ -190,7 +222,15 @@ export function RadarTodayView({
                 />
               ))
             ) : (
-              <EmptyState title="Brak kandydatow" text="Uzyj light research przy repo, ktore wyglada obiecujaco." />
+              <EmptyState
+                title="Brak kandydatow"
+                text="Otworz Biblioteke i uzyj light research przy repo, ktore wyglada obiecujaco."
+                primaryAction={
+                  <Button variant="secondary" size="sm" onClick={onOpenLibrary}>
+                    Otworz Biblioteke
+                  </Button>
+                }
+              />
             )}
           </div>
         </SectionCard>
@@ -268,6 +308,65 @@ function NextActionButton({
     <Button variant="secondary" onClick={onRunScan} disabled={isPending}>
       <Radar className="h-4 w-4" /> {action.actionLabel}
     </Button>
+  );
+}
+
+function ScanFailurePanel({
+  latestScan,
+  isPending,
+  onRunScan,
+  onOpenSettings
+}: {
+  latestScan: NonNullable<RadarTodayData["scanChanges"]["lastScan"]>;
+  isPending: boolean;
+  onRunScan: () => void;
+  onOpenSettings: () => void;
+}) {
+  const error = cleanDisplayText(latestScan.errorMessage, {
+    maxLength: 320,
+    fallback: "Brak szczegolow bledu. Sprawdz token GitHub, rate limit i logi skanu."
+  });
+
+  return (
+    <section className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 shadow-soft" role="alert">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-destructive">
+            <AlertTriangle className="h-4 w-4" />
+            Ostatni scan nie powiodl sie
+            <Badge tone="danger">{latestScan.status}</Badge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-foreground">{error}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Najczestsze przyczyny: wygasl token GitHub, rate limit, brak internetu albo blad jednego z zapytan GitHub API.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 xl:justify-end">
+          <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
+            Uruchom ponownie
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenSettings}>
+            Ustawienia
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RadarCardLoadingStrip() {
+  return (
+    <section className="grid gap-3 md:grid-cols-3" aria-live="polite" aria-label="Odswiezanie kart radaru">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <article key={index} className="rounded-lg border border-border-subtle bg-surface-panel p-3 shadow-soft">
+          <div className="flex items-center gap-2">
+            <SkeletonBlock className="h-8 w-8" />
+            <SkeletonBlock className="h-4 w-40" />
+          </div>
+          <SkeletonText lines={3} className="mt-4" />
+        </article>
+      ))}
+    </section>
   );
 }
 

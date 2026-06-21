@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ChevronDown, ExternalLink, FileText, Flame, GitFork } from "lucide-react";
+import { Archive, ChevronDown, ExternalLink, FileText, Flame, GitCompare, GitFork } from "lucide-react";
 import type React from "react";
 import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
@@ -15,8 +15,10 @@ export type RepoRowProps = {
   isExpanded: boolean;
   timeline: RepositoryTimelineItem[];
   isTimelineLoading: boolean;
+  isCompareSelected: boolean;
   isPending: boolean;
   onToggle: () => void;
+  onToggleCompare: () => void;
   onOpenReport: () => void;
   onRegenerateReport: () => void;
   onSave: () => void;
@@ -35,8 +37,10 @@ export function RepoRow({
   isExpanded,
   timeline,
   isTimelineLoading,
+  isCompareSelected,
   isPending,
   onToggle,
+  onToggleCompare,
   onOpenReport,
   onRegenerateReport,
   onSave,
@@ -118,6 +122,15 @@ export function RepoRow({
         </button>
 
         <div className="flex items-center justify-start gap-1.5 lg:justify-end">
+          <Button
+            variant={isCompareSelected ? "secondary" : "ghost"}
+            size="icon"
+            onClick={onToggleCompare}
+            aria-pressed={isCompareSelected}
+            aria-label={isCompareSelected ? `Usun z porownania ${repo.fullName}` : `Dodaj do porownania ${repo.fullName}`}
+          >
+            <GitCompare className="h-4 w-4" />
+          </Button>
           <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
             <FileText className="h-4 w-4" />
             Raport

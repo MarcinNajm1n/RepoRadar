@@ -1,6 +1,8 @@
 "use client";
 
-import { ArrowDownNarrowWide, RotateCcw, Search } from "lucide-react";
+import type React from "react";
+import { ArrowDownNarrowWide, BookmarkPlus, RotateCcw, Search } from "lucide-react";
+import type { RepositoryFilterPreset } from "@/lib/repository-filter-presets";
 import { REPOSITORY_STATUSES, formatStatus } from "@/types/status";
 import { cn } from "@/lib/utils";
 import { Badge, Button } from "./ui";
@@ -25,14 +27,18 @@ export type RepoFilterBarProps = {
   sortKey: RepoSortKey;
   languages: string[];
   profiles: string[];
+  presets: RepositoryFilterPreset[];
   resultCount: number;
   totalCount: number;
+  searchInputRef?: React.Ref<HTMLInputElement>;
   onQueryChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onLanguageChange: (value: string) => void;
   onProfileChange: (value: string) => void;
   onMinTrendChange: (value: number) => void;
   onSortChange: (value: RepoSortKey) => void;
+  onApplyPreset: (preset: RepositoryFilterPreset) => void;
+  onSavePreset: () => void;
   onReset: () => void;
 };
 
@@ -45,14 +51,18 @@ export function RepoFilterBar({
   sortKey,
   languages,
   profiles,
+  presets,
   resultCount,
   totalCount,
+  searchInputRef,
   onQueryChange,
   onStatusChange,
   onLanguageChange,
   onProfileChange,
   onMinTrendChange,
   onSortChange,
+  onApplyPreset,
+  onSavePreset,
   onReset
 }: RepoFilterBarProps) {
   const activeFilters = [
@@ -71,6 +81,7 @@ export function RepoFilterBar({
           <span className="sr-only">Szukaj repozytoriów</span>
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
+            ref={searchInputRef}
             className={controlClassName("pl-9")}
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
@@ -164,6 +175,31 @@ export function RepoFilterBar({
         ) : (
           <span className="text-muted-foreground">Brak aktywnych filtrów</span>
         )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3 text-xs">
+        <span className="font-semibold uppercase text-muted-foreground">Presety</span>
+        {presets.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            title={preset.description}
+            className="rounded-md border border-border-subtle bg-surface-inset px-2.5 py-1.5 font-medium text-muted-foreground transition duration-fast ease-interface hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            onClick={() => onApplyPreset(preset)}
+          >
+            {preset.label}
+          </button>
+        ))}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onSavePreset}
+          disabled={!hasActiveFilters && sortKey === "trend_desc"}
+          className="h-8"
+        >
+          <BookmarkPlus className="h-4 w-4" />
+          Zapisz preset
+        </Button>
       </div>
     </section>
   );

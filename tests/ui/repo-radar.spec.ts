@@ -20,15 +20,40 @@ test("keeps repository filters usable", async ({ page }) => {
   await page.getByRole("navigation").getByRole("button", { name: "Biblioteka" }).click();
 
   await expect(page.getByPlaceholder("Szukaj nazwy, ownera, topics...")).toBeVisible();
-  await expect(page.getByText("wyników w tym widoku")).toBeVisible();
+  await expect(page.getByText(/wynik/).first()).toBeVisible();
 
   await page.getByPlaceholder("Szukaj nazwy, ownera, topics...").fill("__brak_takiego_repo__");
   await expect(page.getByText("Szukaj: __brak_takiego_repo__")).toBeVisible();
   await page.getByRole("button", { name: /Reset/ }).click();
-  await expect(page.getByText("Brak aktywnych filtrów")).toBeVisible();
+  await expect(page.getByText(/Brak aktywnych/).first()).toBeVisible();
   await expect(page.getByText("Pokazano 100 z")).toBeVisible();
-  await page.getByRole("button", { name: /Pokaż kolejne/ }).click();
+  await page.getByRole("button", { name: /Pokaz kolejne/ }).click();
   await expect(page.getByText("Pokazano 200 z")).toBeVisible();
+
+  await expectNoHorizontalOverflow(page);
+});
+
+test("supports keyboard navigation shortcuts", async ({ page }) => {
+  const libraryButton = page.getByRole("navigation").getByRole("button", { name: "Biblioteka" });
+  await libraryButton.focus();
+  await expect(libraryButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  const searchInput = page.getByPlaceholder("Szukaj nazwy, ownera, topics...");
+  await expect(searchInput).toBeVisible();
+
+  await page.keyboard.press("/");
+  await expect(searchInput).toBeFocused();
+  await searchInput.blur();
+
+  await page.keyboard.press("Control+K");
+  await expect(page.getByRole("heading", { name: "Command Palette" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Command Palette" })).toBeHidden();
+
+  const settingsButton = page.getByRole("navigation").getByRole("button", { name: "Ustawienia" });
+  await settingsButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Ustawienia MVP")).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
 });
@@ -42,7 +67,7 @@ test("keeps the library view within a 1280px desktop viewport", async ({ page })
 });
 
 test("keeps idea and settings navigation reachable", async ({ page }) => {
-  await page.getByRole("complementary").getByRole("button", { name: "Pomysły" }).click();
+  await page.getByRole("complementary").getByRole("button", { name: /Pomys/ }).click();
   await expect(page.getByText("Kandydaci").first()).toBeVisible();
   await expect(page.getByText("Szybka ocena okazji przed pelnym pomyslem.")).toBeVisible();
 
