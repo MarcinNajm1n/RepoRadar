@@ -9,6 +9,8 @@ import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } fro
 import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportunities";
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
+import { getLastGitHubRateLimitSnapshot } from "./rate-limit";
+import { saveGitHubRateLimitSnapshot } from "@/lib/db/github-rate-limit";
 import type { GitHubReadmeResult, GitHubRepositoryItem, GitHubSearchProfile } from "./types";
 
 type ScanOptions = {
@@ -268,6 +270,7 @@ export async function runDailyScan(options: ScanOptions = {}) {
         errorMessage: itemErrors.length ? itemErrors.slice(0, 5).join(" | ") : null
       }
     });
+    await saveGitHubRateLimitSnapshot(getLastGitHubRateLimitSnapshot());
 
     await createDailyReport(scanRun.id);
     await runAutoOpportunityResearch(scanRun.id).catch((opportunityError) => {
@@ -294,6 +297,7 @@ export async function runDailyScan(options: ScanOptions = {}) {
         errorMessage: message
       }
     });
+    await saveGitHubRateLimitSnapshot(getLastGitHubRateLimitSnapshot());
     await dispatchScanFailureNotification(scanRun.id, error).catch((notificationError) => {
       console.warn(
         "RepoRadar failure notification dispatch failed:",

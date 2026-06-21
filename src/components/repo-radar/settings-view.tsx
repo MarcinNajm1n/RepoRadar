@@ -55,6 +55,7 @@ export function SettingsView({
         <SettingsPanel title="Status konfiguracji">
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoItem label="GitHub token" value={settingsSummary.githubTokenConfigured ? "skonfigurowany" : "brak"} />
+            <InfoItem label="GitHub API limit" value={formatGitHubRateLimit(settingsSummary.githubRateLimit)} />
             <InfoItem label="OpenAI key" value={settingsSummary.openAiConfigured ? "skonfigurowany" : "brak"} />
             <InfoItem label="Discord webhook" value={settingsSummary.discordWebhookConfigured ? "skonfigurowany" : "brak"} />
             <InfoItem label="DB settings" value={String(settingsSummary.persistedSettingCount)} />
@@ -206,4 +207,15 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <div className="mt-1 break-words text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
+}
+
+function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
+  if (!rateLimit) {
+    return "brak danych";
+  }
+
+  const remaining = rateLimit.remaining ?? "?";
+  const limit = rateLimit.limit ?? "?";
+  const reset = rateLimit.resetAt ? new Date(rateLimit.resetAt).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?";
+  return `${remaining}/${limit}, reset ${reset}`;
 }

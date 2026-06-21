@@ -131,6 +131,7 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
     externalResearchCacheTtlHours: 24,
     reportsDir: "reports",
     persistedSettingCount: 0,
+    githubRateLimit: null,
     ...overrides
   };
 }

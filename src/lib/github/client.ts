@@ -3,6 +3,7 @@ import { stableHash } from "@/lib/hash";
 import { sanitizeExternalText, truncateText } from "@/lib/utils";
 import type { DiscoveredGitHubRepository, GitHubReadmeResult, GitHubSearchQuerySpec, GitHubSearchResponse, SearchOptions } from "./types";
 import { mergeDiscoveredGitHubRepository } from "./dedupe";
+import { captureGitHubRateLimit } from "./rate-limit";
 
 const GITHUB_API = "https://api.github.com";
 const MAX_GITHUB_RETRY_DELAY_MS = 30_000;
@@ -119,6 +120,7 @@ export class GitHubClient {
         },
         cache: "no-store"
       });
+      captureGitHubRateLimit(response);
 
       if (response.status === 304 && cached) {
         return readCachedResponse<T>(cached, accept);

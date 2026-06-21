@@ -135,6 +135,15 @@ export type SettingsSummary = {
   externalResearchCacheTtlHours: number;
   reportsDir: string;
   persistedSettingCount: number;
+  githubRateLimit: {
+    checkedAt: string;
+    status: number;
+    resource: string | null;
+    limit: number | null;
+    remaining: number | null;
+    used: number | null;
+    resetAt: string | null;
+  } | null;
 };
 
 export type NotificationLogItem = {

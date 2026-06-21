@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GitHubClient, searchGitHubRepositories } from "../../src/lib/github/client";
+import { clearGitHubRateLimitSnapshot, getLastGitHubRateLimitSnapshot } from "../../src/lib/github/rate-limit";
 import type { GitHubRepositoryItem } from "../../src/lib/github/types";
 
 const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  clearGitHubRateLimitSnapshot();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -37,6 +39,32 @@ describe("GitHubClient", () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]));
     expect(url.searchParams.get("sort")).toBe("updated");
     expect(url.searchParams.get("order")).toBe("desc");
+  });
+
+  it("captures the latest GitHub rate limit headers", async () => {
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ total_count: 0, incomplete_results: false, items: [] }), {
+        status: 200,
+        headers: {
+          "x-ratelimit-limit": "5000",
+          "x-ratelimit-remaining": "4998",
+          "x-ratelimit-used": "2",
+          "x-ratelimit-reset": "1782043200",
+          "x-ratelimit-resource": "search"
+        }
+      })
+    ) as unknown as typeof fetch;
+
+    await new GitHubClient(undefined).searchRepositories({ query: "ai agent" });
+
+    expect(getLastGitHubRateLimitSnapshot()).toMatchObject({
+      status: 200,
+      resource: "search",
+      limit: 5000,
+      remaining: 4998,
+      used: 2,
+      resetAt: "2026-06-21T12:00:00.000Z"
+    });
   });
 
   it("reuses cached GitHub responses after a 304", async () => {

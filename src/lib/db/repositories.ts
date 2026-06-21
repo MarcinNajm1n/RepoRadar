@@ -5,6 +5,7 @@ import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
 import type { IdeaStatus } from "@/types/idea-status";
 import { getActionItems } from "./action-items";
+import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import type { ActionItemListItem } from "@/types/action-item";
 import type {
@@ -365,7 +366,7 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const persistedSettings = await getAllSettings();
+  const [persistedSettings, githubRateLimit] = await Promise.all([getAllSettings(), getStoredGitHubRateLimitSnapshot()]);
 
   return {
     githubTokenConfigured: Boolean(config.githubToken),
@@ -381,7 +382,8 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     marketResearchDailyLimit: config.marketResearchDailyLimit,
     externalResearchCacheTtlHours: config.externalResearchCacheTtlHours,
     reportsDir: config.reportsDir,
-    persistedSettingCount: Object.keys(persistedSettings).length
+    persistedSettingCount: Object.keys(persistedSettings).length,
+    githubRateLimit
   };
 }
 
