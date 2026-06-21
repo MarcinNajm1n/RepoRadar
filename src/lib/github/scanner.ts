@@ -10,6 +10,7 @@ import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportuni
 import { buildGitHubSearchQueries } from "./queries";
 import { GitHubClient, searchGitHubRepositories } from "./client";
 import { getAdaptiveGitHubConcurrency, runWithAdaptiveConcurrency } from "./concurrency";
+import { prioritizeIncrementalScanItems } from "./incremental-scan";
 import { getLastGitHubRateLimitSnapshot } from "./rate-limit";
 import { saveGitHubRateLimitSnapshot } from "@/lib/db/github-rate-limit";
 import type { GitHubReadmeResult, GitHubRepositoryItem, GitHubSearchProfile } from "./types";
@@ -220,6 +221,24 @@ async function maybeGenerateSummaries() {
   }
 }
 
+async function orderForIncrementalScan(discovered: Awaited<ReturnType<typeof searchGitHubRepositories>>) {
+  const githubIds = discovered.map((item) => item.item.id);
+  const fullNames = discovered.map((item) => item.item.full_name);
+  const existing = await prisma.repository.findMany({
+    where: {
+      OR: [{ githubId: { in: githubIds } }, { fullName: { in: fullNames } }]
+    },
+    select: {
+      githubId: true,
+      fullName: true,
+      pushedAt: true,
+      starsCurrent: true
+    }
+  });
+
+  return prioritizeIncrementalScanItems(discovered, existing);
+}
+
 export async function runDailyScan(options: ScanOptions = {}) {
   const config = getConfig();
   const scanRun = await prisma.scanRun.create({
@@ -237,6 +256,7 @@ export async function runDailyScan(options: ScanOptions = {}) {
 
       return true;
     });
+    const prioritized = await orderForIncrementalScan(filtered);
 
     const client = new GitHubClient();
     const readmeLimit = options.fetchReadmeLimit ?? 25;
@@ -244,7 +264,7 @@ export async function runDailyScan(options: ScanOptions = {}) {
     const itemErrors: string[] = [];
 
     const concurrency = getAdaptiveGitHubConcurrency(getLastGitHubRateLimitSnapshot());
-    await runWithAdaptiveConcurrency(filtered, concurrency, async (discovered, index) => {
+    await runWithAdaptiveConcurrency(prioritized, concurrency, async (discovered, index) => {
       const item = discovered.item;
       try {
         const readme = await maybeFetchReadme(client, item, index < readmeLimit);
