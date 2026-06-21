@@ -1,9 +1,34 @@
 import { prisma } from "../src/lib/db/client";
 import { calculateTrendScore } from "../src/lib/scoring/trend-score";
+import type { RepositoryStatus } from "../src/types/status";
 
-const now = new Date();
+const isPortfolioMode = process.argv.includes("--portfolio") || process.env.REPORADAR_PORTFOLIO_MODE === "1";
+const now = isPortfolioMode ? new Date("2026-06-21T12:00:00.000Z") : new Date();
 
-const demoRepos = [
+type DemoRepoSeed = {
+  githubId: number;
+  fullName: string;
+  owner: string;
+  name: string;
+  url: string;
+  description: string | null;
+  primaryLanguage: string | null;
+  topics: string[];
+  createdAt: Date;
+  pushedAt: Date | null;
+  starsCurrent: number;
+  forksCurrent: number;
+  watchersCurrent: number;
+  openIssues: number;
+  readmeExcerpt: string | null;
+  growth7d: number | null;
+  growthPercent7d: number | null;
+  shortSummaryPl?: string | null;
+  statusOverride?: RepositoryStatus;
+  isArchived?: boolean;
+};
+
+const demoRepos: DemoRepoSeed[] = [
   {
     githubId: 900001,
     fullName: "affaan-m/ECC",
@@ -64,8 +89,111 @@ const demoRepos = [
   }
 ];
 
+const portfolioOnlyRepos: DemoRepoSeed[] = [
+  {
+    githubId: 900101,
+    fullName: "portfolio-labs/very-long-owner-and-repository-name-for-reporadar-edge-case-agent-evaluation-suite",
+    owner: "portfolio-labs",
+    name: "very-long-owner-and-repository-name-for-reporadar-edge-case-agent-evaluation-suite",
+    url: "https://github.com/portfolio-labs/very-long-owner-and-repository-name-for-reporadar-edge-case-agent-evaluation-suite",
+    description:
+      "A deliberately long repository name and description used to test RepoRadar table density, wrapping, summaries, topics and action controls in portfolio screenshots.",
+    primaryLanguage: "TypeScript",
+    topics: [
+      "ai-agents",
+      "mcp",
+      "rag",
+      "workflow-automation",
+      "prompt-engineering",
+      "developer-tools",
+      "local-ai",
+      "observability",
+      "evaluation",
+      "typescript"
+    ],
+    createdAt: new Date(now.getTime() - 36 * 24 * 60 * 60 * 1000),
+    pushedAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+    starsCurrent: 11200,
+    forksCurrent: 980,
+    watchersCurrent: 11200,
+    openIssues: 44,
+    readmeExcerpt:
+      "Portfolio seed repo with quickstart, examples, API notes, evaluation scripts and long metadata for UI stress testing.",
+    growth7d: 1500,
+    growthPercent7d: 15.5,
+    shortSummaryPl: "Portfolio: mocny kandydat AI agents z dluga nazwa, wieloma topics i wyraznym wzrostem.",
+    statusOverride: "HOT"
+  },
+  {
+    githubId: 900102,
+    fullName: "quiet-oss/no-growth-agent-index",
+    owner: "quiet-oss",
+    name: "no-growth-agent-index",
+    url: "https://github.com/quiet-oss/no-growth-agent-index",
+    description: "Index of local agent tools without enough local history yet.",
+    primaryLanguage: null,
+    topics: ["agents", "index", "local-ai"],
+    createdAt: new Date(now.getTime() - 18 * 24 * 60 * 60 * 1000),
+    pushedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+    starsCurrent: 860,
+    forksCurrent: 38,
+    watchersCurrent: 860,
+    openIssues: 3,
+    readmeExcerpt: null,
+    growth7d: null,
+    growthPercent7d: null,
+    shortSummaryPl: null,
+    statusOverride: "TO_REVIEW"
+  },
+  {
+    githubId: 900103,
+    fullName: "archived-ai/rag-starter-legacy",
+    owner: "archived-ai",
+    name: "rag-starter-legacy",
+    url: "https://github.com/archived-ai/rag-starter-legacy",
+    description: "Archived RAG starter project kept in the demo dataset to verify archived badges and lower-priority decisions.",
+    primaryLanguage: "Python",
+    topics: ["rag", "llm", "archive"],
+    createdAt: new Date(now.getTime() - 920 * 24 * 60 * 60 * 1000),
+    pushedAt: new Date(now.getTime() - 420 * 24 * 60 * 60 * 1000),
+    starsCurrent: 5200,
+    forksCurrent: 610,
+    watchersCurrent: 5200,
+    openIssues: 91,
+    readmeExcerpt: "Legacy RAG starter. Useful for testing old and archived repository presentation.",
+    growth7d: 0,
+    growthPercent7d: 0,
+    shortSummaryPl: "Portfolio: stare zarchiwizowane repo, dobre do sprawdzenia stanow OLD/archived.",
+    statusOverride: "OLD",
+    isArchived: true
+  },
+  {
+    githubId: 900104,
+    fullName: "mcp-observatory/rate-limit-timeline",
+    owner: "mcp-observatory",
+    name: "rate-limit-timeline",
+    url: "https://github.com/mcp-observatory/rate-limit-timeline",
+    description: "GitHub API rate-limit and scan observability dashboard for local developer tools.",
+    primaryLanguage: "Go",
+    topics: ["mcp", "github-api", "observability", "developer-tools"],
+    createdAt: new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000),
+    pushedAt: new Date(now.getTime() - 7 * 60 * 60 * 1000),
+    starsCurrent: 4300,
+    forksCurrent: 210,
+    watchersCurrent: 4300,
+    openIssues: 11,
+    readmeExcerpt: "Shows rate-limit history, cache hit rate, scan duration and failed request reasons.",
+    growth7d: 310,
+    growthPercent7d: 7.8,
+    shortSummaryPl: "Portfolio: praktyczne repo pod observability i kontrolowanie limitow GitHuba.",
+    statusOverride: "SAVED"
+  }
+];
+
 async function main() {
-  for (const demo of demoRepos) {
+  const reposToSeed = isPortfolioMode ? [...demoRepos, ...portfolioOnlyRepos] : demoRepos;
+
+  for (const demo of reposToSeed) {
     const score = calculateTrendScore({
       starsCurrent: demo.starsCurrent,
       forksCurrent: demo.forksCurrent,
@@ -78,17 +206,31 @@ async function main() {
       primaryLanguage: demo.primaryLanguage,
       growth7d: demo.growth7d,
       growthPercent7d: demo.growthPercent7d,
-      starsBefore7d: demo.starsCurrent - demo.growth7d
+      starsBefore7d: demo.growth7d === null ? null : demo.starsCurrent - demo.growth7d
     });
+    const status = demo.statusOverride ?? score.status;
+    const shortSummaryPl =
+      demo.shortSummaryPl === undefined ? "Demo: krotki opis po polsku wygenerowany jako seed data do portfolio." : demo.shortSummaryPl;
 
     const repository = await prisma.repository.upsert({
       where: { githubId: demo.githubId },
       update: {
+        description: demo.description,
+        primaryLanguage: demo.primaryLanguage,
+        topicsJson: JSON.stringify(demo.topics),
+        pushedAt: demo.pushedAt,
         starsCurrent: demo.starsCurrent,
         forksCurrent: demo.forksCurrent,
+        watchersCurrent: demo.watchersCurrent,
+        openIssues: demo.openIssues,
+        isArchived: demo.isArchived ?? false,
         trendScore: score.trendScore,
         relevanceScore: score.relevanceScore,
-        status: score.status
+        initialMomentumScore: score.initialMomentumScore,
+        scoreBreakdownJson: JSON.stringify(score.scoreBreakdown),
+        shortSummaryPl,
+        readmeExcerpt: demo.readmeExcerpt,
+        status
       },
       create: {
         githubId: demo.githubId,
@@ -109,11 +251,14 @@ async function main() {
         openIssues: demo.openIssues,
         ageMonths: score.ageMonths,
         isOldRepo: score.isOldRepo,
-        status: score.status,
-        shortSummaryPl: "Demo: krótki opis po polsku wygenerowany jako seed data do portfolio.",
+        isArchived: demo.isArchived ?? false,
+        status,
+        shortSummaryPl,
         readmeExcerpt: demo.readmeExcerpt,
         trendScore: score.trendScore,
         relevanceScore: score.relevanceScore,
+        initialMomentumScore: score.initialMomentumScore,
+        scoreBreakdownJson: JSON.stringify(score.scoreBreakdown),
         source: "seed"
       }
     });
@@ -127,7 +272,7 @@ async function main() {
         watchers: demo.watchersCurrent,
         openIssues: demo.openIssues,
         pushedAt: demo.pushedAt,
-        growth24h: Math.round(demo.growth7d / 7),
+        growth24h: demo.growth7d === null ? null : Math.round(demo.growth7d / 7),
         growth7d: demo.growth7d,
         growthPercent7d: demo.growthPercent7d
       }
@@ -140,7 +285,25 @@ async function main() {
     create: { key: "auto_generate_weekly_ideas", value: "false" }
   });
 
-  console.log("Seed data inserted.");
+  if (isPortfolioMode) {
+    await prisma.actionItem.upsert({
+      where: { dedupeKey: "portfolio:review-top-signal" },
+      update: {
+        status: "OPEN",
+        title: "Portfolio review: sprawdz najmocniejszy sygnal",
+        priority: 8
+      },
+      create: {
+        type: "READ_README",
+        title: "Portfolio review: sprawdz najmocniejszy sygnal",
+        description: "Stabilne zadanie demo widoczne w kolejce podczas prezentacji RepoRadar.",
+        priority: 8,
+        dedupeKey: "portfolio:review-top-signal"
+      }
+    });
+  }
+
+  console.log(isPortfolioMode ? "Portfolio seed data inserted." : "Seed data inserted.");
 }
 
 main()
