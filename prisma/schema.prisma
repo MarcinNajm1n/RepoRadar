@@ -58,9 +58,14 @@ model Repository {
   @@index([trendScore])
   @@index([starsCurrent])
   @@index([pushedAt])
+  @@index([firstSeenAt])
   @@index([createdAt])
   @@index([isOldRepo])
   @@index([source])
+  @@index([isDeletedFromView, trendScore])
+  @@index([isDeletedFromView, status, trendScore])
+  @@index([isDeletedFromView, primaryLanguage, trendScore])
+  @@index([isOldRepo, isDeletedFromView, trendScore])
 }
 
 model RepoSnapshot {
