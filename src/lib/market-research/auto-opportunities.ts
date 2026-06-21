@@ -1,6 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
 import { dispatchOpportunityCandidateNotification } from "@/lib/notifications/dispatcher";
+import { buildAiPriorityRepositoryWhere } from "@/lib/openai/priority";
 import { generateOpportunityCandidateForRepository } from "@/lib/openai/repository-analysis";
 import { ACTIVE_IDEA_STATUSES } from "@/types/idea-status";
 
@@ -17,6 +18,7 @@ export async function runAutoOpportunityResearch(scanRunId: string) {
       isDeletedFromView: false,
       lastSeenAt: { gte: scanRun.startedAt },
       status: { not: "IGNORED" },
+      ...buildAiPriorityRepositoryWhere(),
       ideas: {
         none: {
           OR: [{ status: { in: ACTIVE_IDEA_STATUSES } }, { lastResearchAt: { gte: recentResearchCutoff } }]

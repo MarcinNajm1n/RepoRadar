@@ -75,6 +75,7 @@ describe("runAutoOpportunityResearch", () => {
         where: expect.objectContaining({
           isDeletedFromView: false,
           status: { not: "IGNORED" },
+          OR: expect.any(Array),
           ideas: {
             none: expect.objectContaining({
               OR: expect.arrayContaining([

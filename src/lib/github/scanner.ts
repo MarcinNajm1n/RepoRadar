@@ -5,6 +5,7 @@ import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExte
 import { calculateGrowth } from "@/lib/scoring/growth";
 import { calculateTrendScore } from "@/lib/scoring/trend-score";
 import { generateShortSummaryForRepository } from "@/lib/openai/repository-analysis";
+import { buildAiPriorityRepositoryWhere } from "@/lib/openai/priority";
 import { createDailyReport } from "@/lib/reports/daily";
 import { dispatchScanFailureNotification, dispatchScanSuccessNotifications } from "@/lib/notifications/dispatcher";
 import { runAutoOpportunityResearch } from "@/lib/market-research/auto-opportunities";
@@ -207,7 +208,7 @@ async function maybeGenerateSummaries() {
     where: {
       isDeletedFromView: false,
       shortSummaryPl: null,
-      trendScore: { gte: 60 }
+      ...buildAiPriorityRepositoryWhere()
     },
     orderBy: [{ trendScore: "desc" }],
     take: config.openAiDailyAnalysisLimit
