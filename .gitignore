@@ -52,6 +52,13 @@ reports/**/*.md
 !reports/.gitkeep
 !reports/**/.gitkeep
 
+# local tool outputs and user-specific workspace state
+graphify-out/
+.obsidian/
+.impeccable/
+.githooks/post-commit
+.githooks/post-checkout
+
 # misc
 .DS_Store
 *.log
