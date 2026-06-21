@@ -180,6 +180,9 @@ export type RadarTodayData = {
 
 export type DashboardData = {
   repositories: RepositoryListItem[];
+  rejectCandidates: RepositoryListItem[];
+  repositoryPage: RepositoryPage;
+  repositoryFilterOptions: RepositoryFilterOptions;
   ideas: IdeaListItem[];
   actionItems: ActionItemListItem[];
   weeklyReports: ReportListItem[];
@@ -201,6 +204,31 @@ export type DashboardData = {
     hot: number;
   };
   lastScan: DashboardLastScan;
+};
+
+export type RepositoryPage = {
+  items: RepositoryListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type RepositoryFilterOptions = {
+  languages: string[];
+  discoveryProfiles: string[];
+};
+
+export type RepositoryPageInput = {
+  tab?: string;
+  query?: string;
+  status?: string;
+  language?: string;
+  profile?: string;
+  minTrend?: number;
+  sortKey?: string;
+  page?: number;
+  pageSize?: number;
 };
 
 export type RepositoryFilters = {

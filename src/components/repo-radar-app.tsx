@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Download, FileText, RefreshCw } from "lucide-react";
-import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem } from "@/types/repository";
+import type { DashboardData, EvidenceSourceItem, IdeaListItem, RepositoryListItem, RepositoryPage, RepositoryPageInput } from "@/types/repository";
 import {
   clearExpiredExternalCacheAction,
   clearOldNotificationLogsAction,
@@ -11,6 +11,7 @@ import {
   createActionItemAction,
   dismissActionItemAction,
   exportIdeasCsvAction,
+  getRepositoryPageAction,
   generateDailyBriefingAction,
   createWeeklyReportAction,
   generateIdeaAction,
@@ -52,43 +53,12 @@ type ReportState = {
   evidenceSources: EvidenceSourceItem[];
 } | null;
 
-function filterByTab(tab: TabKey, repositories: RepositoryListItem[]) {
-  switch (tab) {
-    case "new":
-      return repositories.filter((repo) => repo.status === "NEW" && !repo.isDeletedFromView);
-    case "saved":
-      return repositories.filter((repo) => repo.status === "SAVED" && !repo.isDeletedFromView);
-    case "read":
-      return repositories.filter((repo) => repo.status === "READ" && !repo.isDeletedFromView);
-    case "ignored":
-      return repositories.filter((repo) => repo.status === "IGNORED" || repo.isDeletedFromView);
-    case "old":
-      return repositories.filter((repo) => repo.isOldRepo && repo.status !== "HOT" && !repo.isDeletedFromView);
-    default:
-      return repositories.filter((repo) => !repo.isDeletedFromView);
-  }
-}
-
-function repoMatchesQuery(repo: RepositoryListItem, query: string) {
-  if (!query.trim()) {
-    return true;
-  }
-
-  const normalized = query.toLowerCase();
-  return [
-    repo.fullName,
-    repo.owner,
-    repo.description,
-    repo.shortSummaryPl,
-    repo.primaryLanguage,
-    repo.topics.join(" ")
-  ]
-    .filter(Boolean)
-    .some((value) => value!.toLowerCase().includes(normalized));
-}
-
 function getTomorrowIso() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isRepositoryListTab(tab: TabKey) {
+  return tab === "library" || tab === "new" || tab === "saved" || tab === "read" || tab === "ignored" || tab === "old";
 }
 
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
@@ -101,34 +71,89 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [discoveryProfileFilter, setDiscoveryProfileFilter] = useState("ALL");
   const [minTrend, setMinTrend] = useState(0);
   const [repoSortKey, setRepoSortKey] = useState<RepoSortKey>("trend_desc");
+  const [repositoryPage, setRepositoryPage] = useState<RepositoryPage>(initialData.repositoryPage);
+  const [isRepositoryPageLoading, setIsRepositoryPageLoading] = useState(false);
   const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportState>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaListItem | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isPending, startTransition] = useTransition();
+  const repositoryRequestKeyRef = useRef("");
 
   const languages = useMemo(
-    () =>
-      [...new Set(initialData.repositories.map((repo) => repo.primaryLanguage).filter(Boolean) as string[])].sort(),
-    [initialData.repositories]
+    () => initialData.repositoryFilterOptions.languages,
+    [initialData.repositoryFilterOptions.languages]
   );
   const discoveryProfiles = useMemo(
-    () => [...new Set(initialData.repositories.flatMap((repo) => repo.discoveryProfiles))].sort(),
-    [initialData.repositories]
+    () => initialData.repositoryFilterOptions.discoveryProfiles,
+    [initialData.repositoryFilterOptions.discoveryProfiles]
   );
-  const tabRepositoryCount = useMemo(
-    () => filterByTab(activeTab, initialData.repositories).length,
-    [activeTab, initialData.repositories]
+  const repositoryPageInput = useMemo<RepositoryPageInput>(
+    () => ({
+      tab: activeTab,
+      query,
+      status: statusFilter,
+      language: languageFilter,
+      profile: discoveryProfileFilter,
+      minTrend,
+      sortKey: repoSortKey,
+      page: 1,
+      pageSize: repositoryPage.pageSize
+    }),
+    [activeTab, discoveryProfileFilter, languageFilter, minTrend, query, repoSortKey, repositoryPage.pageSize, statusFilter]
+  );
+  const repositoryRequestKey = useMemo(() => JSON.stringify(repositoryPageInput), [repositoryPageInput]);
+  const repositoryRefreshKey = useMemo(
+    () =>
+      [
+        initialData.counts.all,
+        initialData.counts.new,
+        initialData.counts.saved,
+        initialData.counts.read,
+        initialData.counts.ignored,
+        initialData.counts.old
+      ].join(":"),
+    [initialData.counts]
   );
 
-  const visibleRepositories = useMemo(() => {
-    return filterByTab(activeTab, initialData.repositories)
-      .filter((repo) => repoMatchesQuery(repo, query))
-      .filter((repo) => (statusFilter === "ALL" ? true : repo.status === statusFilter))
-      .filter((repo) => (languageFilter === "ALL" ? true : repo.primaryLanguage === languageFilter))
-      .filter((repo) => (discoveryProfileFilter === "ALL" ? true : repo.discoveryProfiles.includes(discoveryProfileFilter)))
-      .filter((repo) => repo.trendScore >= minTrend);
-  }, [activeTab, discoveryProfileFilter, initialData.repositories, languageFilter, minTrend, query, statusFilter]);
+  useEffect(() => {
+    if (!isRepositoryListTab(activeTab)) {
+      return;
+    }
+
+    let cancelled = false;
+    repositoryRequestKeyRef.current = repositoryRequestKey;
+
+    void Promise.resolve()
+      .then(() => {
+        if (cancelled) {
+          return null;
+        }
+
+        setIsRepositoryPageLoading(true);
+        setExpandedRepoId(null);
+        return getRepositoryPageAction(repositoryPageInput);
+      })
+      .then((page) => {
+        if (!cancelled && page && repositoryRequestKeyRef.current === repositoryRequestKey) {
+          startTransition(() => setRepositoryPage(page));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac repozytoriow." });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRepositoryPageLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, repositoryPageInput, repositoryRefreshKey, repositoryRequestKey]);
 
   const candidates = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.CANDIDATE), [initialData.ideas]);
   const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => isFullIdeaStatus(idea.status)), [initialData.ideas]);
@@ -185,6 +210,36 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     setDiscoveryProfileFilter("ALL");
     setMinTrend(0);
     setRepoSortKey("trend_desc");
+  }
+
+  function loadMoreRepositories() {
+    if (isRepositoryPageLoading || !repositoryPage.hasMore) {
+      return;
+    }
+
+    const requestKey = repositoryRequestKey;
+    setIsRepositoryPageLoading(true);
+    startTransition(() => {
+      void getRepositoryPageAction({
+        ...repositoryPageInput,
+        page: repositoryPage.page + 1,
+        pageSize: repositoryPage.pageSize
+      })
+        .then((nextPage) => {
+          setRepositoryPage((current) =>
+            repositoryRequestKeyRef.current === requestKey
+              ? {
+                  ...nextPage,
+                  items: [...current.items, ...nextPage.items]
+                }
+              : current
+          );
+        })
+        .catch((error) => {
+          setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac kolejnych repozytoriow." });
+        })
+        .finally(() => setIsRepositoryPageLoading(false));
+    });
   }
 
   function createManualTask() {
@@ -342,7 +397,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       activeTab !== "weekly" &&
       activeTab !== "settings" ? (
         <RepoListView
-          repositories={visibleRepositories}
+          repositories={repositoryPage.items}
           filterBar={
             <RepoFilterBar
               query={query}
@@ -353,8 +408,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               sortKey={repoSortKey}
               languages={languages}
               profiles={discoveryProfiles}
-              resultCount={visibleRepositories.length}
-              totalCount={tabRepositoryCount}
+              resultCount={repositoryPage.items.length}
+              totalCount={repositoryPage.total}
               onQueryChange={setQuery}
               onStatusChange={setStatusFilter}
               onLanguageChange={setLanguageFilter}
@@ -365,8 +420,11 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             />
           }
           sortKey={repoSortKey}
+          totalCount={repositoryPage.total}
+          hasMore={repositoryPage.hasMore}
+          onLoadMore={loadMoreRepositories}
           expandedRepoId={expandedRepoId}
-          isPending={isPending}
+          isPending={isPending || isRepositoryPageLoading}
           callbacks={{
             onToggle: (repoId) => setExpandedRepoId(expandedRepoId === repoId ? null : repoId),
             onOpenReport: (repoId) => openReport(repoId),

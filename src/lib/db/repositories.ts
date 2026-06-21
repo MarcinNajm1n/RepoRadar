@@ -14,12 +14,32 @@ import type {
   IdeaListItem,
   NotificationLogItem,
   NotificationSummary,
+  RepositoryFilterOptions,
   RadarTodayData,
   ReportListItem,
+  RepositoryPage,
+  RepositoryPageInput,
   RepositoryListItem,
   SettingsSummary
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
+
+const DEFAULT_REPOSITORY_PAGE = 1;
+const DEFAULT_REPOSITORY_PAGE_SIZE = 100;
+const MAX_REPOSITORY_PAGE_SIZE = 200;
+const latestSnapshotInclude = {
+  snapshots: {
+    orderBy: { capturedAt: "desc" as const },
+    take: 1,
+    select: {
+      capturedAt: true,
+      growth24h: true,
+      growth7d: true,
+      growthPercent7d: true
+    }
+  }
+};
 
 const DEFAULT_SCORE_BREAKDOWN = {
   absoluteGrowthPoints: 0,
@@ -394,23 +414,248 @@ async function getNotificationSummary(): Promise<NotificationSummary> {
   };
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
-  const [repositories, ideas, actionItems, weeklyReports, lastScan, counts, settingsSummary, notificationSummary] = await Promise.all([
+function buildRepositoryPage(items: RepositoryListItem[], total: number, page = DEFAULT_REPOSITORY_PAGE, pageSize = DEFAULT_REPOSITORY_PAGE_SIZE): RepositoryPage {
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    hasMore: page * pageSize < total
+  };
+}
+
+function normalizeRepositoryPageInput(input: RepositoryPageInput = {}) {
+  const page = Math.max(1, Math.floor(input.page ?? DEFAULT_REPOSITORY_PAGE));
+  const pageSize = Math.min(MAX_REPOSITORY_PAGE_SIZE, Math.max(1, Math.floor(input.pageSize ?? DEFAULT_REPOSITORY_PAGE_SIZE)));
+
+  return {
+    tab: input.tab ?? "library",
+    query: input.query?.trim() ?? "",
+    status: input.status ?? "ALL",
+    language: input.language ?? "ALL",
+    profile: input.profile ?? "ALL",
+    minTrend: Math.min(100, Math.max(0, Math.floor(input.minTrend ?? 0))),
+    sortKey: input.sortKey ?? "trend_desc",
+    page,
+    pageSize
+  };
+}
+
+function buildRepositoryWhere(input: ReturnType<typeof normalizeRepositoryPageInput>): Prisma.RepositoryWhereInput {
+  const filters: Prisma.RepositoryWhereInput[] = [];
+
+  switch (input.tab) {
+    case "new":
+      filters.push({ status: "NEW", isDeletedFromView: false });
+      break;
+    case "saved":
+      filters.push({ status: "SAVED", isDeletedFromView: false });
+      break;
+    case "read":
+      filters.push({ status: "READ", isDeletedFromView: false });
+      break;
+    case "ignored":
+      filters.push({ OR: [{ status: "IGNORED" }, { isDeletedFromView: true }] });
+      break;
+    case "old":
+      filters.push({ isOldRepo: true, status: { not: "HOT" }, isDeletedFromView: false });
+      break;
+    default:
+      filters.push({ isDeletedFromView: false });
+      break;
+  }
+
+  if (input.status !== "ALL" && isRepositoryStatus(input.status)) {
+    filters.push({ status: input.status });
+  }
+
+  if (input.language !== "ALL") {
+    filters.push({ primaryLanguage: input.language });
+  }
+
+  if (input.profile !== "ALL") {
+    filters.push({ discoveryProfilesJson: { contains: input.profile } });
+  }
+
+  if (input.minTrend > 0) {
+    filters.push({ trendScore: { gte: input.minTrend } });
+  }
+
+  if (input.query) {
+    filters.push({
+      OR: [
+        { fullName: { contains: input.query } },
+        { owner: { contains: input.query } },
+        { name: { contains: input.query } },
+        { description: { contains: input.query } },
+        { shortSummaryPl: { contains: input.query } },
+        { primaryLanguage: { contains: input.query } },
+        { topicsJson: { contains: input.query } }
+      ]
+    });
+  }
+
+  return { AND: filters };
+}
+
+function buildRepositoryOrderBy(sortKey: string): Prisma.RepositoryOrderByWithRelationInput[] {
+  switch (sortKey) {
+    case "stars_desc":
+      return [{ starsCurrent: "desc" }, { trendScore: "desc" }];
+    case "pushed_desc":
+      return [{ pushedAt: { sort: "desc", nulls: "last" } }, { trendScore: "desc" }];
+    case "first_seen_desc":
+      return [{ firstSeenAt: "desc" }, { trendScore: "desc" }];
+    case "name_asc":
+      return [{ fullName: "asc" }];
+    case "trend_desc":
+    default:
+      return [{ trendScore: "desc" }, { initialMomentumScore: "desc" }, { starsCurrent: "desc" }];
+  }
+}
+
+function compareByGrowth7d(a: RepositoryListItem, b: RepositoryListItem) {
+  const growthA = a.growth7d ?? Number.NEGATIVE_INFINITY;
+  const growthB = b.growth7d ?? Number.NEGATIVE_INFINITY;
+
+  if (growthA !== growthB) {
+    return growthB - growthA;
+  }
+
+  return b.trendScore - a.trendScore;
+}
+
+async function getRadarRepositories(limit = 25): Promise<RepositoryListItem[]> {
+  const [topRepositories, newRepositories, momentumRepositories, latestRepositories] = await Promise.all([
     prisma.repository.findMany({
-      orderBy: [{ trendScore: "desc" }, { starsCurrent: "desc" }],
-      include: {
-        snapshots: {
-          orderBy: { capturedAt: "desc" },
-          take: 1,
-          select: {
-            capturedAt: true,
-            growth24h: true,
-            growth7d: true,
-            growthPercent7d: true
-          }
-        }
-      }
+      where: { status: { not: "IGNORED" }, isDeletedFromView: false },
+      orderBy: [{ trendScore: "desc" }, { initialMomentumScore: "desc" }, { starsCurrent: "desc" }],
+      take: limit,
+      include: latestSnapshotInclude
     }),
+    prisma.repository.findMany({
+      where: { status: "NEW", isDeletedFromView: false },
+      orderBy: [{ trendScore: "desc" }, { initialMomentumScore: "desc" }, { starsCurrent: "desc" }],
+      take: limit,
+      include: latestSnapshotInclude
+    }),
+    prisma.repository.findMany({
+      where: { status: { not: "IGNORED" }, isDeletedFromView: false, initialMomentumScore: { gt: 0 } },
+      orderBy: [{ initialMomentumScore: "desc" }, { trendScore: "desc" }],
+      take: limit,
+      include: latestSnapshotInclude
+    }),
+    prisma.repository.findMany({
+      where: { status: { not: "IGNORED" }, isDeletedFromView: false },
+      orderBy: [{ firstSeenAt: "desc" }],
+      take: limit,
+      include: latestSnapshotInclude
+    })
+  ]);
+  const byId = new Map<string, RepositoryListItem>();
+
+  for (const repository of [...topRepositories, ...newRepositories, ...momentumRepositories, ...latestRepositories]) {
+    byId.set(repository.id, mapRepository(repository));
+  }
+
+  return [...byId.values()];
+}
+
+async function getRejectCandidates(limit = 3): Promise<RepositoryListItem[]> {
+  const repositories = await prisma.repository.findMany({
+    where: {
+      isDeletedFromView: false,
+      status: { not: "IGNORED" },
+      OR: [{ isOldRepo: true }, { trendScore: { lt: 45 } }]
+    },
+    orderBy: [{ trendScore: "asc" }, { ageMonths: "desc" }],
+    take: limit,
+    include: latestSnapshotInclude
+  });
+
+  return repositories.map(mapRepository);
+}
+
+export async function getRepositoryPage(input: RepositoryPageInput = {}): Promise<RepositoryPage> {
+  const normalized = normalizeRepositoryPageInput(input);
+  const where = buildRepositoryWhere(normalized);
+  const skip = (normalized.page - 1) * normalized.pageSize;
+
+  if (normalized.sortKey === "growth7d_desc") {
+    const [repositories, total] = await Promise.all([
+      prisma.repository.findMany({
+        where,
+        include: latestSnapshotInclude
+      }),
+      prisma.repository.count({ where })
+    ]);
+    const items = repositories.map(mapRepository).sort(compareByGrowth7d).slice(skip, skip + normalized.pageSize);
+
+    return buildRepositoryPage(items, total, normalized.page, normalized.pageSize);
+  }
+
+  const [repositories, total] = await Promise.all([
+    prisma.repository.findMany({
+      where,
+      orderBy: buildRepositoryOrderBy(normalized.sortKey),
+      skip,
+      take: normalized.pageSize,
+      include: latestSnapshotInclude
+    }),
+    prisma.repository.count({ where })
+  ]);
+
+  return buildRepositoryPage(repositories.map(mapRepository), total, normalized.page, normalized.pageSize);
+}
+
+async function getRepositoryFilterOptions(): Promise<RepositoryFilterOptions> {
+  const [languageRows, profileRows] = await Promise.all([
+    prisma.repository.findMany({
+      where: {
+        isDeletedFromView: false,
+        primaryLanguage: { not: null }
+      },
+      distinct: ["primaryLanguage"],
+      select: { primaryLanguage: true },
+      orderBy: { primaryLanguage: "asc" }
+    }),
+    prisma.repository.findMany({
+      where: { isDeletedFromView: false },
+      select: { discoveryProfilesJson: true }
+    })
+  ]);
+  const discoveryProfiles = new Set<string>();
+
+  for (const row of profileRows) {
+    for (const profile of safeJsonParse<string[]>(row.discoveryProfilesJson, [])) {
+      discoveryProfiles.add(profile);
+    }
+  }
+
+  return {
+    languages: languageRows.map((row) => row.primaryLanguage).filter((language): language is string => Boolean(language)),
+    discoveryProfiles: [...discoveryProfiles].sort()
+  };
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  const [
+    repositoryPage,
+    repositoryFilterOptions,
+    radarRepositories,
+    rejectCandidates,
+    ideas,
+    actionItems,
+    weeklyReports,
+    lastScan,
+    counts,
+    settingsSummary,
+    notificationSummary
+  ] = await Promise.all([
+    getRepositoryPage(),
+    getRepositoryFilterOptions(),
+    getRadarRepositories(),
+    getRejectCandidates(),
     prisma.idea.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -433,18 +678,20 @@ export async function getDashboardData(): Promise<DashboardData> {
     getSettingsSummary(),
     getNotificationSummary()
   ]);
-  const mappedRepositories = repositories.map(mapRepository);
   const mappedIdeas = ideas.map(mapIdea);
   const mappedReports = weeklyReports.map(mapReport);
   const lastScanSummary = mapLastScan(lastScan);
 
   return {
-    repositories: mappedRepositories,
+    repositories: repositoryPage.items,
+    rejectCandidates,
+    repositoryPage,
+    repositoryFilterOptions,
     ideas: mappedIdeas,
     actionItems,
     weeklyReports: mappedReports,
     radarToday: buildRadarToday({
-      repositories: mappedRepositories,
+      repositories: radarRepositories,
       ideas: mappedIdeas,
       actionItems,
       lastScan: lastScanSummary,

@@ -1,13 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { RepositoryListItem } from "@/types/repository";
 import { Button, EmptyState } from "./ui";
 import type { RepoSortKey } from "./repo-filter-bar";
 import { RepoRow } from "./repo-row";
-
-const REPOSITORY_PAGE_SIZE = 100;
 
 export type RepoCardCallbacks = {
   onToggle: (repoId: string) => void;
@@ -27,6 +25,9 @@ export function RepoListView({
   repositories,
   filterBar,
   sortKey,
+  totalCount,
+  hasMore,
+  onLoadMore,
   expandedRepoId,
   isPending,
   callbacks
@@ -34,16 +35,14 @@ export function RepoListView({
   repositories: RepositoryListItem[];
   filterBar: React.ReactNode;
   sortKey: RepoSortKey;
+  totalCount: number;
+  hasMore: boolean;
+  onLoadMore: () => void;
   expandedRepoId: string | null;
   isPending: boolean;
   callbacks: RepoCardCallbacks;
 }) {
   const sortedRepositories = useMemo(() => sortRepositories(repositories, sortKey), [repositories, sortKey]);
-  const listSignature = `${sortKey}:${repositories.length}:${repositories[0]?.id ?? ""}:${repositories[repositories.length - 1]?.id ?? ""}`;
-  const [pagination, setPagination] = useState({ signature: listSignature, count: REPOSITORY_PAGE_SIZE });
-  const visibleCount = pagination.signature === listSignature ? pagination.count : REPOSITORY_PAGE_SIZE;
-  const visibleRepositories = sortedRepositories.slice(0, visibleCount);
-  const hasMoreRepositories = visibleRepositories.length < sortedRepositories.length;
 
   return (
     <section className="space-y-3">
@@ -60,7 +59,7 @@ export function RepoListView({
             <span className="text-right">Akcje</span>
           </div>
           <div className="divide-y divide-border-subtle">
-            {visibleRepositories.map((repo) => (
+            {sortedRepositories.map((repo) => (
               <RepoRow
                 key={repo.id}
                 repo={repo}
@@ -80,23 +79,19 @@ export function RepoListView({
               />
             ))}
           </div>
-          {hasMoreRepositories ? (
+          {hasMore ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-inset px-3 py-3">
               <p className="text-sm text-muted-foreground">
-                Pokazano <span className="font-semibold text-foreground">{visibleRepositories.length}</span> z{" "}
-                <span className="font-semibold text-foreground">{sortedRepositories.length}</span> repozytoriów.
+                Pokazano <span className="font-semibold text-foreground">{sortedRepositories.length}</span> z{" "}
+                <span className="font-semibold text-foreground">{totalCount}</span> repozytoriów.
               </p>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() =>
-                  setPagination({
-                    signature: listSignature,
-                    count: Math.min(visibleCount + REPOSITORY_PAGE_SIZE, sortedRepositories.length)
-                  })
-                }
+                onClick={onLoadMore}
+                disabled={isPending}
               >
-                Pokaż kolejne {Math.min(REPOSITORY_PAGE_SIZE, sortedRepositories.length - visibleRepositories.length)}
+                Pokaż kolejne
               </Button>
             </div>
           ) : null}

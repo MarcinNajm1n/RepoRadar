@@ -30,10 +30,7 @@ export function buildDailyBriefingMarkdown(data: DashboardData, now = new Date()
   const topRepositories = data.radarToday.topRepositories.slice(0, 3);
   const businessCandidates = data.radarToday.businessCandidates.slice(0, 3);
   const actionItems = data.radarToday.actionItems.slice(0, 3);
-  const rejectCandidates = data.repositories
-    .filter((repo) => !repo.isDeletedFromView && repo.status !== "IGNORED" && (repo.isOldRepo || repo.trendScore < 45))
-    .sort((a, b) => a.trendScore - b.trendScore || b.ageMonths - a.ageMonths)
-    .slice(0, 3);
+  const rejectCandidates = data.rejectCandidates.slice(0, 3);
   const decisions = [
     ...data.radarToday.alerts.map((alert) => `${alert.level.toUpperCase()}: ${alert.title}`),
     ...data.radarToday.businessCandidates

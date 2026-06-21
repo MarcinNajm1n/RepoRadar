@@ -125,6 +125,7 @@ describe("buildDailyBriefingMarkdown", () => {
     const task = actionItem();
     const data = {
       repositories: [topRepo, weakRepo],
+      rejectCandidates: [weakRepo],
       radarToday: {
         topRepositories: [topRepo],
         businessCandidates: [candidate],

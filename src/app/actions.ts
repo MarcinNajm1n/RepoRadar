@@ -8,8 +8,9 @@ import {
   snoozeActionItem,
   updateActionItem
 } from "@/lib/db/action-items";
-import { getEvidenceSourcesForReport, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
+import { getEvidenceSourcesForReport, getRepositoryPage, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
 import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
+import type { RepositoryPageInput } from "@/types/repository";
 import { runDailyScan } from "@/lib/github/scanner";
 import { exportIdeasCsv } from "@/lib/exports/ideas-csv";
 import { clearExpiredExternalCache, clearOldNotificationLogs, pruneOldSnapshots } from "@/lib/maintenance";
@@ -40,6 +41,10 @@ export async function updateStatusAction(repoId: string, status: string) {
   await updateRepositoryStatus(repoId, status);
   revalidatePath("/");
   return { ok: true };
+}
+
+export async function getRepositoryPageAction(input: RepositoryPageInput) {
+  return getRepositoryPage(input);
 }
 
 export async function generateReportAction(repoId: string, force = false) {
