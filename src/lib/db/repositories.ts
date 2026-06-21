@@ -8,6 +8,7 @@ import { getActionItems } from "./action-items";
 import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary } from "./ai-jobs";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
+import { getObservabilitySummary } from "./observability";
 import { recordRepositoryStatusAudit } from "./repository-audit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import type { ActionItemListItem } from "@/types/action-item";
@@ -461,11 +462,12 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const [persistedSettings, githubRateLimit, aiJobSummary, aiCostSummary] = await Promise.all([
+  const [persistedSettings, githubRateLimit, aiJobSummary, aiCostSummary, observability] = await Promise.all([
     getAllSettings(),
     getStoredGitHubRateLimitSnapshot(),
     getAiJobSummary(),
-    getAiCostSummary()
+    getAiCostSummary(),
+    getObservabilitySummary()
   ]);
 
   return {
@@ -485,6 +487,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     persistedSettingCount: Object.keys(persistedSettings).length,
     aiJobSummary,
     aiCostSummary,
+    observability,
     githubRateLimit
   };
 }

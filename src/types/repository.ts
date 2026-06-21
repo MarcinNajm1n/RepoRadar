@@ -143,6 +143,35 @@ export type RadarNextAction = {
   taskId: string | null;
 };
 
+export type ObservabilitySummary = {
+  lastScan: {
+    status: string;
+    startedAt: string;
+    finishedAt: string | null;
+    durationMs: number | null;
+    reposFound: number;
+    reposUpdated: number;
+    errorMessage: string | null;
+  } | null;
+  recentScanCount: number;
+  failedScans24h: number;
+  averageScanDurationMs: number | null;
+  totalRepositories: number;
+  openAiCacheEntries: number;
+  externalResearchCacheEntries: number;
+  expiredExternalResearchCacheEntries: number;
+  marketResearchRuns24h: number;
+  marketResearchSources24h: number;
+  githubRuntime: {
+    requests: number;
+    cacheHits: number;
+    notModifiedHits: number;
+    cacheWrites: number;
+    cacheEntries: number;
+    maxEntries: number;
+  };
+};
+
 export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
@@ -160,6 +189,7 @@ export type SettingsSummary = {
   persistedSettingCount: number;
   aiJobSummary: AiJobSummary;
   aiCostSummary: AiCostSummary;
+  observability: ObservabilitySummary;
   githubRateLimit: {
     checkedAt: string;
     status: number;

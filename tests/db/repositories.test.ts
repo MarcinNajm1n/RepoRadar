@@ -143,6 +143,26 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
         research: "0 calls"
       }
     },
+    observability: {
+      lastScan: null,
+      recentScanCount: 0,
+      failedScans24h: 0,
+      averageScanDurationMs: null,
+      totalRepositories: 0,
+      openAiCacheEntries: 0,
+      externalResearchCacheEntries: 0,
+      expiredExternalResearchCacheEntries: 0,
+      marketResearchRuns24h: 0,
+      marketResearchSources24h: 0,
+      githubRuntime: {
+        requests: 0,
+        cacheHits: 0,
+        notModifiedHits: 0,
+        cacheWrites: 0,
+        cacheEntries: 0,
+        maxEntries: 200
+      }
+    },
     githubRateLimit: null,
     ...overrides
   };

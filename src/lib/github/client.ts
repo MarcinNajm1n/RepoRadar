@@ -21,6 +21,12 @@ type CachedGitHubResponse = {
 };
 
 const conditionalResponseCache = new Map<string, CachedGitHubResponse>();
+const runtimeCacheStats = {
+  requests: 0,
+  cacheHits: 0,
+  notModifiedHits: 0,
+  cacheWrites: 0
+};
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -82,6 +88,7 @@ function writeCachedResponse(cacheKey: string, response: Response, body: string)
     etag,
     lastModified
   });
+  runtimeCacheStats.cacheWrites += 1;
 }
 
 function formatRateLimitReset(response: Response) {
@@ -120,9 +127,12 @@ export class GitHubClient {
         },
         cache: "no-store"
       });
+      runtimeCacheStats.requests += 1;
       captureGitHubRateLimit(response);
 
       if (response.status === 304 && cached) {
+        runtimeCacheStats.cacheHits += 1;
+        runtimeCacheStats.notModifiedHits += 1;
         return readCachedResponse<T>(cached, accept);
       }
 
@@ -189,6 +199,22 @@ export class GitHubClient {
       throw error;
     }
   }
+}
+
+export function getGitHubRuntimeCacheStats() {
+  return {
+    ...runtimeCacheStats,
+    cacheEntries: conditionalResponseCache.size,
+    maxEntries: MAX_CONDITIONAL_CACHE_ENTRIES
+  };
+}
+
+export function clearGitHubRuntimeCacheStats() {
+  runtimeCacheStats.requests = 0;
+  runtimeCacheStats.cacheHits = 0;
+  runtimeCacheStats.notModifiedHits = 0;
+  runtimeCacheStats.cacheWrites = 0;
+  conditionalResponseCache.clear();
 }
 
 export async function searchGitHubRepositories(queries: GitHubSearchQuerySpec[], maxPages = 1) {

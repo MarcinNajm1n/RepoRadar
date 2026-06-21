@@ -138,6 +138,26 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
+      <SettingsPanel title="Observability">
+        <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
+          <InfoItem label="Ostatni scan" value={formatLastScan(settingsSummary.observability)} />
+          <InfoItem label="Czas ostatniego skanu" value={formatDuration(settingsSummary.observability.lastScan?.durationMs ?? null)} />
+          <InfoItem label="Sredni czas skanu" value={formatDuration(settingsSummary.observability.averageScanDurationMs)} />
+          <InfoItem label="Bledy scan 24h" value={String(settingsSummary.observability.failedScans24h)} />
+          <InfoItem label="Repo aktywne" value={String(settingsSummary.observability.totalRepositories)} />
+          <InfoItem label="Repos scanned" value={formatScanRepos(settingsSummary.observability)} />
+          <InfoItem label="GitHub calls runtime" value={String(settingsSummary.observability.githubRuntime.requests)} />
+          <InfoItem label="GitHub ETag hits" value={formatGitHubCacheStats(settingsSummary.observability.githubRuntime)} />
+          <InfoItem label="OpenAI cache" value={String(settingsSummary.observability.openAiCacheEntries)} />
+          <InfoItem label="Research cache" value={formatResearchCache(settingsSummary.observability)} />
+          <InfoItem label="Research runs 24h" value={String(settingsSummary.observability.marketResearchRuns24h)} />
+          <InfoItem label="Research sources 24h" value={String(settingsSummary.observability.marketResearchSources24h)} />
+        </div>
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Liczniki GitHub calls i ETag hits sa runtime-only dla obecnego procesu Next.js. Scan duration, cache i rate limit pochodza z lokalnej bazy.
+        </p>
+      </SettingsPanel>
+
       <SettingsPanel title="Dane i maintenance">
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onOpenDailyBriefing} disabled={isPending}>
@@ -227,4 +247,43 @@ function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
 
 function formatAiJobSummary(summary: SettingsSummary["aiJobSummary"]) {
   return `${summary.running} w toku, ${summary.done24h} OK / 24h, ${summary.failed24h} bledow / 24h`;
+}
+
+function formatDuration(ms: number | null) {
+  if (ms === null) {
+    return "brak danych";
+  }
+
+  if (ms < 1000) {
+    return `${ms} ms`;
+  }
+
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${seconds % 60}s`;
+}
+
+function formatLastScan(observability: SettingsSummary["observability"]) {
+  if (!observability.lastScan) {
+    return "brak danych";
+  }
+
+  return `${observability.lastScan.status}, ${new Date(observability.lastScan.startedAt).toLocaleString("pl-PL")}`;
+}
+
+function formatScanRepos(observability: SettingsSummary["observability"]) {
+  const scan = observability.lastScan;
+  return scan ? `${scan.reposUpdated}/${scan.reposFound}` : "brak danych";
+}
+
+function formatGitHubCacheStats(stats: SettingsSummary["observability"]["githubRuntime"]) {
+  return `${stats.cacheHits} hit, ${stats.cacheEntries}/${stats.maxEntries} entries`;
+}
+
+function formatResearchCache(observability: SettingsSummary["observability"]) {
+  return `${observability.externalResearchCacheEntries} total, ${observability.expiredExternalResearchCacheEntries} expired`;
 }

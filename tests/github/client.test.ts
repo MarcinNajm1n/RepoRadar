@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GitHubClient, searchGitHubRepositories } from "../../src/lib/github/client";
+import { clearGitHubRuntimeCacheStats, getGitHubRuntimeCacheStats, GitHubClient, searchGitHubRepositories } from "../../src/lib/github/client";
 import { clearGitHubRateLimitSnapshot, getLastGitHubRateLimitSnapshot } from "../../src/lib/github/rate-limit";
 import type { GitHubRepositoryItem } from "../../src/lib/github/types";
 
@@ -7,6 +7,7 @@ const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  clearGitHubRuntimeCacheStats();
   clearGitHubRateLimitSnapshot();
   vi.restoreAllMocks();
   vi.useRealTimers();
@@ -88,6 +89,13 @@ describe("GitHubClient", () => {
     expect(second.items[0].full_name).toBe("owner/strong");
     expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toMatchObject({
       "If-None-Match": '"search-v1"'
+    });
+    expect(getGitHubRuntimeCacheStats()).toMatchObject({
+      requests: 2,
+      cacheHits: 1,
+      notModifiedHits: 1,
+      cacheWrites: 1,
+      cacheEntries: 1
     });
   });
 
