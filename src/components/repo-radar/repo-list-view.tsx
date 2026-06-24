@@ -4,7 +4,6 @@ import type React from "react";
 import { useMemo } from "react";
 import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { Button, EmptyState, SkeletonBlock, SkeletonText } from "./ui";
-import type { RepoSortKey } from "./repo-filter-bar";
 import { RepoRow } from "./repo-row";
 import { RepoComparePanel } from "./repo-compare-panel";
 import { RepoInboxStrip } from "./repo-inbox-strip";
@@ -28,7 +27,6 @@ export type RepoCardCallbacks = {
 export function RepoListView({
   repositories,
   filterBar,
-  sortKey,
   totalCount,
   hasMore,
   onLoadMore,
@@ -49,7 +47,6 @@ export function RepoListView({
 }: {
   repositories: RepositoryListItem[];
   filterBar: React.ReactNode;
-  sortKey: RepoSortKey;
   totalCount: number;
   hasMore: boolean;
   onLoadMore: () => void;
@@ -68,10 +65,9 @@ export function RepoListView({
   onClearCompare: () => void;
   callbacks: RepoCardCallbacks;
 }) {
-  const sortedRepositories = useMemo(() => sortRepositories(repositories, sortKey), [repositories, sortKey]);
   const compareRepos = useMemo(
-    () => selectedCompareRepoIds.map((repoId) => sortedRepositories.find((repo) => repo.id === repoId)).filter((repo): repo is RepositoryListItem => Boolean(repo)),
-    [selectedCompareRepoIds, sortedRepositories]
+    () => selectedCompareRepoIds.map((repoId) => repositories.find((repo) => repo.id === repoId)).filter((repo): repo is RepositoryListItem => Boolean(repo)),
+    [selectedCompareRepoIds, repositories]
   );
 
   return (
@@ -80,7 +76,7 @@ export function RepoListView({
 
       {showInbox ? (
         <RepoInboxStrip
-          repositories={sortedRepositories}
+          repositories={repositories}
           isPending={isPending}
           onOpen={callbacks.onToggle}
           onSave={callbacks.onSave}
@@ -98,9 +94,9 @@ export function RepoListView({
         onClear={onClearCompare}
       />
 
-      {isLoading && !sortedRepositories.length ? (
+      {isLoading && !repositories.length ? (
         <RepoListSkeleton />
-      ) : sortedRepositories.length ? (
+      ) : repositories.length ? (
         <div className="overflow-hidden rounded-md border border-border-subtle bg-surface-panel">
           <div className="hidden border-b border-border-subtle bg-surface-inset px-3 py-2 text-xs font-semibold uppercase text-muted-foreground lg:grid lg:grid-cols-[minmax(0,1fr)_92px_92px_92px_112px_150px]">
             <span>Repozytorium</span>
@@ -111,7 +107,7 @@ export function RepoListView({
             <span className="text-right">Akcje</span>
           </div>
           <div className="divide-y divide-border-subtle">
-            {sortedRepositories.map((repo) => (
+            {repositories.map((repo) => (
               <RepoRow
                 key={repo.id}
                 repo={repo}
@@ -140,7 +136,7 @@ export function RepoListView({
           {hasMore ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-inset px-3 py-3">
               <p className="text-sm text-muted-foreground">
-                Pokazano <span className="font-semibold text-foreground">{sortedRepositories.length}</span> z{" "}
+                Pokazano <span className="font-semibold text-foreground">{repositories.length}</span> z{" "}
                 <span className="font-semibold text-foreground">{totalCount}</span> repozytoriow.
               </p>
               <Button variant="secondary" size="sm" onClick={onLoadMore} disabled={isPending}>
@@ -224,51 +220,4 @@ function RepoListLoadingFooter() {
       </div>
     </div>
   );
-}
-
-function sortRepositories(repositories: RepositoryListItem[], sortKey: RepoSortKey) {
-  return repositories
-    .map((repo, index) => ({ repo, index }))
-    .sort((left, right) => {
-      const result = compareRepositories(left.repo, right.repo, sortKey);
-      return result === 0 ? left.index - right.index : result;
-    })
-    .map(({ repo }) => repo);
-}
-
-function compareRepositories(a: RepositoryListItem, b: RepositoryListItem, sortKey: RepoSortKey) {
-  switch (sortKey) {
-    case "stars_desc":
-      return descending(a.starsCurrent, b.starsCurrent) || descending(a.trendScore, b.trendScore);
-    case "growth7d_desc":
-      return descending(nullableNumber(a.growth7d), nullableNumber(b.growth7d)) || descending(a.trendScore, b.trendScore);
-    case "pushed_desc":
-      return descending(dateValue(a.pushedAt), dateValue(b.pushedAt)) || descending(a.trendScore, b.trendScore);
-    case "first_seen_desc":
-      return descending(dateValue(a.firstSeenAt), dateValue(b.firstSeenAt)) || descending(a.trendScore, b.trendScore);
-    case "name_asc":
-      return a.fullName.localeCompare(b.fullName, "pl");
-    case "trend_desc":
-    default:
-      return descending(a.trendScore, b.trendScore) || descending(a.initialMomentumScore, b.initialMomentumScore);
-  }
-}
-
-function descending(a: number, b: number) {
-  if (a === b) {
-    return 0;
-  }
-  return b > a ? 1 : -1;
-}
-
-function nullableNumber(value: number | null | undefined) {
-  return value ?? Number.NEGATIVE_INFINITY;
-}
-
-function dateValue(value: string | null | undefined) {
-  if (!value) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
 }

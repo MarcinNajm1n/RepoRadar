@@ -495,7 +495,6 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               onReset={resetRepoFilters}
             />
           }
-          sortKey={repoSortKey}
           totalCount={repositoryPage.total}
           hasMore={repositoryPage.hasMore}
           onLoadMore={loadMoreRepositories}
