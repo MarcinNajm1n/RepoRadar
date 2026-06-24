@@ -1,9 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import type React from "react";
 import { Bell, CalendarClock, Download, Moon, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { NotificationSummary, SettingsSummary } from "@/types/repository";
 import { Badge, Button, SectionCard, SkeletonBlock, SkeletonText, Switch } from "./ui";
+
+const settingsSections = [
+  { key: "configuration", label: "Konfiguracja" },
+  { key: "ai-costs", label: "AI i koszty" },
+  { key: "integrations", label: "Integracje" },
+  { key: "observability", label: "Observability" },
+  { key: "maintenance", label: "Maintenance" }
+] as const;
+
+type SettingsSectionKey = (typeof settingsSections)[number]["key"];
 
 export function SettingsView({
   settingsSummary,
@@ -32,6 +44,8 @@ export function SettingsView({
   onPruneSnapshots: () => void;
   onRetryLoad: () => void;
 }) {
+  const [activeSection, setActiveSection] = useState<SettingsSectionKey>("configuration");
+
   if (!settingsSummary || !notificationSummary) {
     return (
       <section className="space-y-4" aria-busy={isLoading}>
@@ -69,7 +83,13 @@ export function SettingsView({
 
   return (
     <section className="space-y-4">
-      <SectionCard title="Ustawienia MVP" description="Konfiguracja lokalnej instancji i bezpieczne akcje utrzymaniowe.">
+      <SettingsSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
+
+      <SectionCard
+        title="Ustawienia MVP"
+        description="Konfiguracja lokalnej instancji i bezpieczne akcje utrzymaniowe."
+        className={activeSection === "configuration" ? undefined : "hidden"}
+      >
         <div className="grid gap-3 lg:grid-cols-2">
           <SettingToggle
             id="setting-auto-weekly-ideas"
@@ -91,7 +111,7 @@ export function SettingsView({
       </SectionCard>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SettingsPanel title="Status konfiguracji">
+        <SettingsPanel title="Status konfiguracji" className={activeSection === "configuration" ? undefined : "hidden"}>
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoItem label="GitHub token" value={settingsSummary.githubTokenConfigured ? "skonfigurowany" : "brak"} />
             <InfoItem label="GitHub API limit" value={formatGitHubRateLimit(settingsSummary.githubRateLimit)} />
@@ -104,7 +124,7 @@ export function SettingsView({
           </p>
         </SettingsPanel>
 
-        <SettingsPanel title="Ogólne">
+        <SettingsPanel title="Ogólne" className={activeSection === "configuration" ? undefined : "hidden"}>
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoItem label="UI" value="Polski, desktop-first" />
             <InfoItem label="Motyw" value="preferencje systemu" />
@@ -117,7 +137,7 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
-        <SettingsPanel title="Business Research">
+        <SettingsPanel title="Business Research" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoItem label="Market research" value={String(settingsSummary.marketResearchEnabled)} />
             <InfoItem label="Tryb" value={settingsSummary.marketResearchMode} />
@@ -132,7 +152,7 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
-        <SettingsPanel title="Evidence, cache i notyfikacje">
+        <SettingsPanel title="Evidence, cache i notyfikacje" className={activeSection === "integrations" ? "xl:col-span-2" : "hidden"}>
           <div className="grid gap-2 sm:grid-cols-2">
             <InfoItem label="Cache TTL" value={`${settingsSummary.externalResearchCacheTtlHours}h`} />
             <InfoItem label="Sent 24h" value={String(notificationSummary.sent24h)} />
@@ -155,7 +175,7 @@ export function SettingsView({
         </SettingsPanel>
       </div>
 
-      <SettingsPanel title="Źródła zewnętrzne">
+      <SettingsPanel title="Źródła zewnętrzne" className={activeSection === "integrations" ? undefined : "hidden"}>
         <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-3">
           <InfoItem label="Market research" value="MARKET_RESEARCH_ENABLED" />
           <InfoItem label="Tryb domyślny" value="MARKET_RESEARCH_MODE=light" />
@@ -177,7 +197,7 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
-      <SettingsPanel title="Observability">
+      <SettingsPanel title="Observability" className={activeSection === "observability" ? undefined : "hidden"}>
         <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
           <InfoItem label="Ostatni scan" value={formatLastScan(settingsSummary.observability)} />
           <InfoItem label="Czas ostatniego skanu" value={formatDuration(settingsSummary.observability.lastScan?.durationMs ?? null)} />
@@ -197,7 +217,7 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
-      <SettingsPanel title="Graphify maintenance">
+      <SettingsPanel title="Graphify maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
         <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
           <InfoItem label="Status grafu" value={settingsSummary.graphify.status} />
           <InfoItem label="Nodes" value={String(settingsSummary.graphify.nodeCount)} />
@@ -217,7 +237,7 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
-      <SettingsPanel title="Dane i maintenance">
+      <SettingsPanel title="Dane i maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onOpenDailyBriefing} disabled={isPending}>
             <CalendarClock className="h-4 w-4" /> Daily briefing
@@ -234,6 +254,41 @@ export function SettingsView({
         </div>
       </SettingsPanel>
     </section>
+  );
+}
+
+function SettingsSectionNav({
+  activeSection,
+  onSectionChange
+}: {
+  activeSection: SettingsSectionKey;
+  onSectionChange: (section: SettingsSectionKey) => void;
+}) {
+  return (
+    <nav className="rounded-lg border border-border-subtle bg-surface-panel p-2 shadow-soft" aria-label="Sekcje ustawien">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {settingsSections.map((section) => {
+          const isActive = activeSection === section.key;
+
+          return (
+            <button
+              key={section.key}
+              type="button"
+              className={cn(
+                "rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-sm font-medium transition duration-fast ease-interface hover:bg-surface-inset",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                isActive && "border-primary/30 bg-accent text-accent-foreground"
+              )}
+              aria-pressed={isActive}
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => onSectionChange(section.key)}
+            >
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -272,9 +327,9 @@ function SettingToggle({
   );
 }
 
-function SettingsPanel({ title, children }: { title: string; children: React.ReactNode }) {
+function SettingsPanel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
+    <section className={cn("rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft", className)}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold">{title}</h3>
         <Badge tone="neutral">{title === "Dane i maintenance" ? "local" : "status"}</Badge>

@@ -76,6 +76,15 @@ test("keeps idea and settings navigation reachable", async ({ page }) => {
   await expect(page.getByText("Ustawienia MVP")).toBeVisible();
   await expect(page.getByText("Status konfiguracji")).toBeVisible();
   await expect(page.getByRole("switch").first()).toBeVisible();
+  await page.getByRole("button", { name: "AI i koszty" }).click();
+  await expect(page.getByText("Business Research")).toBeVisible();
+  await page.getByRole("button", { name: "Integracje" }).click();
+  await expect(page.getByText("Źródła zewnętrzne")).toBeVisible();
+  await page.getByRole("button", { name: "Observability" }).click();
+  await expect(page.getByText("Sredni czas skanu")).toBeVisible();
+  await page.getByRole("button", { name: "Maintenance" }).click();
+  await expect(page.getByText("Graphify maintenance")).toBeVisible();
+  await expect(page.getByText("Dane i maintenance")).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
 });
