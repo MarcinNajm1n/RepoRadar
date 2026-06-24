@@ -38,6 +38,9 @@ function repositoryRecord(overrides: Record<string, unknown> = {}) {
     trendScore: 72,
     relevanceScore: 90,
     initialMomentumScore: 77,
+    growth24h: null,
+    growth7d: null,
+    growthPercent7d: null,
     scoreBreakdownJson: JSON.stringify({
       absoluteGrowthPoints: 10,
       percentageGrowthPoints: 0,
@@ -82,6 +85,32 @@ describe("mapRepository", () => {
     expect(mapped.discoveryProfiles).toEqual([]);
     expect(mapped.scoreBreakdown.absoluteGrowthPoints).toBe(0);
     expect(mapped.scoreBreakdown.usedInitialMomentumFallback).toBe(false);
+  });
+
+  it("prefers denormalized growth fields and falls back to the latest snapshot", () => {
+    const denormalized = mapRepository(
+      repositoryRecord({
+        growth24h: 3,
+        growth7d: 30,
+        growthPercent7d: 12.5,
+        snapshots: [{ growth24h: 1, growth7d: 10, growthPercent7d: 4.5 }]
+      })
+    );
+    const fallback = mapRepository(
+      repositoryRecord({
+        growth24h: null,
+        growth7d: null,
+        growthPercent7d: null,
+        snapshots: [{ growth24h: 2, growth7d: 20, growthPercent7d: 8.5 }]
+      })
+    );
+
+    expect(denormalized.growth24h).toBe(3);
+    expect(denormalized.growth7d).toBe(30);
+    expect(denormalized.growthPercent7d).toBe(12.5);
+    expect(fallback.growth24h).toBe(2);
+    expect(fallback.growth7d).toBe(20);
+    expect(fallback.growthPercent7d).toBe(8.5);
   });
 
   it("maps evidence quality fields safely", () => {

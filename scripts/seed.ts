@@ -211,6 +211,7 @@ async function main() {
     const status = demo.statusOverride ?? score.status;
     const shortSummaryPl =
       demo.shortSummaryPl === undefined ? "Demo: krotki opis po polsku wygenerowany jako seed data do portfolio." : demo.shortSummaryPl;
+    const growth24h = demo.growth7d === null ? null : Math.round(demo.growth7d / 7);
 
     const repository = await prisma.repository.upsert({
       where: { githubId: demo.githubId },
@@ -227,6 +228,9 @@ async function main() {
         trendScore: score.trendScore,
         relevanceScore: score.relevanceScore,
         initialMomentumScore: score.initialMomentumScore,
+        growth24h,
+        growth7d: demo.growth7d,
+        growthPercent7d: demo.growthPercent7d,
         scoreBreakdownJson: JSON.stringify(score.scoreBreakdown),
         shortSummaryPl,
         readmeExcerpt: demo.readmeExcerpt,
@@ -258,6 +262,9 @@ async function main() {
         trendScore: score.trendScore,
         relevanceScore: score.relevanceScore,
         initialMomentumScore: score.initialMomentumScore,
+        growth24h,
+        growth7d: demo.growth7d,
+        growthPercent7d: demo.growthPercent7d,
         scoreBreakdownJson: JSON.stringify(score.scoreBreakdown),
         source: "seed"
       }
@@ -272,7 +279,7 @@ async function main() {
         watchers: demo.watchersCurrent,
         openIssues: demo.openIssues,
         pushedAt: demo.pushedAt,
-        growth24h: demo.growth7d === null ? null : Math.round(demo.growth7d / 7),
+        growth24h,
         growth7d: demo.growth7d,
         growthPercent7d: demo.growthPercent7d
       }

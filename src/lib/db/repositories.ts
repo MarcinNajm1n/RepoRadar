@@ -63,6 +63,9 @@ const DEFAULT_SCORE_BREAKDOWN = {
 };
 
 type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[number] & {
+  growth24h?: number | null;
+  growth7d?: number | null;
+  growthPercent7d?: number | null;
   snapshots?: {
     growth24h: number | null;
     growth7d: number | null;
@@ -156,9 +159,9 @@ export function mapRepository(repository: RepositoryRecord): RepositoryListItem 
     scoreBreakdown: safeJsonParse(repository.scoreBreakdownJson, DEFAULT_SCORE_BREAKDOWN),
     discoveryProfiles: safeJsonParse<string[]>(repository.discoveryProfilesJson, []),
     source: repository.source,
-    growth24h: latestSnapshot?.growth24h ?? null,
-    growth7d: latestSnapshot?.growth7d ?? null,
-    growthPercent7d: latestSnapshot?.growthPercent7d ?? null
+    growth24h: repository.growth24h ?? latestSnapshot?.growth24h ?? null,
+    growth7d: repository.growth7d ?? latestSnapshot?.growth7d ?? null,
+    growthPercent7d: repository.growthPercent7d ?? latestSnapshot?.growthPercent7d ?? null
   };
 }
 
@@ -616,23 +619,14 @@ function buildRepositoryOrderBy(sortKey: string): Prisma.RepositoryOrderByWithRe
       return [{ pushedAt: { sort: "desc", nulls: "last" } }, { trendScore: "desc" }];
     case "first_seen_desc":
       return [{ firstSeenAt: "desc" }, { trendScore: "desc" }];
+    case "growth7d_desc":
+      return [{ growth7d: "desc" }, { trendScore: "desc" }];
     case "name_asc":
       return [{ fullName: "asc" }];
     case "trend_desc":
     default:
       return [{ trendScore: "desc" }, { initialMomentumScore: "desc" }, { starsCurrent: "desc" }];
   }
-}
-
-function compareByGrowth7d(a: RepositoryListItem, b: RepositoryListItem) {
-  const growthA = a.growth7d ?? Number.NEGATIVE_INFINITY;
-  const growthB = b.growth7d ?? Number.NEGATIVE_INFINITY;
-
-  if (growthA !== growthB) {
-    return growthB - growthA;
-  }
-
-  return b.trendScore - a.trendScore;
 }
 
 async function getRadarRepositories(limit = 25): Promise<RepositoryListItem[]> {
@@ -690,19 +684,6 @@ export async function getRepositoryPage(input: RepositoryPageInput = {}): Promis
   const normalized = normalizeRepositoryPageInput(input);
   const where = buildRepositoryWhere(normalized);
   const skip = (normalized.page - 1) * normalized.pageSize;
-
-  if (normalized.sortKey === "growth7d_desc") {
-    const [repositories, total] = await Promise.all([
-      prisma.repository.findMany({
-        where,
-        include: latestSnapshotInclude
-      }),
-      prisma.repository.count({ where })
-    ]);
-    const items = repositories.map(mapRepository).sort(compareByGrowth7d).slice(skip, skip + normalized.pageSize);
-
-    return buildRepositoryPage(items, total, normalized.page, normalized.pageSize);
-  }
 
   const [repositories, total] = await Promise.all([
     prisma.repository.findMany({

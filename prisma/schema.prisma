@@ -39,6 +39,9 @@ model Repository {
   trendScore        Int       @default(0)
   relevanceScore    Int       @default(0)
   initialMomentumScore Int    @default(0)
+  growth24h         Int?
+  growth7d          Int?
+  growthPercent7d   Float?
   scoreBreakdownJson String   @default("{}")
   discoveryProfilesJson String @default("[]")
   source            String    @default("github")
@@ -64,6 +67,7 @@ model Repository {
   @@index([isOldRepo])
   @@index([source])
   @@index([isDeletedFromView, trendScore])
+  @@index([isDeletedFromView, growth7d, trendScore])
   @@index([isDeletedFromView, status, trendScore])
   @@index([isDeletedFromView, primaryLanguage, trendScore])
   @@index([isOldRepo, isDeletedFromView, trendScore])
