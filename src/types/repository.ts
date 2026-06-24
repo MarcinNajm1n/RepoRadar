@@ -250,6 +250,18 @@ export type SettingsPanelData = {
   notificationSummary: NotificationSummary;
 };
 
+export type IdeasPanelData = {
+  ideas: IdeaListItem[];
+};
+
+export type TasksPanelData = {
+  actionItems: ActionItemListItem[];
+};
+
+export type WeeklyReportsPanelData = {
+  weeklyReports: ReportListItem[];
+};
+
 export type DashboardLastScan = {
   startedAt: string;
   finishedAt: string | null;
@@ -280,9 +292,6 @@ export type DashboardData = {
   rejectCandidates: RepositoryListItem[];
   repositoryPage: RepositoryPage;
   repositoryFilterOptions: RepositoryFilterOptions;
-  ideas: IdeaListItem[];
-  actionItems: ActionItemListItem[];
-  weeklyReports: ReportListItem[];
   radarToday: RadarTodayData;
   counts: {
     all: number;
@@ -297,6 +306,7 @@ export type DashboardData = {
     dismissedIdeas: number;
     old: number;
     hot: number;
+    actionItems: number;
   };
   lastScan: DashboardLastScan;
 };

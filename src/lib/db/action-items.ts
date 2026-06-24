@@ -136,7 +136,7 @@ function buildUpdateData(input: UpdateActionItemInput) {
   };
 }
 
-export async function getActionItems(limit = 50) {
+export async function getActionItems(limit: number | null = 50) {
   const rows = await prisma.actionItem.findMany({
     where: {
       status: {
@@ -144,7 +144,7 @@ export async function getActionItems(limit = 50) {
       }
     },
     orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
-    take: limit,
+    ...(limit === null ? {} : { take: limit }),
     include: {
       repository: { select: { fullName: true, url: true } },
       idea: { select: { title: true } },

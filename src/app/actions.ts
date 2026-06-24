@@ -11,8 +11,11 @@ import {
 import { runAiJob } from "@/lib/db/ai-jobs";
 import {
   getEvidenceSourcesForReport,
+  getIdeasPanelData,
   getRepositoryPage,
   getSettingsPanelData,
+  getTasksPanelData,
+  getWeeklyReportsPanelData,
   updateIdeaStatus,
   updateRepositoryStatus
 } from "@/lib/db/repositories";
@@ -63,6 +66,18 @@ export async function getRepositoryTimelineAction(repoId: string) {
 
 export async function getSettingsPanelDataAction() {
   return getSettingsPanelData();
+}
+
+export async function getIdeasPanelDataAction() {
+  return getIdeasPanelData();
+}
+
+export async function getTasksPanelDataAction() {
+  return getTasksPanelData();
+}
+
+export async function getWeeklyReportsPanelDataAction() {
+  return getWeeklyReportsPanelData();
 }
 
 export async function generateReportAction(repoId: string, force = false) {

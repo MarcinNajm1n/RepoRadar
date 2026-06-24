@@ -5,7 +5,7 @@ import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
 import type { IdeaStatus } from "@/types/idea-status";
-import { getActionItems } from "./action-items";
+import { getActionItems, getActiveActionItems } from "./action-items";
 import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary } from "./ai-jobs";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
@@ -20,6 +20,7 @@ import type {
   DashboardSettingsStatus,
   EvidenceSourceItem,
   IdeaListItem,
+  IdeasPanelData,
   NotificationLogItem,
   NotificationSummary,
   RadarNextAction,
@@ -30,7 +31,9 @@ import type {
   RepositoryPageInput,
   RepositoryListItem,
   SettingsPanelData,
-  SettingsSummary
+  SettingsSummary,
+  TasksPanelData,
+  WeeklyReportsPanelData
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
 import type { Prisma, Repository } from "@prisma/client";
@@ -64,6 +67,21 @@ const DEFAULT_SCORE_BREAKDOWN = {
   initialMomentumPoints: 0,
   usedInitialMomentumFallback: false
 };
+
+const ideaListInclude = {
+  repository: { select: { fullName: true } },
+  marketResearchSources: {
+    orderBy: [{ sourceRank: "desc" }, { sourceConfidence: "desc" }, { relevanceScore: "desc" }, { retrievedAt: "desc" }],
+    take: 10
+  }
+} satisfies Prisma.IdeaInclude;
+
+const ideaOpportunityOrderBy = [
+  { opportunityScore: "desc" },
+  { confidenceScore: "desc" },
+  { usefulnessScore: "desc" },
+  { createdAt: "desc" }
+] satisfies Prisma.IdeaOrderByWithRelationInput[];
 
 type RepositoryRecord = Awaited<ReturnType<typeof prisma.repository.findMany>>[number] & {
   growth24h?: number | null;
@@ -556,6 +574,36 @@ export async function getSettingsPanelData(): Promise<SettingsPanelData> {
   };
 }
 
+export async function getIdeasPanelData(): Promise<IdeasPanelData> {
+  const ideas = await prisma.idea.findMany({
+    orderBy: { createdAt: "desc" },
+    include: ideaListInclude
+  });
+
+  return {
+    ideas: ideas.map(mapIdea)
+  };
+}
+
+export async function getTasksPanelData(): Promise<TasksPanelData> {
+  const actionItems = await getActionItems(null);
+
+  return {
+    actionItems
+  };
+}
+
+export async function getWeeklyReportsPanelData(): Promise<WeeklyReportsPanelData> {
+  const weeklyReports = await prisma.report.findMany({
+    where: { type: "weekly" },
+    orderBy: { createdAt: "desc" }
+  });
+
+  return {
+    weeklyReports: weeklyReports.map(mapReport)
+  };
+}
+
 function buildRepositoryPage(items: RepositoryListItem[], total: number, page = DEFAULT_REPOSITORY_PAGE, pageSize = DEFAULT_REPOSITORY_PAGE_SIZE): RepositoryPage {
   return {
     items,
@@ -709,6 +757,30 @@ async function getRejectCandidates(limit = 3): Promise<RepositoryListItem[]> {
   return repositories.map(mapRepository);
 }
 
+async function getRadarIdeas(limit = 5): Promise<IdeaListItem[]> {
+  const [businessCandidates, ideasToDevelop] = await Promise.all([
+    prisma.idea.findMany({
+      where: { status: IDEA_STATUS.CANDIDATE },
+      orderBy: ideaOpportunityOrderBy,
+      take: limit,
+      include: ideaListInclude
+    }),
+    prisma.idea.findMany({
+      where: { status: { in: [...FULL_IDEA_STATUSES, IDEA_STATUS.SAVED] } },
+      orderBy: ideaOpportunityOrderBy,
+      take: limit,
+      include: ideaListInclude
+    })
+  ]);
+  const byId = new Map<string, IdeaListItem>();
+
+  for (const idea of [...businessCandidates, ...ideasToDevelop]) {
+    byId.set(idea.id, mapIdea(idea));
+  }
+
+  return [...byId.values()];
+}
+
 export async function getRepositoryPage(input: RepositoryPageInput = {}): Promise<RepositoryPage> {
   const normalized = normalizeRepositoryPageInput(input);
   const where = buildRepositoryWhere(normalized);
@@ -764,9 +836,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     repositoryFilterOptions,
     radarRepositories,
     rejectCandidates,
-    ideas,
-    actionItems,
-    weeklyReports,
+    radarIdeas,
+    radarActionItems,
     lastScan,
     counts,
     settingsStatus,
@@ -776,21 +847,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     getRepositoryFilterOptions(),
     getRadarRepositories(),
     getRejectCandidates(),
-    prisma.idea.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        repository: { select: { fullName: true } },
-        marketResearchSources: {
-          orderBy: [{ sourceRank: "desc" }, { sourceConfidence: "desc" }, { relevanceScore: "desc" }, { retrievedAt: "desc" }],
-          take: 10
-        }
-      }
-    }),
-    getActionItems(),
-    prisma.report.findMany({
-      where: { type: "weekly" },
-      orderBy: { createdAt: "desc" }
-    }),
+    getRadarIdeas(),
+    getActiveActionItems(25),
     prisma.scanRun.findFirst({
       orderBy: { startedAt: "desc" }
     }),
@@ -798,8 +856,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     getDashboardSettingsStatus(),
     getDashboardNotificationStatus()
   ]);
-  const mappedIdeas = ideas.map(mapIdea);
-  const mappedReports = weeklyReports.map(mapReport);
   const lastScanSummary = mapLastScan(lastScan);
 
   return {
@@ -807,13 +863,10 @@ export async function getDashboardData(): Promise<DashboardData> {
     rejectCandidates,
     repositoryPage,
     repositoryFilterOptions,
-    ideas: mappedIdeas,
-    actionItems,
-    weeklyReports: mappedReports,
     radarToday: buildRadarToday({
       repositories: radarRepositories,
-      ideas: mappedIdeas,
-      actionItems,
+      ideas: radarIdeas,
+      actionItems: radarActionItems,
       lastScan: lastScanSummary,
       settingsStatus,
       notificationStatus
@@ -824,7 +877,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 }
 
 async function getCounts() {
-  const [all, newlyFound, saved, read, ignored, ideas, candidates, fullIdeas, savedIdeas, dismissedIdeas, old, hot] = await Promise.all([
+  const [all, newlyFound, saved, read, ignored, ideas, candidates, fullIdeas, savedIdeas, dismissedIdeas, old, hot, actionItems] = await Promise.all([
     prisma.repository.count({ where: { isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "NEW", isDeletedFromView: false } }),
     prisma.repository.count({ where: { status: "SAVED", isDeletedFromView: false } }),
@@ -836,7 +889,8 @@ async function getCounts() {
     prisma.idea.count({ where: { status: IDEA_STATUS.SAVED } }),
     prisma.idea.count({ where: { status: IDEA_STATUS.DISMISSED } }),
     prisma.repository.count({ where: { isOldRepo: true, status: { not: "HOT" }, isDeletedFromView: false } }),
-    prisma.repository.count({ where: { status: "HOT", isDeletedFromView: false } })
+    prisma.repository.count({ where: { status: "HOT", isDeletedFromView: false } }),
+    prisma.actionItem.count({ where: { status: { notIn: ["DONE", "DISMISSED"] } } })
   ]);
 
   return {
@@ -851,7 +905,8 @@ async function getCounts() {
     savedIdeas,
     dismissedIdeas,
     old,
-    hot
+    hot,
+    actionItems
   };
 }
 

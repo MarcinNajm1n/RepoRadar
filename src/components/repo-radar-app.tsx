@@ -6,8 +6,11 @@ import type {
   DashboardData,
   EvidenceSourceItem,
   IdeaListItem,
+  IdeasPanelData,
   RepositoryListItem,
-  SettingsPanelData
+  SettingsPanelData,
+  TasksPanelData,
+  WeeklyReportsPanelData
 } from "@/types/repository";
 import {
   clearExpiredExternalCacheAction,
@@ -22,7 +25,10 @@ import {
   createWeeklyReportAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
+  getIdeasPanelDataAction,
   getSettingsPanelDataAction,
+  getTasksPanelDataAction,
+  getWeeklyReportsPanelDataAction,
   promoteCandidateToFullIdeaAction,
   pruneOldSnapshotsAction,
   generateReportAction,
@@ -50,7 +56,7 @@ import { EvidencePanel } from "@/components/repo-radar/evidence-panel";
 import { ReportView } from "@/components/repo-radar/report-view";
 import { getTabLabel, tabs } from "@/components/repo-radar/navigation";
 import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
-import { Button, DialogShell, SkeletonBlock, SkeletonText } from "@/components/repo-radar/ui";
+import { Button, DialogShell, SectionCard, SkeletonBlock, SkeletonText } from "@/components/repo-radar/ui";
 import { useFeedbackAction } from "@/components/repo-radar/hooks/use-feedback-action";
 import { isRepositoryListTab, useRepositoryBrowser } from "@/components/repo-radar/hooks/use-repository-browser";
 
@@ -78,6 +84,10 @@ function isEditableTarget(target: EventTarget | null) {
   );
 }
 
+function isIdeasPanelTab(tab: TabKey) {
+  return tab === "candidates" || tab === "ideas" || tab === "savedIdeas" || tab === "dismissedIdeas";
+}
+
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [activeSection, setActiveSection] = useState<SectionKey>("repo");
   const [activeTab, setActiveTab] = useState<TabKey>("radar");
@@ -86,6 +96,15 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [report, setReport] = useState<ReportState>(null);
   const [pendingReportTitle, setPendingReportTitle] = useState<string | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaListItem | null>(null);
+  const [ideasPanelData, setIdeasPanelData] = useState<IdeasPanelData | null>(null);
+  const [isIdeasPanelLoading, setIsIdeasPanelLoading] = useState(false);
+  const [hasTriedIdeasPanelLoad, setHasTriedIdeasPanelLoad] = useState(false);
+  const [tasksPanelData, setTasksPanelData] = useState<TasksPanelData | null>(null);
+  const [isTasksPanelLoading, setIsTasksPanelLoading] = useState(false);
+  const [hasTriedTasksPanelLoad, setHasTriedTasksPanelLoad] = useState(false);
+  const [weeklyReportsPanelData, setWeeklyReportsPanelData] = useState<WeeklyReportsPanelData | null>(null);
+  const [isWeeklyReportsPanelLoading, setIsWeeklyReportsPanelLoading] = useState(false);
+  const [hasTriedWeeklyReportsPanelLoad, setHasTriedWeeklyReportsPanelLoad] = useState(false);
   const [settingsPanelData, setSettingsPanelData] = useState<SettingsPanelData | null>(null);
   const [isSettingsPanelLoading, setIsSettingsPanelLoading] = useState(false);
   const [hasTriedSettingsPanelLoad, setHasTriedSettingsPanelLoad] = useState(false);
@@ -144,6 +163,51 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     setIsCommandPaletteOpen(true);
   }, []);
 
+  const loadIdeasPanelData = useCallback(() => {
+    setHasTriedIdeasPanelLoad(true);
+    setIsIdeasPanelLoading(true);
+    startTransition(async () => {
+      try {
+        const data = await getIdeasPanelDataAction();
+        setIdeasPanelData(data);
+      } catch (error) {
+        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac pomyslow." });
+      } finally {
+        setIsIdeasPanelLoading(false);
+      }
+    });
+  }, [setFeedback, startTransition]);
+
+  const loadTasksPanelData = useCallback(() => {
+    setHasTriedTasksPanelLoad(true);
+    setIsTasksPanelLoading(true);
+    startTransition(async () => {
+      try {
+        const data = await getTasksPanelDataAction();
+        setTasksPanelData(data);
+      } catch (error) {
+        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac zadan." });
+      } finally {
+        setIsTasksPanelLoading(false);
+      }
+    });
+  }, [setFeedback, startTransition]);
+
+  const loadWeeklyReportsPanelData = useCallback(() => {
+    setHasTriedWeeklyReportsPanelLoad(true);
+    setIsWeeklyReportsPanelLoading(true);
+    startTransition(async () => {
+      try {
+        const data = await getWeeklyReportsPanelDataAction();
+        setWeeklyReportsPanelData(data);
+      } catch (error) {
+        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac raportow tygodniowych." });
+      } finally {
+        setIsWeeklyReportsPanelLoading(false);
+      }
+    });
+  }, [setFeedback, startTransition]);
+
   const loadSettingsPanelData = useCallback(() => {
     setHasTriedSettingsPanelLoad(true);
     setIsSettingsPanelLoading(true);
@@ -164,6 +228,24 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       loadSettingsPanelData();
     }
   }, [activeTab, loadSettingsPanelData]);
+
+  const refreshIdeasPanelDataIfLoaded = useCallback(() => {
+    if (ideasPanelData || isIdeasPanelTab(activeTab)) {
+      loadIdeasPanelData();
+    }
+  }, [activeTab, ideasPanelData, loadIdeasPanelData]);
+
+  const refreshTasksPanelDataIfLoaded = useCallback(() => {
+    if (tasksPanelData || activeTab === "tasks") {
+      loadTasksPanelData();
+    }
+  }, [activeTab, loadTasksPanelData, tasksPanelData]);
+
+  const refreshWeeklyReportsPanelDataIfLoaded = useCallback(() => {
+    if (weeklyReportsPanelData || activeTab === "weekly") {
+      loadWeeklyReportsPanelData();
+    }
+  }, [activeTab, loadWeeklyReportsPanelData, weeklyReportsPanelData]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -208,23 +290,54 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   }, [activeTab, openCommandPalette, searchInputRef, switchToTab]);
 
   useEffect(() => {
+    if (isIdeasPanelTab(activeTab) && !ideasPanelData && !isIdeasPanelLoading && !hasTriedIdeasPanelLoad) {
+      const timeoutId = window.setTimeout(loadIdeasPanelData, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [activeTab, hasTriedIdeasPanelLoad, ideasPanelData, isIdeasPanelLoading, loadIdeasPanelData]);
+
+  useEffect(() => {
+    if (activeTab === "tasks" && !tasksPanelData && !isTasksPanelLoading && !hasTriedTasksPanelLoad) {
+      const timeoutId = window.setTimeout(loadTasksPanelData, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [activeTab, hasTriedTasksPanelLoad, isTasksPanelLoading, loadTasksPanelData, tasksPanelData]);
+
+  useEffect(() => {
+    if (activeTab === "weekly" && !weeklyReportsPanelData && !isWeeklyReportsPanelLoading && !hasTriedWeeklyReportsPanelLoad) {
+      const timeoutId = window.setTimeout(loadWeeklyReportsPanelData, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [
+    activeTab,
+    hasTriedWeeklyReportsPanelLoad,
+    isWeeklyReportsPanelLoading,
+    loadWeeklyReportsPanelData,
+    weeklyReportsPanelData
+  ]);
+
+  useEffect(() => {
     if (activeTab === "settings" && !settingsPanelData && !isSettingsPanelLoading && !hasTriedSettingsPanelLoad) {
       const timeoutId = window.setTimeout(loadSettingsPanelData, 0);
       return () => window.clearTimeout(timeoutId);
     }
   }, [activeTab, hasTriedSettingsPanelLoad, isSettingsPanelLoading, loadSettingsPanelData, settingsPanelData]);
 
-  const candidates = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.CANDIDATE), [initialData.ideas]);
-  const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => isFullIdeaStatus(idea.status)), [initialData.ideas]);
-  const savedIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.SAVED), [initialData.ideas]);
-  const dismissedIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.DISMISSED), [initialData.ideas]);
-  const activeActionItemCount = useMemo(
-    () => initialData.actionItems.filter((item) => item.status !== "DONE" && item.status !== "DISMISSED").length,
-    [initialData.actionItems]
-  );
+  const panelIdeas = ideasPanelData?.ideas ?? [];
+  const panelActionItems = tasksPanelData?.actionItems ?? [];
+  const candidates = useMemo(() => panelIdeas.filter((idea) => idea.status === IDEA_STATUS.CANDIDATE), [panelIdeas]);
+  const fullIdeas = useMemo(() => panelIdeas.filter((idea) => isFullIdeaStatus(idea.status)), [panelIdeas]);
+  const savedIdeas = useMemo(() => panelIdeas.filter((idea) => idea.status === IDEA_STATUS.SAVED), [panelIdeas]);
+  const dismissedIdeas = useMemo(() => panelIdeas.filter((idea) => idea.status === IDEA_STATUS.DISMISSED), [panelIdeas]);
+  const activeActionItemCount = initialData.counts.actionItems;
 
   function createWeeklyReport() {
-    runAction(() => createWeeklyReportAction(), "Raport tygodniowy utworzony.", "Tworze raport tygodniowy...");
+    runAction(
+      () => createWeeklyReportAction(),
+      "Raport tygodniowy utworzony.",
+      "Tworze raport tygodniowy...",
+      refreshWeeklyReportsPanelDataIfLoaded
+    );
   }
 
   function openPortfolioBrief() {
@@ -293,7 +406,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           priority,
           dedupeKey: `repo:${repo.id}:${type.toLowerCase()}`
         }),
-      success
+      success,
+      "Operacja w toku...",
+      refreshTasksPanelDataIfLoaded
     );
   }
 
@@ -305,12 +420,14 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           title: "Reczne zadanie do doprecyzowania",
           priority: 0
         }),
-      "Zadanie dodane."
+      "Zadanie dodane.",
+      "Operacja w toku...",
+      refreshTasksPanelDataIfLoaded
     );
   }
 
   function snoozeUntilTomorrow(itemId: string) {
-    runAction(() => snoozeActionItemAction(itemId, getTomorrowIso()), "Zadanie odlozone do jutra.");
+    runAction(() => snoozeActionItemAction(itemId, getTomorrowIso()), "Zadanie odlozone do jutra.", undefined, refreshTasksPanelDataIfLoaded);
   }
 
   function openDailyBriefing() {
@@ -375,6 +492,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     new: initialData.counts.new,
     tasks: activeActionItemCount
   };
+  const isIdeasViewLoading = isIdeasPanelLoading || (isIdeasPanelTab(activeTab) && !ideasPanelData && !hasTriedIdeasPanelLoad);
+  const isTasksViewLoading = isTasksPanelLoading || (activeTab === "tasks" && !tasksPanelData && !hasTriedTasksPanelLoad);
+  const isWeeklyReportsViewLoading =
+    isWeeklyReportsPanelLoading || (activeTab === "weekly" && !weeklyReportsPanelData && !hasTriedWeeklyReportsPanelLoad);
   const isSettingsViewLoading = isSettingsPanelLoading || (activeTab === "settings" && !settingsPanelData && !hasTriedSettingsPanelLoad);
 
   return (
@@ -432,7 +553,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           onCreateReadmeTask={(repo) => createRepoTask(repo, "READ_README", `Przeczytaj README: ${repo.fullName}`, "Zadanie README dodane.")}
           onCreateManualTask={createManualTask}
           onOpenCandidate={setIdeaDetail}
-          onPromoteCandidate={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
+          onPromoteCandidate={(ideaId) =>
+            runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+          }
           onOpenTasks={() => setActiveTab("tasks")}
           onOpenSettings={() => setActiveTab("settings")}
           onRunScan={runScan}
@@ -441,23 +564,34 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               key={item.id}
               item={item}
               isPending={isPending}
-              onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.")}
+              onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.", undefined, refreshTasksPanelDataIfLoaded)}
               onSnooze={() => snoozeUntilTomorrow(item.id)}
-              onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.")}
+              onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.", undefined, refreshTasksPanelDataIfLoaded)}
             />
           )}
         />
       ) : null}
 
       {activeTab === "tasks" ? (
-        <TasksView
-          items={initialData.actionItems}
-          isPending={isPending}
-          onCreateManualTask={createManualTask}
-          onComplete={(itemId) => runAction(() => completeActionItemAction(itemId), "Zadanie zakonczone.")}
-          onSnooze={snoozeUntilTomorrow}
-          onDismiss={(itemId) => runAction(() => dismissActionItemAction(itemId), "Zadanie odrzucone.")}
-        />
+        tasksPanelData ? (
+          <TasksView
+            items={panelActionItems}
+            isPending={isPending}
+            onCreateManualTask={createManualTask}
+            onComplete={(itemId) => runAction(() => completeActionItemAction(itemId), "Zadanie zakonczone.", undefined, refreshTasksPanelDataIfLoaded)}
+            onSnooze={snoozeUntilTomorrow}
+            onDismiss={(itemId) => runAction(() => dismissActionItemAction(itemId), "Zadanie odrzucone.", undefined, refreshTasksPanelDataIfLoaded)}
+          />
+        ) : (
+          <LazyPanelState
+            title="Kolejka akcji"
+            loadingText="Pobieram pelna kolejke zadan..."
+            errorText="Nie udalo sie zaladowac pelnej kolejki zadan."
+            isLoading={isTasksViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadTasksPanelData}
+          />
+        )
       ) : null}
 
       {activeTab !== "radar" &&
@@ -518,8 +652,15 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             onSave: (repoId) => updateRepositoryStatusWithUndo(repoId, "SAVED", "Repo zapisane."),
             onMarkRead: (repoId) => updateRepositoryStatusWithUndo(repoId, "READ", "Repo oznaczone jako przeczytane."),
             onOpenQuickBrief: (repoId) => openQuickBrief(repoId),
-            onGenerateIdea: (repoId) => runAction(() => generateIdeaAction(repoId), "Pomysl zostal utworzony.", "Tworze pomysl z repo..."),
-            onResearch: (repoId) => runAction(() => generateOpportunityCandidateAction(repoId), "Research light zakonczony.", "Research light w toku..."),
+            onGenerateIdea: (repoId) =>
+              runAction(() => generateIdeaAction(repoId), "Pomysl zostal utworzony.", "Tworze pomysl z repo...", refreshIdeasPanelDataIfLoaded),
+            onResearch: (repoId) =>
+              runAction(
+                () => generateOpportunityCandidateAction(repoId),
+                "Research light zakonczony.",
+                "Research light w toku...",
+                refreshIdeasPanelDataIfLoaded
+              ),
             onAddInboxTask: (repo) => createRepoTask(repo, "READ_README", `Przejrzyj nowe repo: ${repo.fullName}`, "Zadanie inbox dodane.", 2),
             onAddCloneTask: (repo) => createRepoTask(repo, "CLONE_LATER", `Clone later: ${repo.fullName}`, "Zadanie clone later dodane.", 1),
             onAddDemoTask: (repo) => createRepoTask(repo, "CHECK_DEMO", `Sprawdz demo: ${repo.fullName}`, "Zadanie demo dodane.", 2),
@@ -531,67 +672,156 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       ) : null}
 
       {activeTab === "candidates" ? (
-        <IdeasView
-          mode="candidates"
-          ideas={candidates}
-          isPending={isPending}
-          emptyTitle="Brak kandydatow"
-          emptyText="Uzyj akcji Znajdz okazje przy repo albo wlacz auto opportunity research w .env."
-          onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
-          onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Kandydat zapisany.")}
-          onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Kandydat odrzucony.")}
-          onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
-          onOpenDetail={setIdeaDetail}
-        />
+        ideasPanelData ? (
+          <IdeasView
+            mode="candidates"
+            ideas={candidates}
+            isPending={isPending}
+            emptyTitle="Brak kandydatow"
+            emptyText="Uzyj akcji Znajdz okazje przy repo albo wlacz auto opportunity research w .env."
+            onPromote={(ideaId) =>
+              runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onSave={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Kandydat zapisany.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onDismiss={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Kandydat odrzucony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onRestore={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onOpenDetail={setIdeaDetail}
+          />
+        ) : (
+          <LazyPanelState
+            title="Kandydaci"
+            loadingText="Pobieram pelna liste pomyslow..."
+            errorText="Nie udalo sie zaladowac pomyslow."
+            isLoading={isIdeasViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadIdeasPanelData}
+          />
+        )
       ) : null}
 
       {activeTab === "savedIdeas" ? (
-        <IdeasView
-          mode="saved"
-          ideas={savedIdeas}
-          isPending={isPending}
-          emptyTitle="Brak zapisanych pomyslow"
-          emptyText="Zapisane kandydaty i pomysly pojawia sie tutaj."
-          onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
-          onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
-          onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
-          onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
-          onOpenDetail={setIdeaDetail}
-        />
+        ideasPanelData ? (
+          <IdeasView
+            mode="saved"
+            ideas={savedIdeas}
+            isPending={isPending}
+            emptyTitle="Brak zapisanych pomyslow"
+            emptyText="Zapisane kandydaty i pomysly pojawia sie tutaj."
+            onPromote={(ideaId) =>
+              runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onSave={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onDismiss={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onRestore={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onOpenDetail={setIdeaDetail}
+          />
+        ) : (
+          <LazyPanelState
+            title="Zapisane pomysly"
+            loadingText="Pobieram pelna liste pomyslow..."
+            errorText="Nie udalo sie zaladowac pomyslow."
+            isLoading={isIdeasViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadIdeasPanelData}
+          />
+        )
       ) : null}
 
       {activeTab === "dismissedIdeas" ? (
-        <IdeasView
-          mode="dismissed"
-          ideas={dismissedIdeas}
-          isPending={isPending}
-          emptyTitle="Brak odrzuconych pomyslow"
-          emptyText="Odrzucone kandydaty nie beda automatycznie odtwarzane bez force."
-          onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
-          onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
-          onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
-          onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
-          onOpenDetail={setIdeaDetail}
-        />
+        ideasPanelData ? (
+          <IdeasView
+            mode="dismissed"
+            ideas={dismissedIdeas}
+            isPending={isPending}
+            emptyTitle="Brak odrzuconych pomyslow"
+            emptyText="Odrzucone kandydaty nie beda automatycznie odtwarzane bez force."
+            onPromote={(ideaId) =>
+              runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onSave={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onDismiss={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onRestore={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onOpenDetail={setIdeaDetail}
+          />
+        ) : (
+          <LazyPanelState
+            title="Odrzucone pomysly"
+            loadingText="Pobieram pelna liste pomyslow..."
+            errorText="Nie udalo sie zaladowac pomyslow."
+            isLoading={isIdeasViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadIdeasPanelData}
+          />
+        )
       ) : null}
 
       {activeTab === "ideas" ? (
-        <IdeasView
-          mode="full"
-          ideas={fullIdeas}
-          isPending={isPending}
-          emptyTitle="Brak pomyslow"
-          emptyText="Uzyj akcji Utworz pomysl z repo przy wybranym repozytorium."
-          onPromote={(ideaId) => runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.")}
-          onSave={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
-          onDismiss={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
-          onRestore={(ideaId) => runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.")}
-          onOpenDetail={setIdeaDetail}
-          renderEvidence={(idea) => <EvidenceSources sources={idea.evidenceSources} emptyText="Brak zapisanych zrodel dla tego pomyslu." />}
-        />
+        ideasPanelData ? (
+          <IdeasView
+            mode="full"
+            ideas={fullIdeas}
+            isPending={isPending}
+            emptyTitle="Brak pomyslow"
+            emptyText="Uzyj akcji Utworz pomysl z repo przy wybranym repozytorium."
+            onPromote={(ideaId) =>
+              runAction(() => promoteCandidateToFullIdeaAction(ideaId), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onSave={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.SAVED), "Pomysl zapisany.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onDismiss={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onRestore={(ideaId) =>
+              runAction(() => updateIdeaStatusAction(ideaId, IDEA_STATUS.CANDIDATE), "Kandydat przywrocony.", undefined, refreshIdeasPanelDataIfLoaded)
+            }
+            onOpenDetail={setIdeaDetail}
+            renderEvidence={(idea) => <EvidenceSources sources={idea.evidenceSources} emptyText="Brak zapisanych zrodel dla tego pomyslu." />}
+          />
+        ) : (
+          <LazyPanelState
+            title="Pelne pomysly"
+            loadingText="Pobieram pelna liste pomyslow..."
+            errorText="Nie udalo sie zaladowac pomyslow."
+            isLoading={isIdeasViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadIdeasPanelData}
+          />
+        )
       ) : null}
 
-      {activeTab === "weekly" ? <WeeklyReportsView reports={initialData.weeklyReports} /> : null}
+      {activeTab === "weekly" ? (
+        weeklyReportsPanelData ? (
+          <WeeklyReportsView reports={weeklyReportsPanelData.weeklyReports} />
+        ) : (
+          <LazyPanelState
+            title="Raporty tygodniowe"
+            loadingText="Pobieram pelne raporty tygodniowe..."
+            errorText="Nie udalo sie zaladowac raportow tygodniowych."
+            isLoading={isWeeklyReportsViewLoading}
+            isPending={isPending}
+            onRetryLoad={loadWeeklyReportsPanelData}
+          />
+        )
+      ) : null}
 
       {activeTab === "settings" ? (
         <SettingsView
@@ -624,9 +854,13 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           isPending={isPending}
           evidence={<EvidenceSources sources={ideaDetail.evidenceSources} emptyText="Brak zapisanych zrodel dla tego kandydata." />}
           onClose={() => setIdeaDetail(null)}
-          onPromote={() => runAction(() => promoteCandidateToFullIdeaAction(ideaDetail.id), "Pelny pomysl zostal utworzony.")}
-          onSave={() => runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.SAVED), "Pomysl zapisany.")}
-          onDismiss={() => runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.")}
+          onPromote={() =>
+            runAction(() => promoteCandidateToFullIdeaAction(ideaDetail.id), "Pelny pomysl zostal utworzony.", undefined, refreshIdeasPanelDataIfLoaded)
+          }
+          onSave={() => runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.SAVED), "Pomysl zapisany.", undefined, refreshIdeasPanelDataIfLoaded)}
+          onDismiss={() =>
+            runAction(() => updateIdeaStatusAction(ideaDetail.id, IDEA_STATUS.DISMISSED), "Pomysl odrzucony.", undefined, refreshIdeasPanelDataIfLoaded)
+          }
         />
       ) : null}
 
@@ -662,6 +896,51 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
 function EvidenceSources({ sources, emptyText }: { sources: EvidenceSourceItem[]; emptyText: string }) {
   return <EvidencePanel sources={sources} emptyText={emptyText} />;
+}
+
+function LazyPanelState({
+  title,
+  loadingText,
+  errorText,
+  isLoading,
+  isPending,
+  onRetryLoad
+}: {
+  title: string;
+  loadingText: string;
+  errorText: string;
+  isLoading: boolean;
+  isPending: boolean;
+  onRetryLoad: () => void;
+}) {
+  return (
+    <section className="space-y-4" aria-busy={isLoading}>
+      <SectionCard title={title} description={isLoading ? loadingText : "Dane panelu nie sa jeszcze zaladowane."}>
+        {isLoading ? (
+          <div className="space-y-4" role="status" aria-live="polite">
+            <span className="sr-only">{loadingText}</span>
+            <div className="grid gap-3 md:grid-cols-3">
+              <SkeletonBlock className="h-16" />
+              <SkeletonBlock className="h-16" />
+              <SkeletonBlock className="h-16" />
+            </div>
+            <div className="space-y-3">
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+            <p className="text-sm text-muted-foreground">{errorText}</p>
+            <Button className="mt-3" variant="secondary" size="sm" onClick={onRetryLoad} disabled={isPending}>
+              Ponow pobieranie
+            </Button>
+          </div>
+        )}
+      </SectionCard>
+    </section>
+  );
 }
 
 function ReportLoadingDialog({ title, onClose }: { title: string; onClose: () => void }) {
