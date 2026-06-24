@@ -38,6 +38,7 @@ export type NavigationTab = {
   icon: React.ComponentType<{ className?: string }>;
   section: SectionKey;
   group: "main" | "repo" | "ideas" | "system";
+  shortcut?: string;
 };
 
 export const repoTabKeys = [
@@ -56,18 +57,18 @@ export const repoTabKeys = [
 export const ideasTabKeys = ["candidates", "ideas", "savedIdeas", "dismissedIdeas"] as const satisfies readonly TabKey[];
 
 export const tabs: NavigationTab[] = [
-  { key: "radar", label: "Radar dzisiaj", icon: Bell, section: "repo", group: "main" },
-  { key: "library", label: "Biblioteka", icon: Github, section: "repo", group: "main" },
-  { key: "new", label: "Nowo znalezione", icon: Sparkles, section: "repo", group: "repo" },
+  { key: "radar", label: "Radar dzisiaj", icon: Bell, section: "repo", group: "main", shortcut: "Alt+1" },
+  { key: "library", label: "Biblioteka", icon: Github, section: "repo", group: "main", shortcut: "Alt+2" },
+  { key: "new", label: "Nowo znalezione", icon: Sparkles, section: "repo", group: "repo", shortcut: "Alt+3" },
   { key: "saved", label: "Zapisane", icon: Star, section: "repo", group: "repo" },
   { key: "read", label: "Przeczytane", icon: BookOpen, section: "repo", group: "repo" },
   { key: "ignored", label: "Ignorowane", icon: Trash2, section: "repo", group: "repo" },
-  { key: "tasks", label: "Zadania", icon: ClipboardList, section: "repo", group: "repo" },
+  { key: "tasks", label: "Zadania", icon: ClipboardList, section: "repo", group: "repo", shortcut: "Alt+4" },
   { key: "weekly", label: "Raporty tygodniowe", icon: FileText, section: "repo", group: "repo" },
   { key: "old", label: "Stare repo", icon: CheckCircle2, section: "repo", group: "repo" },
-  { key: "settings", label: "Ustawienia", icon: Settings, section: "repo", group: "system" },
+  { key: "settings", label: "Ustawienia", icon: Settings, section: "repo", group: "system", shortcut: "Alt+6" },
   { key: "candidates", label: "Kandydaci", icon: Search, section: "ideas", group: "ideas" },
-  { key: "ideas", label: "Pełne pomysły", icon: Brain, section: "ideas", group: "ideas" },
+  { key: "ideas", label: "Pełne pomysły", icon: Brain, section: "ideas", group: "ideas", shortcut: "Alt+5" },
   { key: "savedIdeas", label: "Zapisane pomysły", icon: Star, section: "ideas", group: "ideas" },
   { key: "dismissedIdeas", label: "Odrzucone pomysły", icon: Trash2, section: "ideas", group: "ideas" }
 ];

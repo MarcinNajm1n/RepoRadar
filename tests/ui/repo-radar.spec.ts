@@ -57,6 +57,51 @@ test("supports keyboard navigation shortcuts", async ({ page }) => {
   await expectNoHorizontalOverflow(page);
 });
 
+test("runs derived navigation commands from the command palette keyboard selection", async ({ page }) => {
+  await page.getByRole("button", { name: "Komendy" }).click();
+  const commandInput = page.getByRole("combobox", { name: "Szukaj komend albo repozytoriow" });
+  await expect(commandInput).toBeFocused();
+
+  await commandInput.fill("zadania");
+  const tasksCommand = page.getByRole("option", { name: /Otworz Zadania/ });
+  const librarySearchCommand = page.getByRole("option", { name: "Szukaj w Bibliotece" });
+  await expect(tasksCommand).toBeVisible();
+  await expect(tasksCommand).toHaveAttribute("data-active", "true");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-tab-tasks");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(librarySearchCommand).toHaveAttribute("data-active", "true");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "repo-search");
+  await page.keyboard.press("ArrowUp");
+  await expect(tasksCommand).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("End");
+  await expect(librarySearchCommand).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("Home");
+  await expect(tasksCommand).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("Kolejka akcji")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("runs repository results from the command palette keyboard selection", async ({ page }) => {
+  await page.getByRole("button", { name: "Komendy" }).click();
+  const commandInput = page.getByRole("combobox", { name: "Szukaj komend albo repozytoriow" });
+  await commandInput.fill("affaan-m/ECC");
+
+  await expect(page.getByRole("option", { name: /affaan-m\/ECC/ })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: "Szukaj w Bibliotece" })).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+
+  const librarySearch = page.getByPlaceholder("Szukaj nazwy, ownera, topics...");
+  await expect(librarySearch).toBeVisible();
+  await expect(librarySearch).toHaveValue("affaan-m/ECC");
+  await expectNoHorizontalOverflow(page);
+});
+
 test("keeps secondary global actions in the command palette", async ({ page }) => {
   const topBar = page.locator("header").first();
 
@@ -70,10 +115,10 @@ test("keeps secondary global actions in the command palette", async ({ page }) =
   await topBar.getByRole("button", { name: "Komendy" }).click();
   await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Skan i raporty" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Utworz briefing dzienny/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Utworz raport tygodniowy/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Eksportuj CSV pomyslow/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Utworz RepoRadar Brief/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Utworz briefing dzienny/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Utworz raport tygodniowy/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Eksportuj CSV pomyslow/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Utworz RepoRadar Brief/ })).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
 });
