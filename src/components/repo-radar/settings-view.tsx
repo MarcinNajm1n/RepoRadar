@@ -4,8 +4,10 @@ import { useState } from "react";
 import type React from "react";
 import { Bell, CalendarClock, Download, Moon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AI_JOB_STATUSES, AI_JOB_TYPES } from "@/types/ai-job";
 import type { NotificationSummary, SettingsSummary } from "@/types/repository";
 import { Badge, Button, SectionCard, SkeletonBlock, SkeletonText, Switch } from "./ui";
+import type { BadgeTone } from "./ui";
 
 const settingsSections = [
   { key: "configuration", label: "Konfiguracja" },
@@ -150,6 +152,10 @@ export function SettingsView({
             <InfoItem label="AI all-time" value={String(settingsSummary.aiCostSummary.analysesAllTime)} />
             <InfoItem label="Next full report" value={settingsSummary.aiCostSummary.estimatedNextActions.report} />
           </div>
+        </SettingsPanel>
+
+        <SettingsPanel title="Ostatnie zadania AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
+          <RecentAiJobsList jobs={settingsSummary.recentAiJobs} />
         </SettingsPanel>
 
         <SettingsPanel title="Evidence, cache i notyfikacje" className={activeSection === "integrations" ? "xl:col-span-2" : "hidden"}>
@@ -348,6 +354,65 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function RecentAiJobsList({ jobs }: { jobs: SettingsSummary["recentAiJobs"] }) {
+  if (jobs.length === 0) {
+    return (
+      <div className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+        Brak zarejestrowanych zadań AI.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-border-subtle">
+      <table className="min-w-full divide-y divide-border-subtle text-sm">
+        <thead className="bg-surface-inset text-xs font-medium uppercase text-muted-foreground">
+          <tr>
+            <th scope="col" className="px-3 py-2 text-left">
+              Typ
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Status
+            </th>
+            <th scope="col" className="px-3 py-2 text-right">
+              Priorytet
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Repo
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Ostatni etap
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Błąd
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border-subtle bg-surface-panel">
+          {jobs.map((job) => (
+            <tr key={job.id}>
+              <td className="px-3 py-2 font-medium text-foreground">{formatAiJobType(job.type)}</td>
+              <td className="px-3 py-2">
+                <Badge tone={getAiJobStatusTone(job.status)} variant="status">
+                  {formatAiJobStatus(job.status)}
+                </Badge>
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{job.priority}</td>
+              <td className="max-w-[18rem] break-words px-3 py-2 text-muted-foreground">
+                {job.repoFullName ?? "bez repo"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatAiJobTime(job)}</td>
+              <td className="max-w-[22rem] break-words px-3 py-2 text-muted-foreground">
+                {job.error ?? <span aria-label="Brak błędu">-</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
   if (!rateLimit) {
     return "brak danych";
@@ -360,7 +425,49 @@ function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
 }
 
 function formatAiJobSummary(summary: SettingsSummary["aiJobSummary"]) {
-  return `${summary.running} w toku, ${summary.done24h} OK / 24h, ${summary.failed24h} bledow / 24h`;
+  return `${summary.running} w toku, ${summary.done24h} OK / 24h, ${summary.failed24h} błędów / 24h`;
+}
+
+function formatAiJobType(type: string) {
+  return AI_JOB_TYPES[type as keyof typeof AI_JOB_TYPES] ?? type;
+}
+
+function formatAiJobStatus(status: string) {
+  return AI_JOB_STATUSES[status as keyof typeof AI_JOB_STATUSES] ?? status;
+}
+
+function getAiJobStatusTone(status: string): BadgeTone {
+  switch (status) {
+    case "DONE":
+      return "success";
+    case "FAILED":
+      return "danger";
+    case "RUNNING":
+      return "info";
+    case "QUEUED":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
+function formatAiJobTime(job: SettingsSummary["recentAiJobs"][number]) {
+  if (job.finishedAt) {
+    return `Koniec ${formatAiJobDateTime(job.finishedAt)}`;
+  }
+  if (job.startedAt) {
+    return `Start ${formatAiJobDateTime(job.startedAt)}`;
+  }
+  return `Utworzono ${formatAiJobDateTime(job.createdAt)}`;
+}
+
+function formatAiJobDateTime(value: string) {
+  return new Date(value).toLocaleString("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function formatDuration(ms: number | null) {
