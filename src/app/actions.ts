@@ -9,7 +9,13 @@ import {
   updateActionItem
 } from "@/lib/db/action-items";
 import { runAiJob } from "@/lib/db/ai-jobs";
-import { getEvidenceSourcesForReport, getRepositoryPage, updateIdeaStatus, updateRepositoryStatus } from "@/lib/db/repositories";
+import {
+  getEvidenceSourcesForReport,
+  getRepositoryPage,
+  getSettingsPanelData,
+  updateIdeaStatus,
+  updateRepositoryStatus
+} from "@/lib/db/repositories";
 import { getRepositoryTimeline } from "@/lib/db/repository-timeline";
 import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
 import type { RepositoryPageInput } from "@/types/repository";
@@ -53,6 +59,10 @@ export async function getRepositoryPageAction(input: RepositoryPageInput) {
 
 export async function getRepositoryTimelineAction(repoId: string) {
   return getRepositoryTimeline(repoId);
+}
+
+export async function getSettingsPanelDataAction() {
+  return getSettingsPanelData();
 }
 
 export async function generateReportAction(repoId: string, force = false) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRadarToday, mapEvidenceSource, mapRepository } from "../../src/lib/db/repositories";
 import type { ActionItemListItem } from "../../src/types/action-item";
-import type { IdeaListItem, NotificationSummary, SettingsSummary } from "../../src/types/repository";
+import type { DashboardNotificationStatus, DashboardSettingsStatus, IdeaListItem } from "../../src/types/repository";
 
 const now = new Date("2026-06-16T12:00:00Z");
 
@@ -144,80 +144,18 @@ describe("mapRepository", () => {
   });
 });
 
-function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSummary {
+function settingsStatus(overrides: Partial<DashboardSettingsStatus> = {}): DashboardSettingsStatus {
   return {
     githubTokenConfigured: true,
     openAiConfigured: true,
-    discordWebhookConfigured: false,
-    autoGenerateWeeklyIdeas: false,
-    notificationsEnabled: true,
-    windowsNotificationsEnabled: true,
-    marketResearchEnabled: true,
-    marketResearchMode: "light",
     autoOpportunityResearchEnabled: false,
-    openAiDailyAnalysisLimit: 20,
-    marketResearchDailyLimit: 5,
-    externalResearchCacheTtlHours: 24,
-    reportsDir: "reports",
-    persistedSettingCount: 0,
-    aiJobSummary: { queued: 0, running: 0, done24h: 0, failed24h: 0 },
-    aiCostSummary: {
-      analysesToday: 0,
-      analysesThisWeek: 0,
-      analysesAllTime: 0,
-      estimatedNextActions: {
-        summary: "1 call",
-        report: "1 call",
-        idea: "1 call",
-        research: "0 calls"
-      }
-    },
-    observability: {
-      lastScan: null,
-      recentScanCount: 0,
-      failedScans24h: 0,
-      averageScanDurationMs: null,
-      totalRepositories: 0,
-      openAiCacheEntries: 0,
-      externalResearchCacheEntries: 0,
-      expiredExternalResearchCacheEntries: 0,
-      marketResearchRuns24h: 0,
-      marketResearchSources24h: 0,
-      githubRuntime: {
-        requests: 0,
-        cacheHits: 0,
-        notModifiedHits: 0,
-        cacheWrites: 0,
-        cacheEntries: 0,
-        maxEntries: 200
-      }
-    },
-    graphify: {
-      status: "missing",
-      graphExists: false,
-      nodeCount: 0,
-      edgeCount: 0,
-      communityCount: 0,
-      manifestFileCount: 0,
-      graphSizeBytes: 0,
-      reportSizeBytes: 0,
-      lastUpdatedAt: null,
-      packageVersion: null,
-      skillVersion: null,
-      skillPath: null,
-      note: "Brak danych."
-    },
-    githubRateLimit: null,
     ...overrides
   };
 }
 
-function notificationSummary(overrides: Partial<NotificationSummary> = {}): NotificationSummary {
+function notificationStatus(overrides: Partial<DashboardNotificationStatus> = {}): DashboardNotificationStatus {
   return {
-    sent24h: 0,
     failed24h: 0,
-    skipped24h: 0,
-    lastResults: [],
     ...overrides
   };
 }
@@ -293,8 +231,8 @@ describe("buildRadarToday", () => {
         ideas: [],
         actionItems: [],
         lastScan: null,
-        settingsSummary: settingsSummary(),
-        notificationSummary: notificationSummary()
+        settingsStatus: settingsStatus(),
+        notificationStatus: notificationStatus()
       },
       2,
       now
@@ -320,8 +258,8 @@ describe("buildRadarToday", () => {
           actionItemRecord({ id: "done", status: "DONE", priority: 100 })
         ],
         lastScan: null,
-        settingsSummary: settingsSummary(),
-        notificationSummary: notificationSummary()
+        settingsStatus: settingsStatus(),
+        notificationStatus: notificationStatus()
       },
       5,
       now
@@ -346,12 +284,12 @@ describe("buildRadarToday", () => {
           reposUpdated: 0,
           errorMessage: "rate limit"
         },
-        settingsSummary: settingsSummary({
+        settingsStatus: settingsStatus({
           githubTokenConfigured: false,
           openAiConfigured: false,
           autoOpportunityResearchEnabled: true
         }),
-        notificationSummary: notificationSummary({ failed24h: 2 })
+        notificationStatus: notificationStatus({ failed24h: 2 })
       },
       5,
       now

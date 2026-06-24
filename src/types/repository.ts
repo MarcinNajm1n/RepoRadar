@@ -235,6 +235,21 @@ export type NotificationSummary = {
   lastResults: NotificationLogItem[];
 };
 
+export type DashboardSettingsStatus = {
+  githubTokenConfigured: boolean;
+  openAiConfigured: boolean;
+  autoOpportunityResearchEnabled: boolean;
+};
+
+export type DashboardNotificationStatus = {
+  failed24h: number;
+};
+
+export type SettingsPanelData = {
+  settingsSummary: SettingsSummary;
+  notificationSummary: NotificationSummary;
+};
+
 export type DashboardLastScan = {
   startedAt: string;
   finishedAt: string | null;
@@ -269,8 +284,6 @@ export type DashboardData = {
   actionItems: ActionItemListItem[];
   weeklyReports: ReportListItem[];
   radarToday: RadarTodayData;
-  settingsSummary: SettingsSummary;
-  notificationSummary: NotificationSummary;
   counts: {
     all: number;
     new: number;

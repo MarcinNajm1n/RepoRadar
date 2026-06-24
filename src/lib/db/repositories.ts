@@ -16,6 +16,8 @@ import type { ActionItemListItem } from "@/types/action-item";
 import type {
   DashboardData,
   DashboardLastScan,
+  DashboardNotificationStatus,
+  DashboardSettingsStatus,
   EvidenceSourceItem,
   IdeaListItem,
   NotificationLogItem,
@@ -27,6 +29,7 @@ import type {
   RepositoryPage,
   RepositoryPageInput,
   RepositoryListItem,
+  SettingsPanelData,
   SettingsSummary
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
@@ -358,8 +361,8 @@ export function buildRadarToday(
     ideas: IdeaListItem[];
     actionItems: ActionItemListItem[];
     lastScan: DashboardLastScan;
-    settingsSummary: SettingsSummary;
-    notificationSummary: NotificationSummary;
+    settingsStatus: DashboardSettingsStatus;
+    notificationStatus: DashboardNotificationStatus;
   },
   limit = 5,
   now = new Date()
@@ -405,7 +408,7 @@ export function buildRadarToday(
       message: input.lastScan.errorMessage ?? "Sprawdz logi skanu i konfiguracje GitHub."
     });
   }
-  if (!input.settingsSummary.githubTokenConfigured) {
+  if (!input.settingsStatus.githubTokenConfigured) {
     alerts.push({
       id: "github-token-missing",
       level: "warning",
@@ -413,7 +416,7 @@ export function buildRadarToday(
       message: "Skan moze szybciej trafic w rate limit bez lokalnego GITHUB_TOKEN."
     });
   }
-  if (!input.settingsSummary.openAiConfigured) {
+  if (!input.settingsStatus.openAiConfigured) {
     alerts.push({
       id: "openai-missing",
       level: "info",
@@ -421,7 +424,7 @@ export function buildRadarToday(
       message: "Raporty AI i pelne pomysly beda niedostepne do czasu ustawienia OPENAI_API_KEY."
     });
   }
-  if (input.settingsSummary.autoOpportunityResearchEnabled) {
+  if (input.settingsStatus.autoOpportunityResearchEnabled) {
     alerts.push({
       id: "auto-research-enabled",
       level: "warning",
@@ -429,12 +432,12 @@ export function buildRadarToday(
       message: "Kontroluj dzienne limity, bo automatyczny research moze uzywac platnych API."
     });
   }
-  if (input.notificationSummary.failed24h > 0) {
+  if (input.notificationStatus.failed24h > 0) {
     alerts.push({
       id: "notification-failures",
       level: "warning",
       title: "Nieudane powiadomienia",
-      message: `${input.notificationSummary.failed24h} powiadomien nie powiodlo sie w ostatnich 24h.`
+      message: `${input.notificationStatus.failed24h} powiadomien nie powiodlo sie w ostatnich 24h.`
     });
   }
   const limitedAlerts = alerts.slice(0, limit);
@@ -498,6 +501,16 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
   };
 }
 
+function getDashboardSettingsStatus(): DashboardSettingsStatus {
+  const config = getConfig();
+
+  return {
+    githubTokenConfigured: Boolean(config.githubToken),
+    openAiConfigured: Boolean(config.openAiApiKey),
+    autoOpportunityResearchEnabled: config.enableAutoOpportunityResearch
+  };
+}
+
 async function getNotificationSummary(): Promise<NotificationSummary> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [sent24h, failed24h, skipped24h, lastResults] = await Promise.all([
@@ -524,6 +537,22 @@ async function getNotificationSummary(): Promise<NotificationSummary> {
     failed24h,
     skipped24h,
     lastResults: lastResults.map(mapNotificationLog)
+  };
+}
+
+async function getDashboardNotificationStatus(): Promise<DashboardNotificationStatus> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const failed24h = await prisma.notificationLog.count({ where: { status: "FAILED", createdAt: { gte: since } } });
+
+  return { failed24h };
+}
+
+export async function getSettingsPanelData(): Promise<SettingsPanelData> {
+  const [settingsSummary, notificationSummary] = await Promise.all([getSettingsSummary(), getNotificationSummary()]);
+
+  return {
+    settingsSummary,
+    notificationSummary
   };
 }
 
@@ -740,8 +769,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     weeklyReports,
     lastScan,
     counts,
-    settingsSummary,
-    notificationSummary
+    settingsStatus,
+    notificationStatus
   ] = await Promise.all([
     getRepositoryPage(),
     getRepositoryFilterOptions(),
@@ -766,8 +795,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       orderBy: { startedAt: "desc" }
     }),
     getCounts(),
-    getSettingsSummary(),
-    getNotificationSummary()
+    getDashboardSettingsStatus(),
+    getDashboardNotificationStatus()
   ]);
   const mappedIdeas = ideas.map(mapIdea);
   const mappedReports = weeklyReports.map(mapReport);
@@ -786,11 +815,9 @@ export async function getDashboardData(): Promise<DashboardData> {
       ideas: mappedIdeas,
       actionItems,
       lastScan: lastScanSummary,
-      settingsSummary,
-      notificationSummary
+      settingsStatus,
+      notificationStatus
     }),
-    settingsSummary,
-    notificationSummary,
     counts,
     lastScan: lastScanSummary
   };

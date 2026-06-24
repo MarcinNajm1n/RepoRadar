@@ -6,7 +6,8 @@ import type {
   DashboardData,
   EvidenceSourceItem,
   IdeaListItem,
-  RepositoryListItem
+  RepositoryListItem,
+  SettingsPanelData
 } from "@/types/repository";
 import {
   clearExpiredExternalCacheAction,
@@ -21,6 +22,7 @@ import {
   createWeeklyReportAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
+  getSettingsPanelDataAction,
   promoteCandidateToFullIdeaAction,
   pruneOldSnapshotsAction,
   generateReportAction,
@@ -84,6 +86,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [report, setReport] = useState<ReportState>(null);
   const [pendingReportTitle, setPendingReportTitle] = useState<string | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaListItem | null>(null);
+  const [settingsPanelData, setSettingsPanelData] = useState<SettingsPanelData | null>(null);
+  const [isSettingsPanelLoading, setIsSettingsPanelLoading] = useState(false);
+  const [hasTriedSettingsPanelLoad, setHasTriedSettingsPanelLoad] = useState(false);
   const { feedback, isPending, runAction, setFeedback, startTransition } = useFeedbackAction();
   const switchToTab = useCallback((tabKey: TabKey) => {
     const tab = tabs.find((item) => item.key === tabKey);
@@ -139,6 +144,27 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     setIsCommandPaletteOpen(true);
   }, []);
 
+  const loadSettingsPanelData = useCallback(() => {
+    setHasTriedSettingsPanelLoad(true);
+    setIsSettingsPanelLoading(true);
+    startTransition(async () => {
+      try {
+        const data = await getSettingsPanelDataAction();
+        setSettingsPanelData(data);
+      } catch (error) {
+        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac ustawien." });
+      } finally {
+        setIsSettingsPanelLoading(false);
+      }
+    });
+  }, [setFeedback, startTransition]);
+
+  const refreshSettingsPanelDataIfOpen = useCallback(() => {
+    if (activeTab === "settings") {
+      loadSettingsPanelData();
+    }
+  }, [activeTab, loadSettingsPanelData]);
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (isEditableTarget(event.target)) {
@@ -181,6 +207,13 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, openCommandPalette, searchInputRef, switchToTab]);
 
+  useEffect(() => {
+    if (activeTab === "settings" && !settingsPanelData && !isSettingsPanelLoading && !hasTriedSettingsPanelLoad) {
+      const timeoutId = window.setTimeout(loadSettingsPanelData, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [activeTab, hasTriedSettingsPanelLoad, isSettingsPanelLoading, loadSettingsPanelData, settingsPanelData]);
+
   const candidates = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.CANDIDATE), [initialData.ideas]);
   const fullIdeas = useMemo(() => initialData.ideas.filter((idea) => isFullIdeaStatus(idea.status)), [initialData.ideas]);
   const savedIdeas = useMemo(() => initialData.ideas.filter((idea) => idea.status === IDEA_STATUS.SAVED), [initialData.ideas]);
@@ -219,7 +252,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 : "Scan nie powiodl sie. Sprawdz token GitHub, rate limit i logi skanu."
             }
           : { tone: "success", message: `Scan zakonczony. Zaktualizowano ${result.reposUpdated} repo.` },
-      "Scan jest w toku..."
+      "Scan jest w toku...",
+      refreshSettingsPanelDataIfOpen
     );
   }
 
@@ -317,7 +351,12 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     if (!window.confirm("Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.")) {
       return;
     }
-    runAction(() => pruneOldSnapshotsAction({ daysToKeep: 180, confirmed: true }), "Stare snapshoty wyczyszczone.");
+    runAction(
+      () => pruneOldSnapshotsAction({ daysToKeep: 180, confirmed: true }),
+      "Stare snapshoty wyczyszczone.",
+      "Czyszcze stare snapshoty...",
+      refreshSettingsPanelDataIfOpen
+    );
   }
 
   const topBarStats = [
@@ -336,6 +375,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     new: initialData.counts.new,
     tasks: activeActionItemCount
   };
+  const isSettingsViewLoading = isSettingsPanelLoading || (activeTab === "settings" && !settingsPanelData && !hasTriedSettingsPanelLoad);
 
   return (
     <AppShell
@@ -572,16 +612,26 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
       {activeTab === "settings" ? (
         <SettingsView
-          settingsSummary={initialData.settingsSummary}
-          notificationSummary={initialData.notificationSummary}
+          settingsSummary={settingsPanelData?.settingsSummary ?? null}
+          notificationSummary={settingsPanelData?.notificationSummary ?? null}
+          isLoading={isSettingsViewLoading}
           isPending={isPending}
-          onSaveSetting={(key, value) => runAction(() => updateSettingAction(key, String(value)), "Ustawienie zapisane.")}
-          onClearExpiredExternalCache={() => runAction(() => clearExpiredExternalCacheAction(), "Wygasly cache wyczyszczony.")}
-          onClearOldNotificationLogs={() => runAction(() => clearOldNotificationLogsAction(30), "Stare logi powiadomien wyczyszczone.")}
-          onTestNotification={() => runAction(() => testNotificationAction(), "Test notification wykonany.")}
+          onSaveSetting={(key, value) =>
+            runAction(() => updateSettingAction(key, String(value)), "Ustawienie zapisane.", "Zapisuje ustawienie...", refreshSettingsPanelDataIfOpen)
+          }
+          onClearExpiredExternalCache={() =>
+            runAction(() => clearExpiredExternalCacheAction(), "Wygasly cache wyczyszczony.", "Czyszcze cache...", refreshSettingsPanelDataIfOpen)
+          }
+          onClearOldNotificationLogs={() =>
+            runAction(() => clearOldNotificationLogsAction(30), "Stare logi powiadomien wyczyszczone.", "Czyszcze logi...", refreshSettingsPanelDataIfOpen)
+          }
+          onTestNotification={() =>
+            runAction(() => testNotificationAction(), "Test notification wykonany.", "Wysylam test notification...", refreshSettingsPanelDataIfOpen)
+          }
           onOpenDailyBriefing={openDailyBriefing}
           onDownloadIdeasCsv={downloadIdeasCsv}
           onPruneSnapshots={pruneSnapshotsWithConfirmation}
+          onRetryLoad={loadSettingsPanelData}
         />
       ) : null}
 

@@ -3,11 +3,12 @@
 import type React from "react";
 import { Bell, CalendarClock, Download, Moon, Trash2 } from "lucide-react";
 import type { NotificationSummary, SettingsSummary } from "@/types/repository";
-import { Badge, Button, SectionCard, Switch } from "./ui";
+import { Badge, Button, SectionCard, SkeletonBlock, SkeletonText, Switch } from "./ui";
 
 export function SettingsView({
   settingsSummary,
   notificationSummary,
+  isLoading,
   isPending,
   onSaveSetting,
   onClearExpiredExternalCache,
@@ -15,10 +16,12 @@ export function SettingsView({
   onTestNotification,
   onOpenDailyBriefing,
   onDownloadIdeasCsv,
-  onPruneSnapshots
+  onPruneSnapshots,
+  onRetryLoad
 }: {
-  settingsSummary: SettingsSummary;
-  notificationSummary: NotificationSummary;
+  settingsSummary: SettingsSummary | null;
+  notificationSummary: NotificationSummary | null;
+  isLoading: boolean;
   isPending: boolean;
   onSaveSetting: (key: string, value: boolean) => void;
   onClearExpiredExternalCache: () => void;
@@ -27,7 +30,43 @@ export function SettingsView({
   onOpenDailyBriefing: () => void;
   onDownloadIdeasCsv: () => void;
   onPruneSnapshots: () => void;
+  onRetryLoad: () => void;
 }) {
+  if (!settingsSummary || !notificationSummary) {
+    return (
+      <section className="space-y-4" aria-busy={isLoading}>
+        <SectionCard
+          title="Ustawienia MVP"
+          description={isLoading ? "Pobieram pelne dane ustawien i observability..." : "Dane ustawien nie sa jeszcze zaladowane."}
+        >
+          {isLoading ? (
+            <div className="space-y-4" role="status" aria-live="polite">
+              <span className="sr-only">Laduje pelne dane ustawien.</span>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <SkeletonBlock className="h-24" />
+                <SkeletonBlock className="h-24" />
+              </div>
+              <div className="grid gap-3 xl:grid-cols-2">
+                <SkeletonBlock className="h-40" />
+                <SkeletonBlock className="h-40" />
+                <SkeletonBlock className="h-40" />
+                <SkeletonBlock className="h-40" />
+              </div>
+              <SkeletonText lines={6} />
+            </div>
+          ) : (
+            <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+              <p className="text-sm text-muted-foreground">Nie udalo sie zaladowac pelnych danych ustawien.</p>
+              <Button className="mt-3" variant="secondary" size="sm" onClick={onRetryLoad} disabled={isPending}>
+                Ponow pobieranie
+              </Button>
+            </div>
+          )}
+        </SectionCard>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <SectionCard title="Ustawienia MVP" description="Konfiguracja lokalnej instancji i bezpieczne akcje utrzymaniowe.">
