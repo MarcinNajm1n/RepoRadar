@@ -43,17 +43,37 @@ test("supports keyboard navigation shortcuts", async ({ page }) => {
 
   await page.keyboard.press("/");
   await expect(searchInput).toBeFocused();
-  await searchInput.blur();
 
   await page.keyboard.press("Control+K");
-  await expect(page.getByRole("heading", { name: "Command Palette" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("heading", { name: "Command Palette" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeHidden();
 
   const settingsButton = page.getByRole("navigation").getByRole("button", { name: "Ustawienia" });
   await settingsButton.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Ustawienia MVP")).toBeVisible();
+
+  await expectNoHorizontalOverflow(page);
+});
+
+test("keeps secondary global actions in the command palette", async ({ page }) => {
+  const topBar = page.locator("header").first();
+
+  await expect(topBar.getByRole("button", { name: "Komendy" })).toBeVisible();
+  await expect(topBar.getByRole("button", { name: "Uruchom scan" })).toBeVisible();
+  await expect(topBar.getByRole("button", { name: "Briefing dzienny" })).toHaveCount(0);
+  await expect(topBar.getByRole("button", { name: "Raport tygodniowy" })).toHaveCount(0);
+  await expect(topBar.getByRole("button", { name: "Eksport CSV" })).toHaveCount(0);
+  await expect(topBar.getByRole("button", { name: "RepoRadar Brief" })).toHaveCount(0);
+
+  await topBar.getByRole("button", { name: "Komendy" }).click();
+  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Skan i raporty" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Utworz briefing dzienny/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Utworz raport tygodniowy/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Eksportuj CSV pomyslow/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Utworz RepoRadar Brief/ })).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
 });

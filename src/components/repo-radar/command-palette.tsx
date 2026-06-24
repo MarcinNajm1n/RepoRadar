@@ -17,6 +17,12 @@ type CommandItem = {
   run: () => void;
 };
 
+type CommandGroup = {
+  id: string;
+  label: string;
+  commands: CommandItem[];
+};
+
 export function CommandPalette({
   isOpen,
   repositories,
@@ -24,6 +30,7 @@ export function CommandPalette({
   onClose,
   onRunScan,
   onOpenTab,
+  onOpenDailyBriefing,
   onCreateWeeklyReport,
   onCreatePortfolioBrief,
   onDownloadIdeasCsv,
@@ -35,6 +42,7 @@ export function CommandPalette({
   onClose: () => void;
   onRunScan: () => void;
   onOpenTab: (tab: TabKey) => void;
+  onOpenDailyBriefing: () => void;
   onCreateWeeklyReport: () => void;
   onCreatePortfolioBrief: () => void;
   onDownloadIdeasCsv: () => void;
@@ -53,77 +61,100 @@ export function CommandPalette({
     return undefined;
   }, [isOpen]);
 
-  const commands = useMemo<CommandItem[]>(
+  const commandGroups = useMemo<CommandGroup[]>(
     () => [
       {
-        id: "scan",
-        label: "Uruchom scan",
-        hint: "Pobierz najnowsze dane z GitHuba.",
-        shortcut: "Ctrl+K -> scan",
-        icon: RefreshCw,
-        run: onRunScan
+        id: "primary",
+        label: "Skan i raporty",
+        commands: [
+          {
+            id: "scan",
+            label: "Uruchom scan",
+            hint: "Pobierz najnowsze dane z GitHuba.",
+            icon: RefreshCw,
+            run: onRunScan
+          },
+          {
+            id: "daily-briefing",
+            label: "Utworz briefing dzienny",
+            hint: "Wygeneruj lokalny briefing z najwazniejszymi sygnalami.",
+            icon: CalendarClock,
+            run: onOpenDailyBriefing
+          },
+          {
+            id: "weekly",
+            label: "Utworz raport tygodniowy",
+            hint: "Wygeneruj lokalny raport tygodniowy.",
+            icon: FileText,
+            run: onCreateWeeklyReport
+          },
+          {
+            id: "csv",
+            label: "Eksportuj CSV pomyslow",
+            hint: "Pobierz CSV z pomyslami.",
+            icon: Download,
+            run: onDownloadIdeasCsv
+          },
+          {
+            id: "portfolio-brief",
+            label: "Utworz RepoRadar Brief",
+            hint: "Wygeneruj markdown portfolio i otworz widok do PDF.",
+            icon: FileText,
+            run: onCreatePortfolioBrief
+          }
+        ]
       },
       {
-        id: "library",
-        label: "Otworz Biblioteke",
-        hint: "Przejdz do pelnej listy repozytoriow.",
-        shortcut: "Alt+2",
-        icon: FolderSearch,
-        run: () => onOpenTab("library")
-      },
-      {
-        id: "new",
-        label: "Otworz Nowo znalezione",
-        hint: "Przejdz do inboxa nowych repo.",
-        shortcut: "Alt+3",
-        icon: Sparkles,
-        run: () => onOpenTab("new")
-      },
-      {
-        id: "weekly",
-        label: "Utworz raport tygodniowy",
-        hint: "Wygeneruj lokalny raport tygodniowy.",
-        icon: FileText,
-        run: onCreateWeeklyReport
-      },
-      {
-        id: "csv",
-        label: "Eksportuj CSV pomyslow",
-        hint: "Pobierz CSV z pomyslami.",
-        icon: Download,
-        run: onDownloadIdeasCsv
-      },
-      {
-        id: "portfolio-brief",
-        label: "Utworz RepoRadar Brief",
-        hint: "Wygeneruj markdown portfolio i otworz widok do PDF.",
-        icon: FileText,
-        run: onCreatePortfolioBrief
-      },
-      {
-        id: "settings",
-        label: "Otworz Ustawienia",
-        hint: "Przejdz do konfiguracji lokalnego MVP.",
-        shortcut: "Alt+6",
-        icon: Settings,
-        run: () => onOpenTab("settings")
-      },
-      {
-        id: "daily",
-        label: "Otworz Radar dzisiaj",
-        hint: "Wroc do glownego widoku decyzji.",
-        shortcut: "Alt+1",
-        icon: CalendarClock,
-        run: () => onOpenTab("radar")
+        id: "navigation",
+        label: "Nawigacja",
+        commands: [
+          {
+            id: "radar",
+            label: "Otworz Radar dzisiaj",
+            hint: "Wroc do glownego widoku decyzji.",
+            shortcut: "Alt+1",
+            icon: CalendarClock,
+            run: () => onOpenTab("radar")
+          },
+          {
+            id: "library",
+            label: "Otworz Biblioteke",
+            hint: "Przejdz do pelnej listy repozytoriow.",
+            shortcut: "Alt+2",
+            icon: FolderSearch,
+            run: () => onOpenTab("library")
+          },
+          {
+            id: "new",
+            label: "Otworz Nowo znalezione",
+            hint: "Przejdz do inboxa nowych repo.",
+            shortcut: "Alt+3",
+            icon: Sparkles,
+            run: () => onOpenTab("new")
+          },
+          {
+            id: "settings",
+            label: "Otworz Ustawienia",
+            hint: "Przejdz do konfiguracji lokalnego MVP.",
+            shortcut: "Alt+6",
+            icon: Settings,
+            run: () => onOpenTab("settings")
+          }
+        ]
       }
     ],
-    [onCreatePortfolioBrief, onCreateWeeklyReport, onDownloadIdeasCsv, onOpenTab, onRunScan]
+    [onCreatePortfolioBrief, onCreateWeeklyReport, onDownloadIdeasCsv, onOpenDailyBriefing, onOpenTab, onRunScan]
   );
 
   const normalizedQuery = query.trim().toLowerCase();
-  const visibleCommands = normalizedQuery
-    ? commands.filter((command) => `${command.label} ${command.hint}`.toLowerCase().includes(normalizedQuery))
-    : commands;
+  const visibleCommandGroups = commandGroups
+    .map((group) => ({
+      ...group,
+      commands: normalizedQuery
+        ? group.commands.filter((command) => `${command.label} ${command.hint}`.toLowerCase().includes(normalizedQuery))
+        : group.commands
+    }))
+    .filter((group) => group.commands.length > 0);
   const repoMatches = normalizedQuery
     ? repositories
         .filter((repo) => {
@@ -149,7 +180,7 @@ export function CommandPalette({
     <DialogShell titleId="command-palette-title" onClose={onClose} className="max-w-3xl p-0">
       <div className="border-b border-border-subtle p-4">
         <h2 id="command-palette-title" className="text-lg font-semibold text-foreground">
-          Command Palette
+          Paleta komend
         </h2>
         <label className="relative mt-3 block">
           <span className="sr-only">Szukaj komend albo repozytoriow</span>
@@ -166,26 +197,35 @@ export function CommandPalette({
       </div>
 
       <div className="max-h-[68vh] overflow-auto p-3">
-        <div className="space-y-1">
-          {visibleCommands.map((command) => {
-            const Icon = command.icon;
-            return (
-              <button
-                key={command.id}
-                type="button"
-                className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 py-2 text-left transition duration-fast ease-interface hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                onClick={() => runAndClose(command.run)}
-                disabled={isPending}
-              >
-                <Icon className="h-4 w-4 text-primary" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-foreground">{command.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{command.hint}</span>
-                </span>
-                {command.shortcut ? <kbd className="rounded-md border border-border-subtle px-2 py-1 text-xs text-muted-foreground">{command.shortcut}</kbd> : null}
-              </button>
-            );
-          })}
+        <div className="space-y-4">
+          {visibleCommandGroups.map((group) => (
+            <section key={group.id} aria-labelledby={`command-group-${group.id}`}>
+              <h3 id={`command-group-${group.id}`} className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.commands.map((command) => {
+                  const Icon = command.icon;
+                  return (
+                    <button
+                      key={command.id}
+                      type="button"
+                      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 py-2 text-left transition duration-fast ease-interface hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      onClick={() => runAndClose(command.run)}
+                      disabled={isPending}
+                    >
+                      <Icon className="h-4 w-4 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-foreground">{command.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{command.hint}</span>
+                      </span>
+                      {command.shortcut ? <kbd className="rounded-md border border-border-subtle px-2 py-1 text-xs text-muted-foreground">{command.shortcut}</kbd> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
 
         {normalizedQuery ? (

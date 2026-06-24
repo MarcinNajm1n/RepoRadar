@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, Command, Download, FileText, Printer, RefreshCw } from "lucide-react";
+import { Command, Printer, RefreshCw } from "lucide-react";
 import type {
   DashboardData,
   EvidenceSourceItem,
@@ -167,14 +167,14 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
       const key = event.key.toLowerCase();
       if ((event.ctrlKey || event.metaKey) && key === "k") {
         event.preventDefault();
         openCommandPalette();
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
         return;
       }
 
@@ -395,30 +395,13 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             <Button variant="secondary" onClick={openCommandPalette} disabled={isPending}>
               <Command className="h-4 w-4" />
               Komendy
+              <kbd aria-hidden="true" className="ml-1 rounded border border-border-subtle px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                Ctrl K
+              </kbd>
             </Button>
             <Button onClick={runScan} disabled={isPending}>
               <RefreshCw className={cn("h-4 w-4", isPending && "animate-spin")} />
               Uruchom scan
-            </Button>
-            <Button variant="secondary" onClick={openDailyBriefing} disabled={isPending}>
-              <CalendarClock className="h-4 w-4" />
-              Briefing dzienny
-            </Button>
-            <Button variant="secondary" onClick={downloadIdeasCsv} disabled={isPending}>
-              <Download className="h-4 w-4" />
-              Eksport CSV
-            </Button>
-            <Button variant="secondary" onClick={openPortfolioBrief} disabled={isPending}>
-              <FileText className="h-4 w-4" />
-              RepoRadar Brief
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={createWeeklyReport}
-              disabled={isPending}
-            >
-              <FileText className="h-4 w-4" />
-              Raport tygodniowy
             </Button>
           </>
         }
@@ -432,6 +415,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
         onClose={() => setIsCommandPaletteOpen(false)}
         onRunScan={runScan}
         onOpenTab={switchToTab}
+        onOpenDailyBriefing={openDailyBriefing}
         onCreateWeeklyReport={createWeeklyReport}
         onCreatePortfolioBrief={openPortfolioBrief}
         onDownloadIdeasCsv={downloadIdeasCsv}
