@@ -6,6 +6,7 @@ import { getRepositoryStatusDisplay } from "@/lib/display/status-display";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
 import { Badge, Button, MetricPill, ScoreChip, StatusChip, TextClamp } from "./ui";
 import { RepoCardActions } from "./repo-card-actions";
+import { AiBudgetLabel, formatAiBudgetActionLabel } from "./ai-budget-label";
 
 type RepoCardProps = {
   repo: RepositoryListItem;
@@ -86,9 +87,18 @@ export function RepoCard({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 xl:max-w-[260px] xl:justify-end">
-          <Button variant="secondary" onClick={onOpenReport} disabled={isPending}>
-            Raport
-          </Button>
+          <span className="inline-flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              onClick={onOpenReport}
+              disabled={isPending}
+              aria-label={formatAiBudgetActionLabel("Raport", "repo-report")}
+              title={formatAiBudgetActionLabel("Raport", "repo-report")}
+            >
+              Raport
+            </Button>
+            <AiBudgetLabel action="repo-report" />
+          </span>
           {safeUrl && safeUrl.startsWith("https://github.com/") ? (
             <a
               href={safeUrl}

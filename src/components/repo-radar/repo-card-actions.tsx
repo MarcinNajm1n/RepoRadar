@@ -1,6 +1,7 @@
 import { BookOpen, Brain, ClipboardList, ExternalLink, FileText, RefreshCw, Search, Star, Trash2 } from "lucide-react";
 import { Button } from "./ui";
 import { sanitizeExternalUrl } from "@/lib/utils";
+import { AiBudgetLabel, formatAiBudgetActionLabel } from "./ai-budget-label";
 
 export type RepoCardActionsProps = {
   repoUrl: string;
@@ -46,18 +47,58 @@ export function RepoCardActions({
       <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
         <FileText className="h-4 w-4" /> Brief
       </Button>
-      <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
-        <FileText className="h-4 w-4" /> Raport
-      </Button>
-      <Button variant="secondary" size="sm" onClick={onRegenerateReport} disabled={isPending}>
-        <RefreshCw className="h-4 w-4" /> Regeneruj
-      </Button>
-      <Button variant="secondary" size="sm" onClick={onGenerateIdea} disabled={isPending}>
-        <Brain className="h-4 w-4" /> Pomysl
-      </Button>
-      <Button variant="secondary" size="sm" onClick={onResearch} disabled={isPending}>
-        <Search className="h-4 w-4" /> Research
-      </Button>
+      <span className="inline-flex items-center gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onOpenReport}
+          disabled={isPending}
+          aria-label={formatAiBudgetActionLabel("Raport", "repo-report")}
+          title={formatAiBudgetActionLabel("Raport", "repo-report")}
+        >
+          <FileText className="h-4 w-4" /> Raport
+        </Button>
+        <AiBudgetLabel action="repo-report" />
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onRegenerateReport}
+          disabled={isPending}
+          aria-label={formatAiBudgetActionLabel("Regeneruj raport", "repo-report")}
+          title={formatAiBudgetActionLabel("Regeneruj raport", "repo-report")}
+        >
+          <RefreshCw className="h-4 w-4" /> Regeneruj
+        </Button>
+        <AiBudgetLabel action="repo-report" />
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onGenerateIdea}
+          disabled={isPending}
+          aria-label={formatAiBudgetActionLabel("Pomysl", "idea")}
+          title={formatAiBudgetActionLabel("Pomysl", "idea")}
+        >
+          <Brain className="h-4 w-4" /> Pomysl
+        </Button>
+        <AiBudgetLabel action="idea" />
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onResearch}
+          disabled={isPending}
+          aria-label={formatAiBudgetActionLabel("Research", "opportunity-research")}
+          title={formatAiBudgetActionLabel("Research", "opportunity-research")}
+        >
+          <Search className="h-4 w-4" /> Research
+        </Button>
+        <AiBudgetLabel action="opportunity-research" />
+      </span>
       <Button variant="secondary" size="sm" onClick={onAddCloneTask} disabled={isPending}>
         <ClipboardList className="h-4 w-4" /> Clone later
       </Button>

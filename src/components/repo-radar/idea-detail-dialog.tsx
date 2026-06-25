@@ -6,6 +6,7 @@ import type { IdeaListItem } from "@/types/repository";
 import { IDEA_STATUS } from "@/types/idea-status";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { Badge, Button, DialogShell, MetricPill, TextClamp } from "./ui";
+import { AiBudgetLabel, formatAiBudgetActionLabel } from "./ai-budget-label";
 
 const ideaDetailTitleId = "idea-detail-dialog-title";
 
@@ -88,9 +89,18 @@ export function IdeaDetailDialog({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {idea.status !== IDEA_STATUS.DISMISSED ? (
-          <Button variant="secondary" onClick={onPromote} disabled={isPending || idea.status === IDEA_STATUS.FULL}>
-            <Brain className="h-4 w-4" /> Rozwin pelny pomysl
-          </Button>
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <Button
+              variant="secondary"
+              onClick={onPromote}
+              disabled={isPending || idea.status === IDEA_STATUS.FULL}
+              aria-label={formatAiBudgetActionLabel("Rozwin pelny pomysl", "idea-promote")}
+              title={formatAiBudgetActionLabel("Rozwin pelny pomysl", "idea-promote")}
+            >
+              <Brain className="h-4 w-4" /> Rozwin pelny pomysl
+            </Button>
+            <AiBudgetLabel action="idea-promote" />
+          </span>
         ) : null}
         <Button variant="secondary" onClick={onSave} disabled={isPending}>
           <Star className="h-4 w-4" /> Zapisz

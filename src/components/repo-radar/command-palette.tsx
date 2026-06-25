@@ -9,6 +9,7 @@ import type { TabKey } from "./navigation";
 import { tabs } from "./navigation";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { Button, DialogShell } from "./ui";
+import { formatOpenAiBudgetCommandDescription } from "@/lib/openai/token-budgets";
 
 type CommandItem = {
   id: string;
@@ -93,7 +94,7 @@ export function CommandPalette({
           {
             id: "scan",
             label: "Uruchom scan",
-            hint: "Pobierz najnowsze dane z GitHuba.",
+            hint: `Pobierz najnowsze dane z GitHuba. Moze uzyc summary AI: ${formatOpenAiBudgetCommandDescription("summary")}`,
             icon: RefreshCw,
             run: onRunScan
           },

@@ -4,6 +4,7 @@ import { Brain, Star, Trash2 } from "lucide-react";
 import type { IdeaListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { Badge, Button, MetricPill, ScoreChip, TextClamp } from "./ui";
+import { AiBudgetLabel, formatAiBudgetActionLabel } from "./ai-budget-label";
 
 export function CandidateCard({
   idea,
@@ -57,9 +58,19 @@ export function CandidateCard({
             <div className="mt-1 text-sm font-semibold">{nextAction}</div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={onPromote} disabled={isPending}>
-              <Brain className="h-4 w-4" /> Rozwin
-            </Button>
+            <span className="inline-flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onPromote}
+                disabled={isPending}
+                aria-label={formatAiBudgetActionLabel("Rozwin", "idea-promote")}
+                title={formatAiBudgetActionLabel("Rozwin", "idea-promote")}
+              >
+                <Brain className="h-4 w-4" /> Rozwin
+              </Button>
+              <AiBudgetLabel action="idea-promote" />
+            </span>
             <Button variant="secondary" size="sm" onClick={onSave} disabled={isPending}>
               <Star className="h-4 w-4" /> Zapisz
             </Button>

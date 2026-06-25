@@ -8,6 +8,7 @@ import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
 import { Badge, Button, EmptyState, MetricPill, ScoreChip, SectionCard, SkeletonBlock, SkeletonText, TextClamp } from "./ui";
+import { AiBudgetLabel, formatAiBudgetActionLabel } from "./ai-budget-label";
 
 export function RadarTodayView({
   radarToday,
@@ -414,9 +415,19 @@ function RadarRepositoryCard({
           <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
             <FileText className="h-4 w-4" /> Brief
           </Button>
-          <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
-            <FileText className="h-4 w-4" /> Raport
-          </Button>
+          <span className="inline-flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenReport}
+              disabled={isPending}
+              aria-label={formatAiBudgetActionLabel("Raport", "repo-report")}
+              title={formatAiBudgetActionLabel("Raport", "repo-report")}
+            >
+              <FileText className="h-4 w-4" /> Raport
+            </Button>
+            <AiBudgetLabel action="repo-report" />
+          </span>
           <Button variant="secondary" size="sm" onClick={onCreateReadmeTask} disabled={isPending}>
             <BookOpen className="h-4 w-4" /> README
           </Button>
@@ -461,9 +472,19 @@ function RadarBusinessCandidateCard({
         <Button variant="secondary" size="sm" onClick={onOpenDetail}>
           Szczegoly
         </Button>
-        <Button variant="secondary" size="sm" onClick={onPromote} disabled={isPending}>
-          <Brain className="h-4 w-4" /> Rozwin
-        </Button>
+        <span className="inline-flex items-center gap-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onPromote}
+            disabled={isPending}
+            aria-label={formatAiBudgetActionLabel("Rozwin", "idea-promote")}
+            title={formatAiBudgetActionLabel("Rozwin", "idea-promote")}
+          >
+            <Brain className="h-4 w-4" /> Rozwin
+          </Button>
+          <AiBudgetLabel action="idea-promote" />
+        </span>
       </div>
     </article>
   );

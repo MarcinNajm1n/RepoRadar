@@ -9,6 +9,7 @@ import { getRepositoryStatusDisplay } from "@/lib/display/status-display";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
 import { Badge, Button, ScoreChip, StatusChip } from "./ui";
 import { RepoDetailsPanel } from "./repo-details-panel";
+import { formatAiBudgetActionLabel } from "./ai-budget-label";
 
 export type RepoRowProps = {
   repo: RepositoryListItem;
@@ -59,6 +60,7 @@ export function RepoRow({
     fallback: "Brak opisu."
   });
   const pushed = repo.pushedAt ? formatDisplayDate(repo.pushedAt) : "brak";
+  const reportBudgetLabel = formatAiBudgetActionLabel("Raport", "repo-report");
 
   return (
     <article className={cn("bg-surface-panel transition duration-fast ease-interface", isExpanded && "bg-surface-raised")}>
@@ -131,7 +133,14 @@ export function RepoRow({
           >
             <GitCompare className="h-4 w-4" />
           </Button>
-          <Button variant="secondary" size="sm" onClick={onOpenReport} disabled={isPending}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onOpenReport}
+            disabled={isPending}
+            aria-label={reportBudgetLabel}
+            title={reportBudgetLabel}
+          >
             <FileText className="h-4 w-4" />
             Raport
           </Button>

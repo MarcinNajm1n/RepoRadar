@@ -6,12 +6,15 @@ export type OpenAiActionBudgetKey =
   | "opportunity-research"
   | "weekly-report";
 
+export type OpenAiActionKind = OpenAiActionBudgetKey;
+
 export type OpenAiActionBudget = {
   key: OpenAiActionBudgetKey;
   label: string;
   maxInputChars: number;
   maxOutputTokens: number;
   expectedCalls: string;
+  expectedCallsWithoutResearch?: string;
 };
 
 export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBudget> = {
@@ -27,21 +30,24 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
     label: "Full report",
     maxInputChars: 28000,
     maxOutputTokens: 2400,
-    expectedCalls: "1-2 calls"
+    expectedCalls: "1-2 calls",
+    expectedCallsWithoutResearch: "1 call"
   },
   idea: {
     key: "idea",
     label: "Idea",
     maxInputChars: 22000,
     maxOutputTokens: 1600,
-    expectedCalls: "1-2 calls"
+    expectedCalls: "1-2 calls",
+    expectedCallsWithoutResearch: "1 call"
   },
   "idea-promote": {
     key: "idea-promote",
     label: "Idea promotion",
     maxInputChars: 24000,
     maxOutputTokens: 1800,
-    expectedCalls: "1-2 calls"
+    expectedCalls: "1-2 calls",
+    expectedCallsWithoutResearch: "1 call"
   },
   "opportunity-research": {
     key: "opportunity-research",
@@ -77,7 +83,27 @@ export function getOpenAiActionOptions(key: OpenAiActionBudgetKey) {
   return budget.maxOutputTokens > 0 ? { maxOutputTokens: budget.maxOutputTokens } : {};
 }
 
-export function formatOpenAiBudgetLabel(key: OpenAiActionBudgetKey) {
+function formatExpectedCallsPl(expectedCalls: string) {
+  return `${expectedCalls.replace(/\s*calls?$/, "")} wyw.`;
+}
+
+export function formatOpenAiBudgetLabel(key: OpenAiActionBudgetKey, options: { marketResearchEnabled?: boolean } = {}) {
   const budget = getOpenAiActionBudget(key);
-  return `${budget.expectedCalls}, max ${budget.maxOutputTokens} output tokens`;
+  const expectedCalls =
+    options.marketResearchEnabled === false && budget.expectedCallsWithoutResearch
+      ? budget.expectedCallsWithoutResearch
+      : budget.expectedCalls;
+  const calls = formatExpectedCallsPl(expectedCalls);
+  return budget.maxOutputTokens > 0 ? `${calls} / ${budget.maxOutputTokens} tok.` : calls;
+}
+
+export function formatOpenAiBudgetBadgeLabel(key: OpenAiActionBudgetKey, options: { marketResearchEnabled?: boolean } = {}) {
+  return `AI: ${formatOpenAiBudgetLabel(key, options)}`;
+}
+
+export function formatOpenAiBudgetCommandDescription(
+  key: OpenAiActionBudgetKey,
+  options: { marketResearchEnabled?: boolean } = {}
+) {
+  return `Budzet AI: ${formatOpenAiBudgetLabel(key, options)}`;
 }
