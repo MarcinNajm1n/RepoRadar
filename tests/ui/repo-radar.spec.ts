@@ -33,26 +33,84 @@ test("keeps repository filters usable", async ({ page }) => {
   await expectNoHorizontalOverflow(page);
 });
 
-test("supports keyboard navigation shortcuts", async ({ page }) => {
+test("supports sidebar keyboard activation and aria-current state", async ({ page }) => {
+  const navigation = page.getByRole("navigation", { name: "Widoki RepoRadar" });
+  const radarButton = navigation.getByRole("button", { name: "Radar dzisiaj" });
   const libraryButton = page.getByRole("navigation").getByRole("button", { name: "Biblioteka" });
+
+  await expect(radarButton).toHaveAttribute("aria-current", "page");
+  await expect(libraryButton).not.toHaveAttribute("aria-current", "page");
+
   await libraryButton.focus();
   await expect(libraryButton).toBeFocused();
   await page.keyboard.press("Enter");
   const searchInput = page.getByPlaceholder("Szukaj nazwy, ownera, topics...");
   await expect(searchInput).toBeVisible();
+  await expect(libraryButton).toHaveAttribute("aria-current", "page");
+  await expect(radarButton).not.toHaveAttribute("aria-current", "page");
 
   await page.keyboard.press("/");
   await expect(searchInput).toBeFocused();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("opens the command palette with Ctrl+K, traps focus, and restores focus on Escape", async ({ page }) => {
+  const libraryButton = page.getByRole("navigation").getByRole("button", { name: "Biblioteka" });
+  await libraryButton.focus();
+  await expect(libraryButton).toBeFocused();
 
   await page.keyboard.press("Control+K");
-  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeHidden();
+  const dialog = page.getByRole("dialog", { name: "Paleta komend" });
+  const commandInput = page.getByRole("combobox", { name: "Szukaj komend albo repozytoriow" });
+  const scanCommand = page.getByRole("option", { name: /Uruchom scan/ });
 
+  await expect(dialog).toBeVisible();
+  await expect(commandInput).toBeFocused();
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-scan");
+  await expect(scanCommand).toHaveAttribute("id", "command-scan");
+  await expect(scanCommand).toHaveAttribute("data-active", "true");
+
+  await page.keyboard.press("Tab");
+  await expect(commandInput).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(commandInput).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(libraryButton).toBeFocused();
+
+  await expectNoHorizontalOverflow(page);
+});
+
+test("supports keyboard navigation shortcuts", async ({ page }) => {
   const settingsButton = page.getByRole("navigation").getByRole("button", { name: "Ustawienia" });
   await settingsButton.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Ustawienia MVP")).toBeVisible();
+
+  await expectNoHorizontalOverflow(page);
+});
+
+test("expands and collapses repository details by keyboard", async ({ page }) => {
+  await page.getByRole("navigation").getByRole("button", { name: "Biblioteka" }).click();
+
+  const initialToggle = page.getByRole("button", { name: "Rozwin szczegoly" }).first();
+  await expect(initialToggle).toBeVisible();
+  await expect(initialToggle).toHaveAttribute("aria-expanded", "false");
+  const detailsId = await initialToggle.getAttribute("aria-controls");
+  expect(detailsId).toBeTruthy();
+  const repoToggle = page.locator(`button[aria-controls="${detailsId}"]`).last();
+  const detailsPanel = page.locator(`[id="${detailsId}"]`);
+
+  await repoToggle.focus();
+  await expect(repoToggle).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(repoToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(detailsPanel).toBeVisible();
+
+  await page.keyboard.press("Space");
+  await expect(repoToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(detailsPanel).toBeHidden();
 
   await expectNoHorizontalOverflow(page);
 });

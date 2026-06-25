@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const focusableSelector = [
@@ -27,13 +27,15 @@ export function DialogShell({
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const [previousActiveElement] = useState<HTMLElement | null>(() =>
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null
+  );
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
 
   useEffect(() => {
-    const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = window.requestAnimationFrame(() => {
       dialogRef.current?.focus();
     });
@@ -99,7 +101,7 @@ export function DialogShell({
         previousActiveElement.focus();
       }
     };
-  }, []);
+  }, [previousActiveElement]);
 
   function closeFromBackdrop(event: React.MouseEvent<HTMLDivElement>) {
     if (event.target === event.currentTarget) {
