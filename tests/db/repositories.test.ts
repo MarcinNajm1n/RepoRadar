@@ -346,4 +346,96 @@ describe("buildRadarToday", () => {
     ]);
     expect(radar.nextAction).toMatchObject({ kind: "alert", id: "alert:last-scan-failed" });
   });
+
+  it("builds first-run onboarding for an empty or unconfigured radar", () => {
+    const radar = buildRadarToday(
+      {
+        repositories: [],
+        ideas: [],
+        actionItems: [],
+        lastScan: null,
+        settingsStatus: settingsStatus({ githubTokenConfigured: false, openAiConfigured: false }),
+        notificationStatus: notificationStatus()
+      },
+      5,
+      now
+    );
+
+    expect(radar.firstRun.visible).toBe(true);
+    expect(radar.firstRun.completedCount).toBe(0);
+    expect(radar.firstRun.totalCount).toBe(3);
+    expect(radar.firstRun.steps.map((step) => step.id)).toEqual([
+      "local_data",
+      "github_token",
+      "first_scan",
+      "decision_queue",
+      "openai",
+      "portfolio_screenshots"
+    ]);
+    expect(radar.firstRun.steps.find((step) => step.id === "local_data")).toMatchObject({
+      status: "todo",
+      priority: "required",
+      command: "npm run db:seed"
+    });
+    expect(radar.firstRun.steps.find((step) => step.id === "openai")).toMatchObject({
+      status: "optional",
+      priority: "optional",
+      action: "open_settings"
+    });
+  });
+
+  it("hides first-run onboarding once local data, scan, and GitHub config are ready", () => {
+    const radar = buildRadarToday(
+      {
+        repositories: [mapRepository(repositoryRecord({ id: "repo_ready", fullName: "owner/ready" }))],
+        ideas: [],
+        actionItems: [actionItemRecord()],
+        lastScan: {
+          startedAt: now.toISOString(),
+          finishedAt: now.toISOString(),
+          status: "SUCCESS",
+          reposFound: 1,
+          reposUpdated: 1,
+          errorMessage: null
+        },
+        settingsStatus: settingsStatus({ githubTokenConfigured: true, openAiConfigured: false }),
+        notificationStatus: notificationStatus()
+      },
+      5,
+      now
+    );
+
+    expect(radar.firstRun.visible).toBe(false);
+    expect(radar.firstRun.steps.find((step) => step.id === "local_data")).toMatchObject({ status: "done" });
+    expect(radar.firstRun.steps.find((step) => step.id === "first_scan")).toMatchObject({ status: "done" });
+    expect(radar.firstRun.steps.find((step) => step.id === "openai")).toMatchObject({ status: "optional" });
+  });
+
+  it("keeps first-run onboarding visible after a failed scan until a successful scan exists", () => {
+    const radar = buildRadarToday(
+      {
+        repositories: [mapRepository(repositoryRecord({ id: "repo_existing", fullName: "owner/existing" }))],
+        ideas: [],
+        actionItems: [],
+        lastScan: {
+          startedAt: now.toISOString(),
+          finishedAt: now.toISOString(),
+          status: "FAILED",
+          reposFound: 0,
+          reposUpdated: 0,
+          errorMessage: "rate limit"
+        },
+        settingsStatus: settingsStatus({ githubTokenConfigured: true }),
+        notificationStatus: notificationStatus()
+      },
+      5,
+      now
+    );
+
+    expect(radar.firstRun.visible).toBe(true);
+    expect(radar.firstRun.steps.find((step) => step.id === "first_scan")).toMatchObject({
+      status: "todo",
+      priority: "required"
+    });
+  });
 });

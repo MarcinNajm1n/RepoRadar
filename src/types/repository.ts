@@ -234,6 +234,23 @@ export type RadarNextAction = {
   taskId: string | null;
 };
 
+export type RadarFirstRunStep = {
+  id: "local_data" | "github_token" | "first_scan" | "decision_queue" | "openai" | "portfolio_screenshots";
+  title: string;
+  description: string;
+  status: "done" | "todo" | "optional";
+  priority: "required" | "optional";
+  action: "open_library" | "open_settings" | "run_scan" | "open_tasks" | "none";
+  command: string | null;
+};
+
+export type RadarFirstRunOnboarding = {
+  visible: boolean;
+  completedCount: number;
+  totalCount: number;
+  steps: RadarFirstRunStep[];
+};
+
 export type ObservabilitySummary = {
   lastScan: {
     status: string;
@@ -382,6 +399,7 @@ export type DashboardLastScan = {
 
 export type RadarTodayData = {
   generatedAt: string;
+  firstRun: RadarFirstRunOnboarding;
   nextAction: RadarNextAction;
   topRepositories: RepositoryListItem[];
   newGems: RepositoryListItem[];

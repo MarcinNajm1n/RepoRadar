@@ -9,6 +9,12 @@ const noop = () => undefined;
 function radarToday(overrides: Partial<RadarTodayData> = {}): RadarTodayData {
   return {
     generatedAt: "2026-06-16T12:00:00.000Z",
+    firstRun: {
+      visible: false,
+      completedCount: 3,
+      totalCount: 3,
+      steps: []
+    },
     nextAction: {
       id: "repo:repo_signal",
       kind: "repo",
@@ -61,5 +67,69 @@ describe("RadarTodayView", () => {
     expect(html).toContain("Ocena trendu: 91.");
     expect(html).toContain("Wzrost 7d: +42 gwiazdek.");
     expect(html.indexOf("Dlaczego teraz")).toBeLessThan(html.indexOf("Ocena trendu: 91."));
+  });
+
+  it("renders first-run onboarding when the radar is not configured yet", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RadarTodayView, {
+        radarToday: radarToday({
+          firstRun: {
+            visible: true,
+            completedCount: 0,
+            totalCount: 2,
+            steps: [
+              {
+                id: "local_data",
+                title: "Dane lokalne albo demo",
+                description: "Pusta baza jest poprawna, ale do demo najpierw uruchom seed albo scan.",
+                status: "todo",
+                priority: "required",
+                action: "open_library",
+                command: "npm run db:seed"
+              },
+              {
+                id: "github_token",
+                title: "GitHub token",
+                description: "Dodaj GITHUB_TOKEN w .env, zeby uniknac szybkiego rate limitu.",
+                status: "todo",
+                priority: "required",
+                action: "open_settings",
+                command: null
+              },
+              {
+                id: "portfolio_screenshots",
+                title: "Portfolio screenshots",
+                description: "Po seedzie i starcie aplikacji zapisz lokalne ujecia do ignorowanego test-results.",
+                status: "optional",
+                priority: "optional",
+                action: "none",
+                command: "npm run screenshots:portfolio"
+              }
+            ]
+          }
+        }),
+        isPending: false,
+        onOpenLibrary: noop,
+        onOpenReport: noop,
+        onOpenQuickBrief: noop,
+        onCreateReadmeTask: noop,
+        onCreateManualTask: noop,
+        onOpenCandidate: noop,
+        onPromoteCandidate: noop,
+        onOpenTasks: noop,
+        onOpenSettings: noop,
+        onRunScan: noop,
+        renderActionItem: () => React.createElement("div")
+      })
+    );
+
+    expect(html).toContain("Szybki start");
+    expect(html).toContain("Przygotuj lokalny radar do pierwszej decyzji");
+    expect(html).toContain("Dane lokalne albo demo");
+    expect(html).toContain("npm run db:seed");
+    expect(html).toContain("GitHub token");
+    expect(html).toContain("Otworz Ustawienia dla kroku: GitHub token");
+    expect(html).toContain("Opcjonalnie pozniej");
+    expect(html).toContain("npm run screenshots:portfolio");
   });
 });

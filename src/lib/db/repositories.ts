@@ -475,6 +475,89 @@ function buildNextAction(input: RadarNextActionSelectionInput): RadarNextAction 
   return rankRadarNextActionCandidates(input)[0] ?? buildScanNextAction(input.lastScan);
 }
 
+function buildFirstRunOnboarding(input: {
+  activeRepositories: RepositoryListItem[];
+  actionItems: ActionItemListItem[];
+  lastScan: DashboardLastScan;
+  settingsStatus: DashboardSettingsStatus;
+}): RadarTodayData["firstRun"] {
+  const hasLocalData = input.activeRepositories.length > 0;
+  const hasSuccessfulScan = input.lastScan?.status === "SUCCESS";
+  const hasDecisionQueue = input.actionItems.length > 0;
+  const steps: RadarTodayData["firstRun"]["steps"] = [
+    {
+      id: "local_data",
+      title: "Dane lokalne albo demo",
+      description: hasLocalData
+        ? `${input.activeRepositories.length} repo jest gotowych do przegladu w Bibliotece.`
+        : "Pusta baza jest poprawna, ale do demo najpierw uruchom seed albo scan.",
+      status: hasLocalData ? "done" : "todo",
+      priority: "required",
+      action: "open_library",
+      command: hasLocalData ? null : "npm run db:seed"
+    },
+    {
+      id: "github_token",
+      title: "GitHub token",
+      description: input.settingsStatus.githubTokenConfigured
+        ? "Token jest skonfigurowany, wiec scan ma wiekszy limit zapytan."
+        : "Dodaj GITHUB_TOKEN w .env, zeby uniknac szybkiego rate limitu.",
+      status: input.settingsStatus.githubTokenConfigured ? "done" : "todo",
+      priority: "required",
+      action: "open_settings",
+      command: null
+    },
+    {
+      id: "first_scan",
+      title: "Pierwszy scan",
+      description: hasSuccessfulScan ? "Radar ma juz zapisany udany wynik skanu." : "Uruchom udany scan, zeby zapisac snapshoty i ranking trendu.",
+      status: hasSuccessfulScan ? "done" : "todo",
+      priority: "required",
+      action: "run_scan",
+      command: "npm run scan"
+    },
+    {
+      id: "decision_queue",
+      title: "Kolejka decyzji",
+      description: hasDecisionQueue
+        ? `${input.actionItems.length} aktywnych zadan porzadkuje dalsza prace.`
+        : "Dodaj pierwsze zadanie z repo albo recznie, zeby nie gubic follow-upow.",
+      status: hasDecisionQueue ? "done" : "optional",
+      priority: "optional",
+      action: "open_tasks",
+      command: null
+    },
+    {
+      id: "openai",
+      title: "AI tylko na zadanie",
+      description: input.settingsStatus.openAiConfigured
+        ? "OPENAI_API_KEY jest gotowy dla briefow, raportow i pomyslow."
+        : "OpenAI jest opcjonalne; bez klucza nadal dziala scan, scoring i kolejka.",
+      status: input.settingsStatus.openAiConfigured ? "done" : "optional",
+      priority: "optional",
+      action: "open_settings",
+      command: null
+    },
+    {
+      id: "portfolio_screenshots",
+      title: "Portfolio screenshots",
+      description: "Po seedzie i starcie aplikacji zapisz lokalne ujecia do ignorowanego test-results.",
+      status: "optional",
+      priority: "optional",
+      action: "none",
+      command: "npm run screenshots:portfolio"
+    }
+  ];
+  const requiredSteps = steps.filter((step) => step.priority === "required");
+
+  return {
+    visible: requiredSteps.some((step) => step.status !== "done"),
+    completedCount: requiredSteps.filter((step) => step.status === "done").length,
+    totalCount: requiredSteps.length,
+    steps
+  };
+}
+
 export function buildRadarToday(
   input: {
     repositories: RepositoryListItem[];
@@ -518,6 +601,12 @@ export function buildRadarToday(
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     .slice(0, limit);
+  const firstRun = buildFirstRunOnboarding({
+    activeRepositories,
+    actionItems,
+    lastScan: input.lastScan,
+    settingsStatus: input.settingsStatus
+  });
   const alerts: RadarTodayData["alerts"] = [];
 
   if (input.lastScan?.status === "FAILED") {
@@ -572,6 +661,7 @@ export function buildRadarToday(
 
   return {
     generatedAt: now.toISOString(),
+    firstRun,
     nextAction,
     topRepositories,
     newGems,

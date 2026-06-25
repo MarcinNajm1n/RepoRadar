@@ -1,9 +1,25 @@
 "use client";
 
 import type React from "react";
-import { Activity, AlertTriangle, BookOpen, Brain, ClipboardList, ExternalLink, FileText, Radar, Sparkles } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BookOpen,
+  Brain,
+  CheckCircle2,
+  Circle,
+  ClipboardList,
+  Database,
+  ExternalLink,
+  FileText,
+  PlayCircle,
+  Radar,
+  Settings,
+  Sparkles,
+  Terminal
+} from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
-import type { IdeaListItem, RadarTodayData, RepositoryListItem } from "@/types/repository";
+import type { IdeaListItem, RadarFirstRunStep, RadarTodayData, RepositoryListItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { cn, sanitizeExternalUrl } from "@/lib/utils";
@@ -71,6 +87,17 @@ export function RadarTodayView({
           <MetricPill label="Alerty" value={radarToday.alerts.length} />
         </div>
       </section>
+
+      {radarToday.firstRun.visible ? (
+        <FirstRunOnboardingPanel
+          onboarding={radarToday.firstRun}
+          isPending={isPending}
+          onOpenLibrary={onOpenLibrary}
+          onOpenSettings={onOpenSettings}
+          onOpenTasks={onOpenTasks}
+          onRunScan={onRunScan}
+        />
+      ) : null}
 
       <section className="rounded-lg border border-primary/30 bg-primary/10 p-4 shadow-soft">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
@@ -263,6 +290,246 @@ export function RadarTodayView({
       </div>
     </section>
   );
+}
+
+function FirstRunOnboardingPanel({
+  onboarding,
+  isPending,
+  onOpenLibrary,
+  onOpenSettings,
+  onOpenTasks,
+  onRunScan
+}: {
+  onboarding: RadarTodayData["firstRun"];
+  isPending: boolean;
+  onOpenLibrary: () => void;
+  onOpenSettings: () => void;
+  onOpenTasks: () => void;
+  onRunScan: () => void;
+}) {
+  const requiredSteps = onboarding.steps.filter((step) => step.priority === "required");
+  const optionalSteps = onboarding.steps.filter((step) => step.priority === "optional");
+
+  return (
+    <section className="rounded-lg border border-info/30 bg-info/10 p-4 shadow-soft" aria-labelledby="first-run-title">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] xl:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-info">
+            <Database className="h-4 w-4" />
+            Szybki start
+            <Badge tone="info" variant="score">
+              wymagane {onboarding.completedCount}/{onboarding.totalCount}
+            </Badge>
+          </div>
+          <h3 id="first-run-title" className="mt-2 text-lg font-semibold text-foreground">
+            Przygotuj lokalny radar do pierwszej decyzji
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Ten panel znika, gdy masz lokalne dane, pierwszy scan i podstawowa konfiguracje GitHub. Kosztowne akcje AI nadal uruchamiasz recznie.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
+              <PlayCircle className="h-4 w-4" /> Uruchom scan
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onOpenSettings}>
+              <Settings className="h-4 w-4" /> Ustawienia
+            </Button>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <ol className="grid gap-2 md:grid-cols-3">
+            {requiredSteps.map((step) => (
+              <FirstRunStepItem
+                key={step.id}
+                step={step}
+                isPending={isPending}
+                onOpenLibrary={onOpenLibrary}
+                onOpenSettings={onOpenSettings}
+                onOpenTasks={onOpenTasks}
+                onRunScan={onRunScan}
+              />
+            ))}
+          </ol>
+          {optionalSteps.length ? (
+            <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Opcjonalnie pozniej</div>
+              <ol className="grid gap-2 md:grid-cols-3">
+                {optionalSteps.map((step) => (
+                  <FirstRunOptionalStep
+                    key={step.id}
+                    step={step}
+                    isPending={isPending}
+                    onOpenLibrary={onOpenLibrary}
+                    onOpenSettings={onOpenSettings}
+                    onOpenTasks={onOpenTasks}
+                    onRunScan={onRunScan}
+                  />
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FirstRunStepItem({
+  step,
+  isPending,
+  onOpenLibrary,
+  onOpenSettings,
+  onOpenTasks,
+  onRunScan
+}: {
+  step: RadarFirstRunStep;
+  isPending: boolean;
+  onOpenLibrary: () => void;
+  onOpenSettings: () => void;
+  onOpenTasks: () => void;
+  onRunScan: () => void;
+}) {
+  const isDone = step.status === "done";
+  const Icon = isDone ? CheckCircle2 : Circle;
+
+  return (
+    <li className="rounded-md border border-border-subtle bg-surface-panel p-3">
+      <div className="flex items-start gap-3">
+        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", isDone ? "text-success" : "text-muted-foreground")} aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-semibold text-foreground">{step.title}</h4>
+            <Badge tone={statusTone(step.status)} variant="status">
+              {statusLabel(step.status)}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {step.command ? (
+              <code className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-subtle bg-surface-inset px-2 py-1 text-xs text-muted-foreground">
+                <Terminal className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{step.command}</span>
+              </code>
+            ) : null}
+            <FirstRunStepAction
+              step={step}
+              isPending={isPending}
+              onOpenLibrary={onOpenLibrary}
+              onOpenSettings={onOpenSettings}
+              onOpenTasks={onOpenTasks}
+              onRunScan={onRunScan}
+            />
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function FirstRunOptionalStep({
+  step,
+  isPending,
+  onOpenLibrary,
+  onOpenSettings,
+  onOpenTasks,
+  onRunScan
+}: {
+  step: RadarFirstRunStep;
+  isPending: boolean;
+  onOpenLibrary: () => void;
+  onOpenSettings: () => void;
+  onOpenTasks: () => void;
+  onRunScan: () => void;
+}) {
+  return (
+    <li className="min-w-0 rounded-md border border-dashed border-border-subtle bg-surface-panel px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="min-w-0 text-xs font-semibold text-foreground">{step.title}</h4>
+        <Badge tone={statusTone(step.status)} variant="status">
+          {statusLabel(step.status)}
+        </Badge>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.description}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {step.command ? (
+          <code className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-subtle bg-surface-inset px-2 py-1 text-xs text-muted-foreground">
+            <Terminal className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{step.command}</span>
+          </code>
+        ) : null}
+        <FirstRunStepAction
+          step={step}
+          isPending={isPending}
+          onOpenLibrary={onOpenLibrary}
+          onOpenSettings={onOpenSettings}
+          onOpenTasks={onOpenTasks}
+          onRunScan={onRunScan}
+        />
+      </div>
+    </li>
+  );
+}
+
+function FirstRunStepAction({
+  step,
+  isPending,
+  onOpenLibrary,
+  onOpenSettings,
+  onOpenTasks,
+  onRunScan
+}: {
+  step: RadarFirstRunStep;
+  isPending: boolean;
+  onOpenLibrary: () => void;
+  onOpenSettings: () => void;
+  onOpenTasks: () => void;
+  onRunScan: () => void;
+}) {
+  switch (step.action) {
+    case "open_library":
+      return (
+        <Button variant="ghost" size="sm" onClick={onOpenLibrary} aria-label={`Otworz Biblioteke dla kroku: ${step.title}`}>
+          Biblioteka
+        </Button>
+      );
+    case "open_settings":
+      return (
+        <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label={`Otworz Ustawienia dla kroku: ${step.title}`}>
+          Ustawienia
+        </Button>
+      );
+    case "open_tasks":
+      return (
+        <Button variant="ghost" size="sm" onClick={onOpenTasks} aria-label={`Otworz Kolejke dla kroku: ${step.title}`}>
+          Kolejka
+        </Button>
+      );
+    case "run_scan":
+      return (
+        <Button variant="ghost" size="sm" onClick={onRunScan} disabled={isPending} aria-label={`Uruchom scan dla kroku: ${step.title}`}>
+          Scan
+        </Button>
+      );
+    case "none":
+    default:
+      return null;
+  }
+}
+
+function statusTone(status: RadarFirstRunStep["status"]) {
+  if (status === "done") {
+    return "success";
+  }
+
+  return status === "todo" ? "warning" : "info";
+}
+
+function statusLabel(status: RadarFirstRunStep["status"]) {
+  if (status === "done") {
+    return "gotowe";
+  }
+
+  return status === "todo" ? "do zrobienia" : "opcjonalne";
 }
 
 function NextActionButton({
