@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type React from "react";
-import { Bell, CalendarClock, Download, Moon, Trash2 } from "lucide-react";
+import { Bell, CalendarClock, Download, Moon, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AI_JOB_STATUSES, AI_JOB_TYPES } from "@/types/ai-job";
 import type { NotificationSummary, SettingsSummary } from "@/types/repository";
@@ -37,6 +37,7 @@ export function SettingsView({
   onClearExpiredExternalCache,
   onClearOldNotificationLogs,
   onTestNotification,
+  onRetryAiJob,
   onOpenDailyBriefing,
   onDownloadIdeasCsv,
   onPruneSnapshots,
@@ -50,6 +51,7 @@ export function SettingsView({
   onClearExpiredExternalCache: () => void;
   onClearOldNotificationLogs: () => void;
   onTestNotification: () => void;
+  onRetryAiJob: (job: SettingsSummary["recentAiJobs"][number]) => void;
   onOpenDailyBriefing: () => void;
   onDownloadIdeasCsv: () => void;
   onPruneSnapshots: () => void;
@@ -168,12 +170,18 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
-        <SettingsPanel title="Cache OpenAI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
-          <OpenAiCacheDiagnostics summary={settingsSummary.openAiCache} />
+        <SettingsPanel title="Centrum zadan AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
+          <AiJobsCenter
+            queue={settingsSummary.aiJobQueue}
+            jobs={settingsSummary.recentAiJobs}
+            estimatedNextActions={settingsSummary.aiCostSummary.estimatedNextActions}
+            isPending={isPending}
+            onRetryAiJob={onRetryAiJob}
+          />
         </SettingsPanel>
 
-        <SettingsPanel title="Ostatnie zadania AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
-          <RecentAiJobsList jobs={settingsSummary.recentAiJobs} />
+        <SettingsPanel title="Cache OpenAI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
+          <OpenAiCacheDiagnostics summary={settingsSummary.openAiCache} />
         </SettingsPanel>
 
         <SettingsPanel title="Evidence, cache i notyfikacje" className={activeSection === "integrations" ? "xl:col-span-2" : "hidden"}>
@@ -476,6 +484,141 @@ function RecentOpenAiCacheEntries({ entries }: { entries: SettingsSummary["openA
   );
 }
 
+function AiJobsCenter({
+  queue,
+  jobs,
+  estimatedNextActions,
+  isPending,
+  onRetryAiJob
+}: {
+  queue: SettingsSummary["aiJobQueue"];
+  jobs: SettingsSummary["recentAiJobs"];
+  estimatedNextActions: SettingsSummary["aiCostSummary"]["estimatedNextActions"];
+  isPending: boolean;
+  onRetryAiJob: (job: SettingsSummary["recentAiJobs"][number]) => void;
+}) {
+  const oldestActive = queue.oldestActiveJob;
+  const availableRetryCount = queue.recentFailures.filter((job) => canRetryAiJobFromSettings(job, estimatedNextActions)).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoItem label="Aktywne" value={String(queue.activeCount)} />
+        <InfoItem label="Bledy lacznie" value={String(queue.needsAttentionCount)} />
+        <InfoItem label="Retry dostepne" value={String(availableRetryCount)} />
+        <InfoItem label="Najstarsze aktywne" value={oldestActive ? formatAiJobSource(oldestActive) : "brak"} />
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-2">
+        <AiJobCountLedger title="Statusy" counts={queue.byStatus} />
+        <AiJobCountLedger title="Typy" counts={queue.byType} emptyText="Brak zarejestrowanych typow zadan." />
+      </div>
+
+      {queue.activeCount > 0 ? (
+        <p className="rounded-md border border-info/40 bg-info/10 p-3 text-sm text-info-foreground">
+          {queue.activeCount} zadanie AI jest aktywne. Kolejne uruchomienie tej samej analizy zostanie zablokowane przez dedupe.
+        </p>
+      ) : null}
+
+      <AiJobRetryActions
+        failures={queue.recentFailures}
+        totalFailedCount={queue.needsAttentionCount}
+        estimatedNextActions={estimatedNextActions}
+        isPending={isPending}
+        onRetryAiJob={onRetryAiJob}
+      />
+      <RecentAiJobsList jobs={jobs} />
+    </div>
+  );
+}
+
+function AiJobCountLedger({
+  title,
+  counts,
+  emptyText = "Brak danych."
+}: {
+  title: string;
+  counts: SettingsSummary["aiJobQueue"]["byStatus"];
+  emptyText?: string;
+}) {
+  const visibleCounts = counts.filter((entry) => entry.count > 0);
+
+  return (
+    <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      {visibleCounts.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {visibleCounts.map((entry) => (
+            <Badge key={entry.key} tone="neutral">
+              {entry.label}: <span className="tabular-nums">{entry.count}</span>
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function AiJobRetryActions({
+  failures,
+  totalFailedCount,
+  estimatedNextActions,
+  isPending,
+  onRetryAiJob
+}: {
+  failures: SettingsSummary["aiJobQueue"]["recentFailures"];
+  totalFailedCount: number;
+  estimatedNextActions: SettingsSummary["aiCostSummary"]["estimatedNextActions"];
+  isPending: boolean;
+  onRetryAiJob: (job: SettingsSummary["recentAiJobs"][number]) => void;
+}) {
+  if (failures.length === 0) {
+    return totalFailedCount > 0 ? (
+      <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground">
+        W historii jest {totalFailedCount} nieudanych zadan AI, ale nie ma bledow z ostatnich 24h do szybkiego retry.
+      </div>
+    ) : (
+      <div className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+        Brak bledow AI z ostatnich 24h.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground">
+      <div className="font-medium">Ostatnie bledy 24h</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {failures.map((job) => {
+          const retryCost = getAiJobRetryCostLabel(job.type, estimatedNextActions);
+          const canRetry = canRetryAiJobFromSettings(job, estimatedNextActions);
+
+          return canRetry ? (
+            <Button
+              key={job.id}
+              size="sm"
+              variant="secondary"
+              className="max-w-full justify-start"
+              title={`Ponow ${formatAiJobSource(job)} (${retryCost})`}
+              onClick={() => onRetryAiJob(job)}
+              disabled={isPending}
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span className="max-w-[18rem] truncate">Ponow {formatAiJobSource(job)}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">({retryCost})</span>
+            </Button>
+          ) : (
+            <span key={job.id} className="rounded-md border border-warning/40 bg-surface-panel px-2 py-1 text-warning-foreground">
+              {formatAiJobSource(job)}: {formatAiJobRetryHint(job, estimatedNextActions)}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RecentAiJobsList({ jobs }: { jobs: SettingsSummary["recentAiJobs"] }) {
   if (jobs.length === 0) {
     return (
@@ -486,8 +629,9 @@ function RecentAiJobsList({ jobs }: { jobs: SettingsSummary["recentAiJobs"] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border-subtle">
+    <div className="overflow-x-auto rounded-md border border-border-subtle" role="region" aria-label="Ostatnie zadania AI" tabIndex={0}>
       <table className="min-w-full divide-y divide-border-subtle text-sm">
+        <caption className="sr-only">Ostatnie zadania AI</caption>
         <thead className="bg-surface-inset text-xs font-medium uppercase text-muted-foreground">
           <tr>
             <th scope="col" className="px-3 py-2 text-left">
@@ -548,6 +692,53 @@ function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
 
 function formatAiJobSummary(summary: SettingsSummary["aiJobSummary"]) {
   return `${summary.running} w toku, ${summary.done24h} OK / 24h, ${summary.failed24h} błędów / 24h`;
+}
+
+function formatAiJobSource(job: SettingsSummary["recentAiJobs"][number]) {
+  return `${formatAiJobType(job.type)} / ${job.repoFullName ?? "bez repo"}`;
+}
+
+function getAiJobRetryCostLabel(type: string, estimatedNextActions: SettingsSummary["aiCostSummary"]["estimatedNextActions"]) {
+  switch (type) {
+    case "REPORT":
+      return estimatedNextActions.report;
+    case "IDEA":
+      return estimatedNextActions.idea;
+    case "RESEARCH":
+      return estimatedNextActions.research;
+    case "SUMMARY":
+      return estimatedNextActions.summary;
+    default:
+      return null;
+  }
+}
+
+function canRetryAiJobFromSettings(
+  job: SettingsSummary["recentAiJobs"][number],
+  estimatedNextActions: SettingsSummary["aiCostSummary"]["estimatedNextActions"]
+) {
+  const retryCost = getAiJobRetryCostLabel(job.type, estimatedNextActions);
+  return job.status === "FAILED" && Boolean(job.repoId) && Boolean(retryCost) && retryCost !== "wylaczone";
+}
+
+function formatAiJobRetryHint(
+  job: SettingsSummary["recentAiJobs"][number],
+  estimatedNextActions: SettingsSummary["aiCostSummary"]["estimatedNextActions"]
+) {
+  if (job.status !== "FAILED") {
+    return "Brak akcji";
+  }
+  if (!job.repoId) {
+    return "Brak repo do ponowienia";
+  }
+  const retryCost = getAiJobRetryCostLabel(job.type, estimatedNextActions);
+  if (retryCost === "wylaczone") {
+    return "Retry wylaczone w ustawieniach kosztow";
+  }
+  if (!retryCost) {
+    return "Ponow z kontekstu zrodla";
+  }
+  return "Ponow z panelu bledow";
 }
 
 function formatAiJobType(type: string) {

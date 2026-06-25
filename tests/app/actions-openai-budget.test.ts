@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   generateFullReportForRepository: vi.fn(),
   generateIdeaForRepository: vi.fn(),
   generateOpportunityCandidateForRepository: vi.fn(),
+  generateShortSummaryForRepository: vi.fn(),
   promoteCandidateToFullIdea: vi.fn(),
   revalidatePath: vi.fn(),
   runAiJob: vi.fn()
@@ -32,6 +33,7 @@ vi.mock("@/lib/openai/repository-analysis", () => ({
   generateFullReportForRepository: mocks.generateFullReportForRepository,
   generateIdeaForRepository: mocks.generateIdeaForRepository,
   generateOpportunityCandidateForRepository: mocks.generateOpportunityCandidateForRepository,
+  generateShortSummaryForRepository: mocks.generateShortSummaryForRepository,
   promoteCandidateToFullIdea: mocks.promoteCandidateToFullIdea
 }));
 
@@ -104,6 +106,7 @@ import {
   generateIdeaAction,
   generateOpportunityCandidateAction,
   generateReportAction,
+  generateShortSummaryAction,
   promoteCandidateToFullIdeaAction
 } from "../../src/app/actions";
 
@@ -135,6 +138,7 @@ beforeEach(() => {
     ideaId: "idea_1",
     opportunityScore: 72
   });
+  mocks.generateShortSummaryForRepository.mockResolvedValue("Krotkie streszczenie");
   mocks.promoteCandidateToFullIdea.mockResolvedValue({
     id: "idea_1",
     title: "Pelny pomysl"
@@ -154,6 +158,49 @@ describe("AI action OpenAI budget preflight", () => {
     expect(mocks.countOpenAiAnalysesToday).toHaveBeenCalledTimes(1);
     expect(mocks.runAiJob).toHaveBeenCalledTimes(1);
     expect(mocks.generateFullReportForRepository).toHaveBeenCalledWith("repo_1", false);
+  });
+
+  it("keeps force retries on the same per-repo dedupe keys", async () => {
+    await generateReportAction("repo_1", true);
+    await generateIdeaAction("repo_1", true);
+    await generateOpportunityCandidateAction("repo_1", true);
+    await generateShortSummaryAction("repo_1", true);
+
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ type: "REPORT", repoId: "repo_1", dedupeKey: "report:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ type: "IDEA", repoId: "repo_1", dedupeKey: "idea:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ type: "RESEARCH", repoId: "repo_1", dedupeKey: "research:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ type: "SUMMARY", repoId: "repo_1", dedupeKey: "summary:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
+  it("runs the summary AI job through budget preflight", async () => {
+    await expect(generateShortSummaryAction("repo_1")).resolves.toEqual({
+      repoId: "repo_1",
+      summary: "Krotkie streszczenie"
+    });
+
+    expect(mocks.countOpenAiAnalysesToday).toHaveBeenCalledTimes(1);
+    expect(mocks.runAiJob).toHaveBeenCalledTimes(1);
+    expect(mocks.generateShortSummaryForRepository).toHaveBeenCalledWith("repo_1", false);
   });
 
   it("does not create an AI job when the daily OpenAI limit is used up", async () => {
@@ -183,6 +230,15 @@ describe("AI action OpenAI budget preflight", () => {
 
     expect(mocks.runAiJob).not.toHaveBeenCalled();
     expect(mocks.generateOpportunityCandidateForRepository).not.toHaveBeenCalled();
+  });
+
+  it("does not create an AI job for summary when the limit is used up", async () => {
+    mocks.countOpenAiAnalysesToday.mockResolvedValue(2);
+
+    await expect(generateShortSummaryAction("repo_1")).rejects.toThrow("Dzienny limit OpenAI jest juz wykorzystany");
+
+    expect(mocks.runAiJob).not.toHaveBeenCalled();
+    expect(mocks.generateShortSummaryForRepository).not.toHaveBeenCalled();
   });
 
   it("does not promote a candidate when the OpenAI limit is used up", async () => {

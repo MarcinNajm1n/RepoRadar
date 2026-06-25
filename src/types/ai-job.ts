@@ -22,14 +22,36 @@ export type AiJobSummary = {
   failed24h: number;
 };
 
+export type AiJobQueueCount = {
+  key: string;
+  label: string;
+  count: number;
+};
+
 export type AiJobListItem = {
   id: string;
   type: string;
   status: string;
   priority: number;
+  repoId: string | null;
+  ideaId: string | null;
+  reportId: string | null;
   repoFullName: string | null;
+  dedupeKey: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
   error: string | null;
+};
+
+export type AiJobQueueSummary = {
+  generatedAt: string;
+  totalJobs: number;
+  activeCount: number;
+  needsAttentionCount: number;
+  retryableFailedCount: number;
+  byStatus: AiJobQueueCount[];
+  byType: AiJobQueueCount[];
+  oldestActiveJob: AiJobListItem | null;
+  recentFailures: AiJobListItem[];
 };

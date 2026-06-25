@@ -25,6 +25,7 @@ import {
   createWeeklyReportAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
+  generateShortSummaryAction,
   getIdeasPanelDataAction,
   getSettingsPanelDataAction,
   getTasksPanelDataAction,
@@ -404,6 +405,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       });
     }, force ? "Raport zostal zregenerowany." : "Raport jest gotowy.", force ? "Regeneruje raport..." : "Generuje raport...", () => {
       setPendingReportTitle(null);
+      refreshSettingsPanelDataIfOpen();
       refreshRepositoryDecisionContext(repoId);
     });
   }
@@ -527,6 +529,50 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       "Czyszcze stare snapshoty...",
       refreshSettingsPanelDataIfOpen
     );
+  }
+
+  function retryAiJob(job: SettingsPanelData["settingsSummary"]["recentAiJobs"][number]) {
+    if (!job.repoId) {
+      return;
+    }
+
+    switch (job.type) {
+      case "REPORT":
+        openReport(job.repoId, true);
+        return;
+      case "IDEA":
+        runAction(
+          () => generateIdeaAction(job.repoId!, true),
+          "Pomysl zostal ponowiony.",
+          "Ponawiam pomysl z repo...",
+          () => {
+            refreshIdeasPanelDataIfLoaded();
+            refreshSettingsPanelDataIfOpen();
+          }
+        );
+        return;
+      case "RESEARCH":
+        runAction(
+          () => generateOpportunityCandidateAction(job.repoId!, true),
+          "Research zostal ponowiony.",
+          "Ponawiam research...",
+          () => {
+            refreshIdeasPanelDataIfLoaded();
+            refreshSettingsPanelDataIfOpen();
+          }
+        );
+        return;
+      case "SUMMARY":
+        runAction(
+          () => generateShortSummaryAction(job.repoId!, true),
+          "Streszczenie zostalo ponowione.",
+          "Ponawiam streszczenie...",
+          refreshSettingsPanelDataIfOpen
+        );
+        return;
+      default:
+        return;
+    }
   }
 
   const topBarStats = [
@@ -901,6 +947,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           onTestNotification={() =>
             runAction(() => testNotificationAction(), "Test notification wykonany.", "Wysylam test notification...", refreshSettingsPanelDataIfOpen)
           }
+          onRetryAiJob={retryAiJob}
           onOpenDailyBriefing={openDailyBriefing}
           onDownloadIdeasCsv={downloadIdeasCsv}
           onPruneSnapshots={pruneSnapshotsWithConfirmation}

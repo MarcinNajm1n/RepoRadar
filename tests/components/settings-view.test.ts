@@ -35,7 +35,70 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
       done24h: 0,
       failed24h: 0
     },
-    recentAiJobs: [],
+    aiJobQueue: {
+      generatedAt: "2026-06-25T12:00:00.000Z",
+      totalJobs: 2,
+      activeCount: 1,
+      needsAttentionCount: 1,
+      retryableFailedCount: 1,
+      byStatus: [
+        { key: "RUNNING", label: "W toku", count: 1 },
+        { key: "FAILED", label: "Blad", count: 1 }
+      ],
+      byType: [
+        { key: "REPORT", label: "Raport", count: 1 },
+        { key: "RESEARCH", label: "Badanie", count: 1 }
+      ],
+      oldestActiveJob: {
+        id: "job_running",
+        type: "REPORT",
+        status: "RUNNING",
+        priority: 70,
+        repoId: "repo_1",
+        ideaId: null,
+        reportId: null,
+        dedupeKey: "report:repo_1:default",
+        repoFullName: "owner/tool",
+        createdAt: "2026-06-25T11:00:00.000Z",
+        startedAt: "2026-06-25T11:01:00.000Z",
+        finishedAt: null,
+        error: null
+      },
+      recentFailures: [
+        {
+          id: "job_failed",
+          type: "RESEARCH",
+          status: "FAILED",
+          priority: 40,
+          repoId: "repo_2",
+          ideaId: null,
+          reportId: null,
+          dedupeKey: "research:repo_2:default",
+          repoFullName: "owner/research",
+          createdAt: "2026-06-25T10:00:00.000Z",
+          startedAt: "2026-06-25T10:01:00.000Z",
+          finishedAt: "2026-06-25T10:02:00.000Z",
+          error: "Provider failed"
+        }
+      ]
+    },
+    recentAiJobs: [
+      {
+        id: "job_failed",
+        type: "RESEARCH",
+        status: "FAILED",
+        priority: 40,
+        repoId: "repo_2",
+        ideaId: null,
+        reportId: null,
+        dedupeKey: "research:repo_2:default",
+        repoFullName: "owner/research",
+        createdAt: "2026-06-25T10:00:00.000Z",
+        startedAt: "2026-06-25T10:01:00.000Z",
+        finishedAt: "2026-06-25T10:02:00.000Z",
+        error: "Provider failed"
+      }
+    ],
     aiCostSummary: {
       analysesToday: 0,
       analysesThisWeek: 0,
@@ -122,6 +185,7 @@ describe("SettingsView maintenance preview", () => {
         onClearExpiredExternalCache: noop,
         onClearOldNotificationLogs: noop,
         onTestNotification: noop,
+        onRetryAiJob: noop,
         onOpenDailyBriefing: noop,
         onDownloadIdeasCsv: noop,
         onPruneSnapshots: noop,
@@ -136,5 +200,33 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("Wyczysc logi 30d+ (4)");
     expect(html).toContain("Przytnij snapshoty 180d+ (12)");
     expect(html).toContain("2 repo straci wszystkie snapshoty po prune");
+  });
+
+  it("renders AI jobs center with queue diagnostics and retry cost", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        settingsSummary: settingsSummary(),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain("Centrum zadan AI");
+    expect(html).toContain("Aktywne");
+    expect(html).toContain("Retry dostepne");
+    expect(html).toContain("Ostatnie bledy 24h");
+    expect(html).toContain("Ponow Badanie / owner/research");
+    expect(html).toContain("(ok. 2 calls)");
+    expect(html).toContain("Provider failed");
   });
 });

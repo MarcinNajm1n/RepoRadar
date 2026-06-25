@@ -31,6 +31,7 @@ import {
   generateFullReportForRepository,
   generateIdeaForRepository,
   generateOpportunityCandidateForRepository,
+  generateShortSummaryForRepository,
   promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
 import { assertOpenAiBudgetForAction } from "@/lib/openai/budget-status";
@@ -89,7 +90,7 @@ export async function getWeeklyReportsPanelDataAction() {
 export async function generateReportAction(repoId: string, force = false) {
   await assertOpenAiBudgetForAction("repo-report");
   const report = await runAiJob(
-    { type: "REPORT", repoId, priority: force ? 80 : 60, dedupeKey: `report:${repoId}:${force ? "force" : "default"}` },
+    { type: "REPORT", repoId, priority: force ? 80 : 60, dedupeKey: `report:${repoId}` },
     () => generateFullReportForRepository(repoId, force),
     (value) => ({ reportId: value.id })
   );
@@ -118,10 +119,21 @@ export async function generateQuickBriefAction(repoId: string) {
   };
 }
 
+export async function generateShortSummaryAction(repoId: string, force = false) {
+  await assertOpenAiBudgetForAction("summary");
+  const summary = await runAiJob(
+    { type: "SUMMARY", repoId, priority: force ? 70 : 40, dedupeKey: `summary:${repoId}` },
+    () => generateShortSummaryForRepository(repoId, force),
+    () => ({ repoId })
+  );
+  revalidatePath("/");
+  return { repoId, summary };
+}
+
 export async function generateIdeaAction(repoId: string, force = false) {
   await assertOpenAiBudgetForAction("idea");
   const idea = await runAiJob(
-    { type: "IDEA", repoId, priority: force ? 80 : 50, dedupeKey: `idea:${repoId}:${force ? "force" : "default"}` },
+    { type: "IDEA", repoId, priority: force ? 80 : 50, dedupeKey: `idea:${repoId}` },
     () => generateIdeaForRepository(repoId, force),
     (value) => ({ ideaId: value.id })
   );
@@ -135,7 +147,7 @@ export async function generateIdeaAction(repoId: string, force = false) {
 export async function generateOpportunityCandidateAction(repoId: string, force = false) {
   await assertOpenAiBudgetForAction("opportunity-research");
   const result = await runAiJob(
-    { type: "RESEARCH", repoId, priority: force ? 70 : 40, dedupeKey: `research:${repoId}:${force ? "force" : "default"}` },
+    { type: "RESEARCH", repoId, priority: force ? 70 : 40, dedupeKey: `research:${repoId}` },
     () => generateOpportunityCandidateForRepository(repoId, force),
     (value) => ({ created: value.created, ideaId: value.ideaId ?? null, opportunityScore: value.opportunityScore ?? null })
   );

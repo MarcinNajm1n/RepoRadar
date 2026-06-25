@@ -1,6 +1,6 @@
 import type { ActionItemListItem } from "./action-item";
 import type { AiCostSummary } from "./ai-cost";
-import type { AiJobListItem, AiJobSummary } from "./ai-job";
+import type { AiJobListItem, AiJobQueueSummary, AiJobSummary } from "./ai-job";
 
 export type ScoreBreakdown = {
   absoluteGrowthPoints: number;
@@ -346,6 +346,7 @@ export type SettingsSummary = {
   reportsDir: string;
   persistedSettingCount: number;
   aiJobSummary: AiJobSummary;
+  aiJobQueue: AiJobQueueSummary;
   recentAiJobs: AiJobListItem[];
   aiCostSummary: AiCostSummary;
   openAiCache: OpenAiCacheSummary;

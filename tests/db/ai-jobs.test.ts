@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => {
     update: vi.fn(),
     updateMany: vi.fn(),
     count: vi.fn(),
-    findMany: vi.fn()
+    findMany: vi.fn(),
+    groupBy: vi.fn()
   };
   const prisma = {
     aiJob,
@@ -25,6 +26,7 @@ import {
   AI_JOB_ALREADY_RUNNING_MESSAGE,
   AI_JOB_STALE_LOCK_ERROR,
   buildAiJobDedupeKey,
+  getAiJobQueueSummary,
   getRecentAiJobs,
   runAiJob
 } from "../../src/lib/db/ai-jobs";
@@ -172,6 +174,10 @@ describe("getRecentAiJobs", () => {
         type: "REPORT",
         status: "FAILED",
         priority: 60,
+        repoId: "repo_1",
+        ideaId: null,
+        reportId: null,
+        dedupeKey: "report:repo_1:default",
         error: "Boom",
         createdAt,
         startedAt: null,
@@ -186,6 +192,10 @@ describe("getRecentAiJobs", () => {
         type: "REPORT",
         status: "FAILED",
         priority: 60,
+        repoId: "repo_1",
+        ideaId: null,
+        reportId: null,
+        dedupeKey: "report:repo_1:default",
         repoFullName: "owner/tool",
         createdAt: createdAt.toISOString(),
         startedAt: null,
@@ -199,5 +209,77 @@ describe("getRecentAiJobs", () => {
         take: 20
       })
     );
+  });
+});
+
+describe("getAiJobQueueSummary", () => {
+  it("builds queue diagnostics with status/type counts and retryable failures", async () => {
+    const createdAt = new Date("2026-06-16T12:00:00Z");
+    const startedAt = new Date("2026-06-16T12:00:10Z");
+    const finishedAt = new Date("2026-06-16T12:01:00Z");
+    mocks.aiJob.groupBy
+      .mockResolvedValueOnce([
+        { status: "RUNNING", _count: { _all: 1 } },
+        { status: "FAILED", _count: { _all: 2 } }
+      ])
+      .mockResolvedValueOnce([
+        { type: "REPORT", _count: { _all: 2 } },
+        { type: "RESEARCH", _count: { _all: 1 } }
+      ]);
+    mocks.aiJob.findFirst.mockResolvedValue({
+      id: "job_running",
+      type: "REPORT",
+      status: "RUNNING",
+      priority: 80,
+      repoId: "repo_1",
+      ideaId: null,
+      reportId: null,
+      dedupeKey: "report:repo_1:default",
+      error: null,
+      createdAt,
+      startedAt,
+      finishedAt: null,
+      repository: { fullName: "owner/tool" }
+    });
+    mocks.aiJob.findMany.mockResolvedValue([
+      {
+        id: "job_failed",
+        type: "RESEARCH",
+        status: "FAILED",
+        priority: 40,
+        repoId: "repo_2",
+        ideaId: null,
+        reportId: null,
+        dedupeKey: "research:repo_2:default",
+        error: "Provider failed",
+        createdAt,
+        startedAt,
+        finishedAt,
+        repository: { fullName: "owner/research" }
+      }
+    ]);
+
+    const summary = await getAiJobQueueSummary();
+
+    expect(summary.activeCount).toBe(1);
+    expect(summary.needsAttentionCount).toBe(2);
+    expect(summary.retryableFailedCount).toBe(1);
+    expect(summary.byStatus).toEqual([
+      { key: "QUEUED", label: "W kolejce", count: 0 },
+      { key: "RUNNING", label: "W toku", count: 1 },
+      { key: "DONE", label: "Gotowe", count: 0 },
+      { key: "FAILED", label: "Błąd", count: 2 }
+    ]);
+    expect(summary.byType).toEqual([
+      { key: "REPORT", label: "Raport", count: 2 },
+      { key: "RESEARCH", label: "Badanie", count: 1 }
+    ]);
+    expect(summary.oldestActiveJob?.repoFullName).toBe("owner/tool");
+    expect(summary.recentFailures[0]).toMatchObject({
+      id: "job_failed",
+      repoId: "repo_2",
+      repoFullName: "owner/research",
+      error: "Provider failed"
+    });
   });
 });

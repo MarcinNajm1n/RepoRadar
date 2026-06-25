@@ -7,7 +7,7 @@ import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-stat
 import type { IdeaStatus } from "@/types/idea-status";
 import { getActionItems, getActiveActionItems } from "./action-items";
 import { getAiCostSummary } from "./ai-costs";
-import { getAiJobSummary, getRecentAiJobs } from "./ai-jobs";
+import { getAiJobQueueSummary, getAiJobSummary, getRecentAiJobs } from "./ai-jobs";
 import { buildWeeklyReportComparison } from "@/lib/reports/weekly-comparison";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
 import { getObservabilitySummary } from "./observability";
@@ -680,10 +680,22 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const [persistedSettings, githubRateLimit, aiJobSummary, recentAiJobs, aiCostSummary, openAiCache, observability, graphify, maintenancePreview] = await Promise.all([
+  const [
+    persistedSettings,
+    githubRateLimit,
+    aiJobSummary,
+    aiJobQueue,
+    recentAiJobs,
+    aiCostSummary,
+    openAiCache,
+    observability,
+    graphify,
+    maintenancePreview
+  ] = await Promise.all([
     getAllSettings(),
     getStoredGitHubRateLimitSnapshot(),
     getAiJobSummary(),
+    getAiJobQueueSummary(),
     getRecentAiJobs(),
     getAiCostSummary(),
     getOpenAiCacheSummary(),
@@ -708,6 +720,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     reportsDir: config.reportsDir,
     persistedSettingCount: Object.keys(persistedSettings).length,
     aiJobSummary,
+    aiJobQueue,
     recentAiJobs,
     aiCostSummary,
     openAiCache,
