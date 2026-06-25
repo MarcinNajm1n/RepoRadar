@@ -231,6 +231,22 @@ npm run test:ui
 
 `npm run test:ui` requires Playwright browsers. If they are missing locally, run `npx playwright install chromium`.
 
+## Large Dataset Benchmark
+
+Run the local large dataset benchmark without GitHub, OpenAI, or network calls:
+
+```bash
+npm run benchmark:large
+```
+
+By default it creates an isolated SQLite database with 5000 synthetic repositories under `test-results/benchmarks/`, measures `getRepositoryPage`, `getDashboardData`, and `RepoListView` server rendering, then writes JSON and Markdown results in the same ignored directory. Custom output paths must stay under `test-results/`.
+
+For a quick smoke run:
+
+```bash
+npm run benchmark:large -- --size=200 --output=test-results/benchmarks/smoke.json
+```
+
 ## CI
 
 GitHub Actions runs on `windows-latest` without real secrets. The workflow installs dependencies, generates Prisma Client, migrates a local SQLite database, then runs typecheck, lint, Vitest, build, and the sensitive-file check.
