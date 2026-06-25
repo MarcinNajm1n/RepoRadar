@@ -188,6 +188,21 @@ export type GraphifyMaintenanceSummary = {
   note: string;
 };
 
+export type OpenAiCacheSummary = {
+  totalEntries: number;
+  byKind: {
+    kind: string;
+    count: number;
+  }[];
+  recentEntries: {
+    id: string;
+    kind: string;
+    repoFullName: string | null;
+    model: string;
+    createdAt: string;
+  }[];
+};
+
 export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
@@ -206,6 +221,7 @@ export type SettingsSummary = {
   aiJobSummary: AiJobSummary;
   recentAiJobs: AiJobListItem[];
   aiCostSummary: AiCostSummary;
+  openAiCache: OpenAiCacheSummary;
   observability: ObservabilitySummary;
   graphify: GraphifyMaintenanceSummary;
   githubRateLimit: {

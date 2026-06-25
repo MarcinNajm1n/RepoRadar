@@ -17,6 +17,15 @@ const settingsSections = [
   { key: "maintenance", label: "Maintenance" }
 ] as const;
 
+const OPENAI_CACHE_KIND_LABELS: Record<string, string> = {
+  summary: "Podsumowania",
+  "repo-report": "Pełne raporty",
+  idea: "Pomysły",
+  "idea:v2": "Pomysły v2",
+  "idea-promote": "Promocje pomysłów",
+  "opportunity-research": "Research szans"
+};
+
 type SettingsSectionKey = (typeof settingsSections)[number]["key"];
 
 export function SettingsView({
@@ -152,6 +161,10 @@ export function SettingsView({
             <InfoItem label="AI all-time" value={String(settingsSummary.aiCostSummary.analysesAllTime)} />
             <InfoItem label="Next full report" value={settingsSummary.aiCostSummary.estimatedNextActions.report} />
           </div>
+        </SettingsPanel>
+
+        <SettingsPanel title="Cache OpenAI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
+          <OpenAiCacheDiagnostics summary={settingsSummary.openAiCache} />
         </SettingsPanel>
 
         <SettingsPanel title="Ostatnie zadania AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
@@ -354,6 +367,82 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function OpenAiCacheDiagnostics({ summary }: { summary: SettingsSummary["openAiCache"] }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoItem label="Łącznie wpisów" value={String(summary.totalEntries)} />
+        {summary.byKind.map((entry) => (
+          <InfoItem key={entry.kind} label={formatOpenAiCacheKind(entry.kind)} value={String(entry.count)} />
+        ))}
+      </div>
+
+      {summary.byKind.length === 0 ? (
+        <div className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Brak wpisów cache OpenAI.
+        </div>
+      ) : (
+        <RecentOpenAiCacheEntries entries={summary.recentEntries} />
+      )}
+
+      {summary.byKind.length > 0 ? (
+        <p className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Panel jest tylko diagnostyczny: nie czyści cache i nie pokazuje liczby trafień, bo tabela jej nie zapisuje.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function RecentOpenAiCacheEntries({ entries }: { entries: SettingsSummary["openAiCache"]["recentEntries"] }) {
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+        Brak ostatnich wpisów cache.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="overflow-x-auto rounded-md border border-border-subtle"
+      role="region"
+      aria-label="Ostatnie wpisy cache OpenAI"
+      tabIndex={0}
+    >
+      <table className="min-w-full divide-y divide-border-subtle text-sm">
+        <caption className="sr-only">Ostatnie wpisy cache OpenAI</caption>
+        <thead className="bg-surface-inset text-xs font-medium uppercase text-muted-foreground">
+          <tr>
+            <th scope="col" className="px-3 py-2 text-left">
+              Typ
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Repo
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Model
+            </th>
+            <th scope="col" className="px-3 py-2 text-left">
+              Zapisano
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border-subtle bg-surface-panel">
+          {entries.map((entry) => (
+            <tr key={entry.id}>
+              <td className="px-3 py-2 font-medium text-foreground">{formatOpenAiCacheKind(entry.kind)}</td>
+              <td className="max-w-[18rem] break-words px-3 py-2 text-muted-foreground">{entry.repoFullName ?? "bez repo"}</td>
+              <td className="max-w-[16rem] break-words px-3 py-2 text-muted-foreground">{entry.model}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatOpenAiCacheDate(entry.createdAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function RecentAiJobsList({ jobs }: { jobs: SettingsSummary["recentAiJobs"] }) {
   if (jobs.length === 0) {
     return (
@@ -462,6 +551,19 @@ function formatAiJobTime(job: SettingsSummary["recentAiJobs"][number]) {
 }
 
 function formatAiJobDateTime(value: string) {
+  return new Date(value).toLocaleString("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatOpenAiCacheKind(kind: string) {
+  return OPENAI_CACHE_KIND_LABELS[kind] ?? kind;
+}
+
+function formatOpenAiCacheDate(value: string) {
   return new Date(value).toLocaleString("pl-PL", {
     day: "2-digit",
     month: "2-digit",

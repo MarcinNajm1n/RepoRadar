@@ -10,6 +10,7 @@ import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary, getRecentAiJobs } from "./ai-jobs";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
 import { getObservabilitySummary } from "./observability";
+import { getOpenAiCacheSummary } from "./openai-cache";
 import { recordRepositoryStatusAudit } from "./repository-audit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import type { ActionItemListItem } from "@/types/action-item";
@@ -487,12 +488,13 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
-  const [persistedSettings, githubRateLimit, aiJobSummary, recentAiJobs, aiCostSummary, observability, graphify] = await Promise.all([
+  const [persistedSettings, githubRateLimit, aiJobSummary, recentAiJobs, aiCostSummary, openAiCache, observability, graphify] = await Promise.all([
     getAllSettings(),
     getStoredGitHubRateLimitSnapshot(),
     getAiJobSummary(),
     getRecentAiJobs(),
     getAiCostSummary(),
+    getOpenAiCacheSummary(),
     getObservabilitySummary(),
     getGraphifyMaintenanceSummary()
   ]);
@@ -515,6 +517,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     aiJobSummary,
     recentAiJobs,
     aiCostSummary,
+    openAiCache,
     observability,
     graphify,
     githubRateLimit
