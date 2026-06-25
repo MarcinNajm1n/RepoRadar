@@ -8,6 +8,7 @@ import type { IdeaStatus } from "@/types/idea-status";
 import { getActionItems, getActiveActionItems } from "./action-items";
 import { getAiCostSummary } from "./ai-costs";
 import { getAiJobSummary, getRecentAiJobs } from "./ai-jobs";
+import { buildWeeklyReportComparison } from "@/lib/reports/weekly-comparison";
 import { getStoredGitHubRateLimitSnapshot } from "./github-rate-limit";
 import { getObservabilitySummary } from "./observability";
 import { getOpenAiCacheSummary } from "./openai-cache";
@@ -703,9 +704,12 @@ export async function getWeeklyReportsPanelData(): Promise<WeeklyReportsPanelDat
     where: { type: "weekly" },
     orderBy: { createdAt: "desc" }
   });
+  const mappedReports = weeklyReports.map(mapReport);
+  const latestReport = mappedReports[0] ?? null;
 
   return {
-    weeklyReports: weeklyReports.map(mapReport)
+    weeklyReports: mappedReports,
+    comparison: latestReport ? buildWeeklyReportComparison(latestReport, mappedReports[1] ?? null) : null
   };
 }
 

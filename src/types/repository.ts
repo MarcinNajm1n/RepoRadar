@@ -115,6 +115,17 @@ export type ReportListItem = {
   createdAt: string;
 };
 
+export type WeeklyReportComparison = {
+  currentNames: string[];
+  previousNames: string[];
+  retained: string[];
+  added: string[];
+  dropped: string[];
+  currentRepoCount: number;
+  previousRepoCount: number | null;
+  repoCountDelta: number | null;
+};
+
 export type DashboardAlert = {
   id: string;
   level: "info" | "warning" | "critical";
@@ -278,6 +289,7 @@ export type TasksPanelData = {
 
 export type WeeklyReportsPanelData = {
   weeklyReports: ReportListItem[];
+  comparison?: WeeklyReportComparison | null;
 };
 
 export type DashboardLastScan = {

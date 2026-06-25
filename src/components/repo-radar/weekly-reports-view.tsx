@@ -1,39 +1,12 @@
 "use client";
 
-import type { ReportListItem } from "@/types/repository";
+import type { ReportListItem, WeeklyReportComparison } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
+import { buildWeeklyReportComparison } from "@/lib/reports/weekly-comparison";
 import { formatDate } from "@/lib/utils";
 import { Badge, EmptyState, MetricPill, SectionCard, TextClamp } from "./ui";
 
-export function extractWeeklyReportRepoNames(markdown: string) {
-  const names = new Set<string>();
-  const linkPattern = /^-\s+\[([^\]]+)\]\([^)]+\)/gm;
-  let match = linkPattern.exec(markdown);
-
-  while (match) {
-    names.add(match[1]);
-    match = linkPattern.exec(markdown);
-  }
-
-  return [...names].slice(0, 20);
-}
-
-export function buildWeeklyReportComparison(current: ReportListItem, previous: ReportListItem | null) {
-  const currentNames = extractWeeklyReportRepoNames(current.contentMarkdown);
-  const previousNames = previous ? extractWeeklyReportRepoNames(previous.contentMarkdown) : [];
-  const previousSet = new Set(previousNames);
-  const currentSet = new Set(currentNames);
-
-  return {
-    currentNames,
-    previousNames,
-    retained: currentNames.filter((name) => previousSet.has(name)),
-    added: currentNames.filter((name) => !previousSet.has(name)),
-    dropped: previousNames.filter((name) => !currentSet.has(name))
-  };
-}
-
-export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
+export function WeeklyReportsView({ reports, comparison: panelComparison }: { reports: ReportListItem[]; comparison?: WeeklyReportComparison | null }) {
   if (!reports.length) {
     return (
       <SectionCard title="Raporty tygodniowe" description="Lokalne podsumowania zapisane jako markdown.">
@@ -44,7 +17,7 @@ export function WeeklyReportsView({ reports }: { reports: ReportListItem[] }) {
 
   const latestReport = reports[0];
   const previousReport = reports[1] ?? null;
-  const comparison = buildWeeklyReportComparison(latestReport, previousReport);
+  const comparison = panelComparison ?? buildWeeklyReportComparison(latestReport, previousReport);
 
   return (
     <section className="space-y-4">
@@ -99,7 +72,7 @@ function WeeklyComparisonPanel({
 }: {
   latest: ReportListItem;
   previous: ReportListItem | null;
-  comparison: ReturnType<typeof buildWeeklyReportComparison>;
+  comparison: WeeklyReportComparison;
 }) {
   if (!previous) {
     return (
@@ -114,7 +87,8 @@ function WeeklyComparisonPanel({
 
   return (
     <SectionCard title="Porownanie tydzien do tygodnia" description={`${formatDate(latest.createdAt)} vs ${formatDate(previous.createdAt)}`}>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-4">
+        <MetricPill label="Zmiana repo" value={`${formatSignedNumber(comparison.repoCountDelta ?? 0)} (${comparison.currentRepoCount} vs ${comparison.previousRepoCount})`} />
         <MetricPill label="Zostaly w top" value={comparison.retained.length} />
         <MetricPill label="Nowe w top" value={comparison.added.length} />
         <MetricPill label="Wypadly" value={comparison.dropped.length} />
@@ -128,6 +102,10 @@ function WeeklyComparisonPanel({
   );
 }
 
+function formatSignedNumber(value: number) {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 function WeeklyRepoGroup({
   title,
   names,
@@ -139,19 +117,29 @@ function WeeklyRepoGroup({
   tone: "success" | "info" | "warning";
   empty: string;
 }) {
+  const visibleNames = names.slice(0, 8);
+  const hiddenCount = Math.max(0, names.length - visibleNames.length);
+
   return (
-    <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+    <div className="min-w-0 rounded-md border border-border-subtle bg-surface-inset p-3">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {names.length ? (
-          names.slice(0, 8).map((name) => (
-            <Badge key={name} tone={tone}>
-              {cleanDisplayText(name, { maxLength: 44 })}
+          visibleNames.map((name) => (
+            <Badge key={name} tone={tone} className="max-w-full min-w-0">
+              <span className="truncate" title={name}>
+                {cleanDisplayText(name, { maxLength: 44 })}
+              </span>
             </Badge>
           ))
         ) : (
           <p className="text-sm text-muted-foreground">{empty}</p>
         )}
+        {hiddenCount ? (
+          <Badge tone="neutral" variant="score">
+            +{hiddenCount}
+          </Badge>
+        ) : null}
       </div>
     </div>
   );

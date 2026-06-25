@@ -1,8 +1,11 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { buildWeeklyReportComparison, extractWeeklyReportRepoNames } from "../../src/components/repo-radar/weekly-reports-view";
+import { WeeklyReportsView } from "../../src/components/repo-radar/weekly-reports-view";
+import { buildWeeklyReportComparison, extractWeeklyReportRepoNames } from "../../src/lib/reports/weekly-comparison";
 import type { ReportListItem } from "../../src/types/repository";
 
-function report(id: string, markdown: string): ReportListItem {
+function report(id: string, markdown: string, repoCount = 0): ReportListItem {
   return {
     id,
     type: "weekly",
@@ -11,7 +14,7 @@ function report(id: string, markdown: string): ReportListItem {
     markdownPath: null,
     contentMarkdown: markdown,
     summary: null,
-    repoCount: 0,
+    repoCount,
     topRepoIds: [],
     createdAt: "2026-06-21T12:00:00.000Z"
   };
@@ -31,13 +34,42 @@ describe("weekly report comparison", () => {
   });
 
   it("separates added, retained and dropped repositories", () => {
-    const current = report("current", "- [owner/alpha](https://github.com/owner/alpha)\n- [owner/gamma](https://github.com/owner/gamma)");
-    const previous = report("previous", "- [owner/alpha](https://github.com/owner/alpha)\n- [owner/beta](https://github.com/owner/beta)");
+    const current = report("current", "- [owner/alpha](https://github.com/owner/alpha)\n- [owner/gamma](https://github.com/owner/gamma)", 6);
+    const previous = report("previous", "- [owner/alpha](https://github.com/owner/alpha)\n- [owner/beta](https://github.com/owner/beta)", 4);
 
     expect(buildWeeklyReportComparison(current, previous)).toMatchObject({
       retained: ["owner/alpha"],
       added: ["owner/gamma"],
-      dropped: ["owner/beta"]
+      dropped: ["owner/beta"],
+      currentRepoCount: 6,
+      previousRepoCount: 4,
+      repoCountDelta: 2
     });
+  });
+
+  it("handles missing previous report without counting all current repositories as new", () => {
+    const current = report("current", "- [owner/alpha](https://github.com/owner/alpha)\n- [owner/gamma](https://github.com/owner/gamma)", 2);
+
+    expect(buildWeeklyReportComparison(current, null)).toMatchObject({
+      currentNames: ["owner/alpha", "owner/gamma"],
+      previousNames: [],
+      retained: [],
+      added: [],
+      dropped: [],
+      currentRepoCount: 2,
+      previousRepoCount: null,
+      repoCountDelta: null
+    });
+  });
+
+  it("shows an overflow count when comparison groups exceed visible badges", () => {
+    const markdown = Array.from({ length: 10 }, (_, index) => `- [owner/repo-${index}](https://github.com/owner/repo-${index})`).join(
+      "\n"
+    );
+    const html = renderToStaticMarkup(React.createElement(WeeklyReportsView, { reports: [report("current", markdown, 10), report("previous", "", 0)] }));
+
+    expect(html).toContain("Nowe sygnaly");
+    expect(html).toContain("owner/repo-0");
+    expect(html).toContain("+2");
   });
 });

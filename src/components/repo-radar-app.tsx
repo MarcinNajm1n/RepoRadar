@@ -810,7 +810,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
       {activeTab === "weekly" ? (
         weeklyReportsPanelData ? (
-          <WeeklyReportsView reports={weeklyReportsPanelData.weeklyReports} />
+          <WeeklyReportsView reports={weeklyReportsPanelData.weeklyReports} comparison={weeklyReportsPanelData.comparison} />
         ) : (
           <LazyPanelState
             title="Raporty tygodniowe"
