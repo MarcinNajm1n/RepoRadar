@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local-first GitHub repository discovery and trend analysis portfolio app.",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

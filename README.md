@@ -66,7 +66,9 @@ Suggested shots:
 
 ## Local Setup
 
-Install Node.js 20+ first.
+Install Node.js 24 first.
+
+CI uses Node 24. Local Node 20 is no longer the recommended runtime.
 
 ```bash
 npm install
