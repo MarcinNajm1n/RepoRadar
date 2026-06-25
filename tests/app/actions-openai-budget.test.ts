@@ -58,6 +58,10 @@ vi.mock("@/lib/db/repository-timeline", () => ({
   getRepositoryTimeline: vi.fn()
 }));
 
+vi.mock("@/lib/db/repository-decision-context", () => ({
+  getRepositoryDecisionContext: vi.fn()
+}));
+
 vi.mock("@/lib/github/scanner", () => ({
   runDailyScan: vi.fn()
 }));

@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction, TransitionStartFunction } from "react";
-import { getRepositoryPageAction, getRepositoryTimelineAction, updateStatusAction } from "@/app/actions";
+import {
+  getRepositoryDecisionContextAction,
+  getRepositoryPageAction,
+  getRepositoryTimelineAction,
+  updateStatusAction
+} from "@/app/actions";
 import type {
   DashboardData,
+  RepositoryDecisionContext,
   RepositoryPage,
   RepositoryPageInput,
   RepositoryTimelineItem
@@ -72,6 +78,9 @@ export function useRepositoryBrowser({
   const [selectedCompareRepoIds, setSelectedCompareRepoIds] = useState<string[]>([]);
   const [repositoryTimelines, setRepositoryTimelines] = useState<Record<string, RepositoryTimelineItem[]>>({});
   const [loadingTimelineRepoId, setLoadingTimelineRepoId] = useState<string | null>(null);
+  const [repositoryDecisionContexts, setRepositoryDecisionContexts] = useState<Record<string, RepositoryDecisionContext>>({});
+  const [loadingDecisionContextRepoId, setLoadingDecisionContextRepoId] = useState<string | null>(null);
+  const [repositoryDecisionContextErrors, setRepositoryDecisionContextErrors] = useState<Record<string, string>>({});
   const [savedFilterPresets, setSavedFilterPresets] = useState<RepositoryFilterPreset[]>(readSavedFilterPresets);
   const repositoryRequestKeyRef = useRef("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -247,6 +256,30 @@ export function useRepositoryBrowser({
     [initialData.radarToday, initialData.repositories, repositoryPage.items]
   );
 
+  const refreshRepositoryDecisionContext = useCallback(
+    (repoId: string) => {
+      setLoadingDecisionContextRepoId(repoId);
+      setRepositoryDecisionContextErrors((current) => {
+        const next = { ...current };
+        delete next[repoId];
+        return next;
+      });
+      void getRepositoryDecisionContextAction(repoId)
+        .then((decisionContext) => {
+          setRepositoryDecisionContexts((current) => ({ ...current, [repoId]: decisionContext }));
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "Nie udalo sie pobrac centrum decyzji.";
+          setRepositoryDecisionContextErrors((current) => ({ ...current, [repoId]: message }));
+          setFeedback({ tone: "error", message });
+        })
+        .finally(() => {
+          setLoadingDecisionContextRepoId((current) => (current === repoId ? null : current));
+        });
+    },
+    [setFeedback]
+  );
+
   const updateRepositoryStatusWithUndo = useCallback(
     (repoId: string, nextStatus: string, success: string) => {
       const repo = findRepositoryForStatus(repoId);
@@ -265,15 +298,17 @@ export function useRepositoryBrowser({
                     runAction(
                       () => updateStatusAction(repoId, previousStatus),
                       `Przywrocono status ${previousStatus}.`,
-                      "Cofam zmiane statusu..."
+                      "Cofam zmiane statusu...",
+                      () => refreshRepositoryDecisionContext(repoId)
                     )
                 }
               : undefined
         }),
-        "Zmieniam status repo..."
+        "Zmieniam status repo...",
+        () => refreshRepositoryDecisionContext(repoId)
       );
     },
-    [findRepositoryForStatus, runAction]
+    [findRepositoryForStatus, refreshRepositoryDecisionContext, runAction]
   );
 
   const resetRepoFilters = useCallback(() => {
@@ -290,23 +325,29 @@ export function useRepositoryBrowser({
       const shouldExpand = expandedRepoId !== repoId;
       setExpandedRepoId(shouldExpand ? repoId : null);
 
-      if (!shouldExpand || repositoryTimelines[repoId]) {
+      if (!shouldExpand) {
         return;
       }
 
-      setLoadingTimelineRepoId(repoId);
-      void getRepositoryTimelineAction(repoId)
-        .then((timeline) => {
-          setRepositoryTimelines((current) => ({ ...current, [repoId]: timeline }));
-        })
-        .catch((error) => {
-          setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac timeline repo." });
-        })
-        .finally(() => {
-          setLoadingTimelineRepoId((current) => (current === repoId ? null : current));
-        });
+      if (!repositoryTimelines[repoId]) {
+        setLoadingTimelineRepoId(repoId);
+        void getRepositoryTimelineAction(repoId)
+          .then((timeline) => {
+            setRepositoryTimelines((current) => ({ ...current, [repoId]: timeline }));
+          })
+          .catch((error) => {
+            setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Nie udalo sie pobrac timeline repo." });
+          })
+          .finally(() => {
+            setLoadingTimelineRepoId((current) => (current === repoId ? null : current));
+          });
+      }
+
+      if (!repositoryDecisionContexts[repoId]) {
+        refreshRepositoryDecisionContext(repoId);
+      }
     },
-    [expandedRepoId, repositoryTimelines, setFeedback]
+    [expandedRepoId, refreshRepositoryDecisionContext, repositoryDecisionContexts, repositoryTimelines, setFeedback]
   );
 
   const loadMoreRepositories = useCallback(() => {
@@ -375,6 +416,10 @@ export function useRepositoryBrowser({
     selectedCompareRepoIds,
     repositoryTimelines,
     loadingTimelineRepoId,
+    repositoryDecisionContexts,
+    loadingDecisionContextRepoId,
+    repositoryDecisionContextErrors,
+    refreshRepositoryDecisionContext,
     searchInputRef,
     languages,
     discoveryProfiles,

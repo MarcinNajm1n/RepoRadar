@@ -142,6 +142,85 @@ export type RepositoryTimelineItem = {
   tone: "neutral" | "positive" | "warning";
 };
 
+export type RepositoryDecisionNextAction = {
+  id: string;
+  kind: "quick_brief" | "full_report" | "open_task" | "research_evidence" | "status_decision" | "monitor";
+  title: string;
+  description: string;
+  reason: string;
+  actionLabel: string;
+  tone: "neutral" | "info" | "success" | "warning";
+  taskId: string | null;
+};
+
+export type RepositoryDecisionContext = {
+  repoId: string;
+  generatedAt: string;
+  nextAction: RepositoryDecisionNextAction;
+  signals: {
+    id: string;
+    label: string;
+    value: string;
+    tone: "neutral" | "info" | "success" | "warning";
+  }[];
+  reports: {
+    totalCount: number;
+    quickBriefCount: number;
+    fullReportCount: number;
+    decisionLogCount: number;
+    scoringSnapshotCount: number;
+    recent: {
+      id: string;
+      type: string;
+      title: string;
+      summary: string | null;
+      createdAt: string;
+    }[];
+  };
+  tasks: {
+    openCount: number;
+    recentOpen: {
+      id: string;
+      type: string;
+      status: string;
+      title: string;
+      priority: number;
+      dueAt: string | null;
+      snoozedUntil: string | null;
+      createdAt: string;
+    }[];
+  };
+  evidence: {
+    sourceCount: number;
+    researchRunCount: number;
+    lastResearchAt: string | null;
+    sourceTypes: string[];
+    summary: string;
+    topSources: {
+      id: string;
+      sourceType: string;
+      title: string;
+      publisher: string | null;
+      retrievedAt: string;
+      evidenceKind: string | null;
+      whatItProves: string | null;
+      sourceConfidence: number | null;
+    }[];
+  };
+  snapshots: {
+    totalCount: number;
+    latestCapturedAt: string | null;
+    growth24h: number | null;
+    growth7d: number | null;
+    growthPercent7d: number | null;
+  };
+  status: {
+    current: string;
+    needsDecision: boolean;
+    lastAnalyzedAt: string | null;
+  };
+};
+
 export type RadarNextAction = {
   id: string;
   kind: "alert" | "task" | "repo" | "idea" | "scan";

@@ -19,6 +19,7 @@ import {
   updateIdeaStatus,
   updateRepositoryStatus
 } from "@/lib/db/repositories";
+import { getRepositoryDecisionContext } from "@/lib/db/repository-decision-context";
 import { getRepositoryTimeline } from "@/lib/db/repository-timeline";
 import type { CreateActionItemInput, UpdateActionItemInput } from "@/types/action-item";
 import type { RepositoryPageInput } from "@/types/repository";
@@ -63,6 +64,10 @@ export async function getRepositoryPageAction(input: RepositoryPageInput) {
 
 export async function getRepositoryTimelineAction(repoId: string) {
   return getRepositoryTimeline(repoId);
+}
+
+export async function getRepositoryDecisionContextAction(repoId: string) {
+  return getRepositoryDecisionContext(repoId);
 }
 
 export async function getSettingsPanelDataAction() {

@@ -135,6 +135,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     selectedCompareRepoIds,
     repositoryTimelines,
     loadingTimelineRepoId,
+    repositoryDecisionContexts,
+    loadingDecisionContextRepoId,
+    repositoryDecisionContextErrors,
+    refreshRepositoryDecisionContext,
     searchInputRef,
     languages,
     discoveryProfiles,
@@ -380,7 +384,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
         path: generated.markdownPath,
         evidenceSources: generated.evidenceSources
       });
-    }, force ? "Raport zostal zregenerowany." : "Raport jest gotowy.", force ? "Regeneruje raport..." : "Generuje raport...", () => setPendingReportTitle(null));
+    }, force ? "Raport zostal zregenerowany." : "Raport jest gotowy.", force ? "Regeneruje raport..." : "Generuje raport...", () => {
+      setPendingReportTitle(null);
+      refreshRepositoryDecisionContext(repoId);
+    });
   }
 
   function openQuickBrief(repoId: string) {
@@ -393,7 +400,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
         path: generated.markdownPath,
         evidenceSources: []
       });
-    }, "Quick brief jest gotowy.", "Tworze quick brief...", () => setPendingReportTitle(null));
+    }, "Quick brief jest gotowy.", "Tworze quick brief...", () => {
+      setPendingReportTitle(null);
+      refreshRepositoryDecisionContext(repoId);
+    });
   }
 
   function createRepoTask(repo: RepositoryListItem, type: string, title: string, success: string, priority = 1) {
@@ -408,7 +418,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
         }),
       success,
       "Operacja w toku...",
-      refreshTasksPanelDataIfLoaded
+      () => {
+        refreshTasksPanelDataIfLoaded();
+        refreshRepositoryDecisionContext(repo.id);
+      }
     );
   }
 
@@ -426,8 +439,29 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     );
   }
 
+  function refreshDecisionContextForTask(itemId: string) {
+    const item = panelActionItems.find((candidate) => candidate.id === itemId) ?? initialData.radarToday.actionItems.find((candidate) => candidate.id === itemId);
+
+    if (item?.repoId) {
+      refreshRepositoryDecisionContext(item.repoId);
+    }
+  }
+
+  function refreshTasksAndDecisionContextForTask(itemId: string) {
+    refreshTasksPanelDataIfLoaded();
+    refreshDecisionContextForTask(itemId);
+  }
+
+  function completeTask(itemId: string) {
+    runAction(() => completeActionItemAction(itemId), "Zadanie zakonczone.", undefined, () => refreshTasksAndDecisionContextForTask(itemId));
+  }
+
+  function dismissTask(itemId: string) {
+    runAction(() => dismissActionItemAction(itemId), "Zadanie odrzucone.", undefined, () => refreshTasksAndDecisionContextForTask(itemId));
+  }
+
   function snoozeUntilTomorrow(itemId: string) {
-    runAction(() => snoozeActionItemAction(itemId, getTomorrowIso()), "Zadanie odlozone do jutra.", undefined, refreshTasksPanelDataIfLoaded);
+    runAction(() => snoozeActionItemAction(itemId, getTomorrowIso()), "Zadanie odlozone do jutra.", undefined, () => refreshTasksAndDecisionContextForTask(itemId));
   }
 
   function openDailyBriefing() {
@@ -564,9 +598,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               key={item.id}
               item={item}
               isPending={isPending}
-              onComplete={() => runAction(() => completeActionItemAction(item.id), "Zadanie zakonczone.", undefined, refreshTasksPanelDataIfLoaded)}
+              onComplete={() => completeTask(item.id)}
               onSnooze={() => snoozeUntilTomorrow(item.id)}
-              onDismiss={() => runAction(() => dismissActionItemAction(item.id), "Zadanie odrzucone.", undefined, refreshTasksPanelDataIfLoaded)}
+              onDismiss={() => dismissTask(item.id)}
             />
           )}
         />
@@ -578,9 +612,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
             items={panelActionItems}
             isPending={isPending}
             onCreateManualTask={createManualTask}
-            onComplete={(itemId) => runAction(() => completeActionItemAction(itemId), "Zadanie zakonczone.", undefined, refreshTasksPanelDataIfLoaded)}
+            onComplete={completeTask}
             onSnooze={snoozeUntilTomorrow}
-            onDismiss={(itemId) => runAction(() => dismissActionItemAction(itemId), "Zadanie odrzucone.", undefined, refreshTasksPanelDataIfLoaded)}
+            onDismiss={dismissTask}
           />
         ) : (
           <LazyPanelState
@@ -635,6 +669,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           expandedRepoId={expandedRepoId}
           timelines={repositoryTimelines}
           loadingTimelineRepoId={loadingTimelineRepoId}
+          decisionContexts={repositoryDecisionContexts}
+          loadingDecisionContextRepoId={loadingDecisionContextRepoId}
+          decisionContextErrors={repositoryDecisionContextErrors}
           selectedCompareRepoIds={selectedCompareRepoIds}
           showInbox={activeTab === "new"}
           hasActiveFilters={hasActiveRepositoryFilters}
@@ -659,7 +696,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
                 () => generateOpportunityCandidateAction(repoId),
                 "Research light zakonczony.",
                 "Research light w toku...",
-                refreshIdeasPanelDataIfLoaded
+                () => {
+                  refreshIdeasPanelDataIfLoaded();
+                  refreshRepositoryDecisionContext(repoId);
+                }
               ),
             onAddInboxTask: (repo) => createRepoTask(repo, "READ_README", `Przejrzyj nowe repo: ${repo.fullName}`, "Zadanie inbox dodane.", 2),
             onAddCloneTask: (repo) => createRepoTask(repo, "CLONE_LATER", `Clone later: ${repo.fullName}`, "Zadanie clone later dodane.", 1),

@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useMemo } from "react";
-import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
+import type { RepositoryDecisionContext, RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { Button, EmptyState, SkeletonBlock, SkeletonText } from "./ui";
 import { RepoRow } from "./repo-row";
 import { RepoComparePanel } from "./repo-compare-panel";
@@ -33,6 +33,9 @@ export function RepoListView({
   expandedRepoId,
   timelines,
   loadingTimelineRepoId,
+  decisionContexts,
+  loadingDecisionContextRepoId,
+  decisionContextErrors,
   selectedCompareRepoIds,
   showInbox,
   hasActiveFilters,
@@ -53,6 +56,9 @@ export function RepoListView({
   expandedRepoId: string | null;
   timelines: Record<string, RepositoryTimelineItem[]>;
   loadingTimelineRepoId: string | null;
+  decisionContexts: Record<string, RepositoryDecisionContext>;
+  loadingDecisionContextRepoId: string | null;
+  decisionContextErrors: Record<string, string>;
   selectedCompareRepoIds: string[];
   showInbox: boolean;
   hasActiveFilters: boolean;
@@ -114,6 +120,9 @@ export function RepoListView({
                 isExpanded={expandedRepoId === repo.id}
                 timeline={timelines[repo.id] ?? []}
                 isTimelineLoading={loadingTimelineRepoId === repo.id}
+                decisionContext={decisionContexts[repo.id] ?? null}
+                isDecisionContextLoading={loadingDecisionContextRepoId === repo.id}
+                decisionContextError={decisionContextErrors[repo.id] ?? null}
                 isCompareSelected={selectedCompareRepoIds.includes(repo.id)}
                 isPending={isPending}
                 onToggle={() => callbacks.onToggle(repo.id)}

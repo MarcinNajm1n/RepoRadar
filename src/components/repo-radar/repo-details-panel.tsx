@@ -1,17 +1,21 @@
 "use client";
 
-import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
+import type { ReactNode } from "react";
+import type { RepositoryDecisionContext, RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { buildRepositoryRadarReasons } from "@/lib/display/radar-reason";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { getAiPriorityReasons } from "@/lib/openai/priority";
-import { Badge, ScoreChip, TextClamp } from "./ui";
+import { Badge, ScoreChip, TextClamp, type BadgeTone } from "./ui";
 import { RepoCardActions } from "./repo-card-actions";
 
 export type RepoDetailsPanelProps = {
   repo: RepositoryListItem;
   timeline: RepositoryTimelineItem[];
   isTimelineLoading: boolean;
+  decisionContext?: RepositoryDecisionContext | null;
+  isDecisionContextLoading?: boolean;
+  decisionContextError?: string | null;
   isPending: boolean;
   onOpenReport: () => void;
   onRegenerateReport: () => void;
@@ -30,6 +34,9 @@ export function RepoDetailsPanel({
   repo,
   timeline,
   isTimelineLoading,
+  decisionContext = null,
+  isDecisionContextLoading = false,
+  decisionContextError = null,
   isPending,
   onOpenReport,
   onRegenerateReport,
@@ -83,6 +90,7 @@ export function RepoDetailsPanel({
           </section>
 
           <RadarReasonPanel repo={repo} />
+          <RepositoryDecisionCenter decisionContext={decisionContext} isLoading={isDecisionContextLoading} error={decisionContextError} />
           <AiPriorityPanel repo={repo} />
           <RepositoryTrendMiniChart repo={repo} timeline={timeline} isLoading={isTimelineLoading} />
           <RepositoryTimeline timeline={timeline} isLoading={isTimelineLoading} />
@@ -143,6 +151,218 @@ export function RepoDetailsPanel({
       </div>
     </div>
   );
+}
+
+function RepositoryDecisionCenter({
+  decisionContext,
+  isLoading,
+  error
+}: {
+  decisionContext: RepositoryDecisionContext | null;
+  isLoading: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="rounded-md border border-border-subtle bg-surface-panel p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-foreground">Centrum decyzji</h4>
+        <Badge tone={decisionContext ? decisionTone(decisionContext.nextAction.tone) : isLoading ? "info" : "warning"} variant="status">
+          {decisionContext ? nextActionKindLabel(decisionContext.nextAction.kind) : isLoading ? "ladowanie" : error ? "blad" : "brak danych"}
+        </Badge>
+      </div>
+
+      {isLoading && !decisionContext ? (
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Pobieram raporty, zadania i evidence dla centrum decyzji...
+        </p>
+      ) : null}
+
+      {!isLoading && error ? (
+        <p className="mt-3 rounded-md border border-warning/40 bg-warning/15 p-3 text-sm text-warning-foreground">
+          Nie udalo sie zaladowac centrum decyzji: {cleanDisplayText(error, { maxLength: 180 })}
+        </p>
+      ) : null}
+
+      {!isLoading && !error && !decisionContext ? (
+        <p className="mt-3 rounded-md border border-dashed border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Centrum decyzji nie zostalo jeszcze zaladowane. Rozwin repo ponownie albo odswiez widok.
+        </p>
+      ) : null}
+
+      {decisionContext ? (
+        <div className="mt-3 space-y-3">
+          <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge tone={decisionTone(decisionContext.nextAction.tone)} variant="status">
+                Nastepna akcja
+              </Badge>
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">{decisionContext.nextAction.title}</span>
+              <Badge tone="neutral" variant="score">
+                {decisionContext.nextAction.actionLabel}
+              </Badge>
+            </div>
+            <p className="mt-2 text-sm leading-5 text-foreground">{decisionContext.nextAction.description}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{decisionContext.nextAction.reason}</p>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {decisionContext.signals.map((signal) => (
+              <div key={signal.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border-subtle bg-surface-inset px-3 py-2">
+                <span className="truncate text-xs font-medium text-muted-foreground">{signal.label}</span>
+                <Badge tone={decisionTone(signal.tone)} variant="score" className="max-w-[170px] truncate">
+                  {signal.value}
+                </Badge>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            <DecisionLedgerBlock
+              title="Raporty"
+              meta={`${decisionContext.reports.totalCount} lacznie`}
+              rows={[
+                ["Quick brief", String(decisionContext.reports.quickBriefCount)],
+                ["Pelny raport", String(decisionContext.reports.fullReportCount)],
+                ["Decyzje", String(decisionContext.reports.decisionLogCount)],
+                ["Scoring", String(decisionContext.reports.scoringSnapshotCount)]
+              ]}
+            >
+              {decisionContext.reports.recent.length ? (
+                <ol className="mt-2 space-y-2">
+                  {decisionContext.reports.recent.map((report) => (
+                    <li key={report.id} className="min-w-0 border-t border-border-subtle pt-2 first:border-t-0 first:pt-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Badge tone="info">{reportKindLabel(report.type)}</Badge>
+                        <span className="min-w-0 truncate text-sm font-medium text-foreground">{cleanDisplayText(report.title, { maxLength: 96 })}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDisplayDate(report.createdAt)}
+                        {report.summary ? ` | ${cleanDisplayText(report.summary, { maxLength: 110 })}` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Brak raportow dla tego repo.</p>
+              )}
+            </DecisionLedgerBlock>
+
+            <DecisionLedgerBlock title="Otwarte zadania" meta={`${decisionContext.tasks.openCount} aktywne`}>
+              {decisionContext.tasks.recentOpen.length ? (
+                <ol className="mt-2 space-y-2">
+                  {decisionContext.tasks.recentOpen.map((task) => (
+                    <li key={task.id} className="min-w-0 border-t border-border-subtle pt-2 first:border-t-0 first:pt-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Badge tone={task.status === "SNOOZED" ? "warning" : "info"}>{task.status}</Badge>
+                        <span className="min-w-0 truncate text-sm font-medium text-foreground">{cleanDisplayText(task.title, { maxLength: 120 })}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Priorytet {task.priority}
+                        {task.dueAt ? ` | termin ${formatDisplayDate(task.dueAt)}` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Brak otwartych zadan blokujacych decyzje.</p>
+              )}
+            </DecisionLedgerBlock>
+
+            <DecisionLedgerBlock
+              title="Evidence / research"
+              meta={`${decisionContext.evidence.sourceCount} zrodel`}
+              rows={[
+                ["Przebiegi researchu", String(decisionContext.evidence.researchRunCount)],
+                ["Typy", decisionContext.evidence.sourceTypes.join(", ") || "brak"],
+                ["Ostatni research", decisionContext.evidence.lastResearchAt ? formatDisplayDate(decisionContext.evidence.lastResearchAt) : "brak"]
+              ]}
+            >
+              <p className="mt-2 text-sm leading-5 text-muted-foreground">{decisionContext.evidence.summary}</p>
+              {decisionContext.evidence.topSources.length ? (
+                <ol className="mt-2 space-y-2">
+                  {decisionContext.evidence.topSources.map((source) => (
+                    <li key={source.id} className="min-w-0 border-t border-border-subtle pt-2 first:border-t-0 first:pt-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Badge tone="info" className="max-w-full min-w-0">
+                          <span className="truncate">{cleanDisplayText(source.sourceType, { maxLength: 36 })}</span>
+                        </Badge>
+                        <span className="min-w-0 truncate text-sm font-medium text-foreground">{cleanDisplayText(source.title, { maxLength: 110 })}</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {source.whatItProves
+                          ? cleanDisplayText(source.whatItProves, { maxLength: 130 })
+                          : `${source.publisher ?? "nieznane zrodlo"} | ${formatDisplayDate(source.retrievedAt)}`}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </DecisionLedgerBlock>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DecisionLedgerBlock({
+  title,
+  meta,
+  rows = [],
+  children
+}: {
+  title: string;
+  meta: string;
+  rows?: Array<[string, string]>;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-border-subtle bg-surface-inset p-3">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <h5 className="truncate text-xs font-semibold uppercase text-muted-foreground">{title}</h5>
+        <Badge tone="neutral" variant="score">
+          {meta}
+        </Badge>
+      </div>
+      {rows.length ? (
+        <div className="mt-2 grid gap-1.5 text-sm">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex min-w-0 items-center justify-between gap-3">
+              <span className="truncate text-muted-foreground">{label}</span>
+              <span className="max-w-[170px] truncate font-semibold tabular-nums text-foreground">{value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+function decisionTone(tone: RepositoryDecisionContext["nextAction"]["tone"]): BadgeTone {
+  return tone;
+}
+
+function nextActionKindLabel(kind: RepositoryDecisionContext["nextAction"]["kind"]) {
+  const labels: Record<RepositoryDecisionContext["nextAction"]["kind"], string> = {
+    quick_brief: "quick brief",
+    full_report: "pelny raport",
+    open_task: "zadanie",
+    research_evidence: "evidence",
+    status_decision: "status",
+    monitor: "monitor"
+  };
+  return labels[kind];
+}
+
+function reportKindLabel(type: string) {
+  const labels: Record<string, string> = {
+    repo_quick_brief: "brief",
+    repo: "raport",
+    decision_log: "decyzja",
+    scoring_snapshot: "scoring"
+  };
+  return labels[type] ?? type;
 }
 
 function AiPriorityPanel({ repo }: { repo: RepositoryListItem }) {

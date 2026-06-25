@@ -2,7 +2,7 @@
 
 import { Archive, ChevronDown, ExternalLink, FileText, Flame, GitCompare, GitFork } from "lucide-react";
 import type React from "react";
-import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
+import type { RepositoryDecisionContext, RepositoryListItem, RepositoryTimelineItem } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
 import { getRepositoryStatusDisplay } from "@/lib/display/status-display";
@@ -16,6 +16,9 @@ export type RepoRowProps = {
   isExpanded: boolean;
   timeline: RepositoryTimelineItem[];
   isTimelineLoading: boolean;
+  decisionContext?: RepositoryDecisionContext | null;
+  isDecisionContextLoading?: boolean;
+  decisionContextError?: string | null;
   isCompareSelected: boolean;
   isPending: boolean;
   onToggle: () => void;
@@ -38,6 +41,9 @@ export function RepoRow({
   isExpanded,
   timeline,
   isTimelineLoading,
+  decisionContext = null,
+  isDecisionContextLoading = false,
+  decisionContextError = null,
   isCompareSelected,
   isPending,
   onToggle,
@@ -172,6 +178,9 @@ export function RepoRow({
           repo={repo}
           timeline={timeline}
           isTimelineLoading={isTimelineLoading}
+          decisionContext={decisionContext}
+          isDecisionContextLoading={isDecisionContextLoading}
+          decisionContextError={decisionContextError}
           isPending={isPending}
           onOpenReport={onOpenReport}
           onRegenerateReport={onRegenerateReport}
