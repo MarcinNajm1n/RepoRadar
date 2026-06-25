@@ -296,6 +296,25 @@ export type GraphifyMaintenanceSummary = {
   note: string;
 };
 
+export type MaintenancePreviewSummary = {
+  generatedAt: string;
+  externalResearchCache: {
+    expiredEntries: number;
+  };
+  notificationLogs: {
+    daysToKeep: number;
+    cutoff: string;
+    oldEntries: number;
+  };
+  snapshots: {
+    daysToKeep: number;
+    cutoff: string;
+    oldEntries: number;
+    affectedRepositories: number;
+    repositoriesLosingAllSnapshots: number;
+  };
+};
+
 export type OpenAiCacheSummary = {
   totalEntries: number;
   byKind: {
@@ -332,6 +351,7 @@ export type SettingsSummary = {
   openAiCache: OpenAiCacheSummary;
   observability: ObservabilitySummary;
   graphify: GraphifyMaintenanceSummary;
+  maintenancePreview: MaintenancePreviewSummary;
   githubRateLimit: {
     checkedAt: string;
     status: number;

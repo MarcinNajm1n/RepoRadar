@@ -92,6 +92,11 @@ export function SettingsView({
     );
   }
 
+  const maintenancePreview = settingsSummary.maintenancePreview;
+  const expiredCacheCount = maintenancePreview.externalResearchCache.expiredEntries;
+  const oldNotificationLogCount = maintenancePreview.notificationLogs.oldEntries;
+  const oldSnapshotCount = maintenancePreview.snapshots.oldEntries;
+
   return (
     <section className="space-y-4">
       <SettingsSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
@@ -181,12 +186,6 @@ export function SettingsView({
             <InfoItem label="Discord" value={settingsSummary.discordWebhookConfigured ? "skonfigurowany" : "brak"} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={onClearExpiredExternalCache} disabled={isPending}>
-              Wyczyść cache
-            </Button>
-            <Button variant="secondary" onClick={onClearOldNotificationLogs} disabled={isPending}>
-              Wyczyść logi 30d+
-            </Button>
             <Button variant="secondary" onClick={onTestNotification} disabled={isPending}>
               <Bell className="h-4 w-4" /> Test powiadomienia
             </Button>
@@ -257,15 +256,23 @@ export function SettingsView({
       </SettingsPanel>
 
       <SettingsPanel title="Dane i maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
-        <div className="flex flex-wrap gap-2">
+        <MaintenancePreview preview={maintenancePreview} />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onClearExpiredExternalCache} disabled={isPending || expiredCacheCount === 0}>
+            Wyczysc cache ({expiredCacheCount})
+          </Button>
+          <Button variant="secondary" onClick={onClearOldNotificationLogs} disabled={isPending || oldNotificationLogCount === 0}>
+            Wyczysc logi {maintenancePreview.notificationLogs.daysToKeep}d+ ({oldNotificationLogCount})
+          </Button>
+          <Button variant="danger" onClick={onPruneSnapshots} disabled={isPending || oldSnapshotCount === 0}>
+            <Trash2 className="h-4 w-4" /> Przytnij snapshoty {maintenancePreview.snapshots.daysToKeep}d+ ({oldSnapshotCount})
+          </Button>
           <Button variant="secondary" onClick={onOpenDailyBriefing} disabled={isPending}>
-            <CalendarClock className="h-4 w-4" /> Daily briefing
+            <CalendarClock className="h-4 w-4" /> Brief dzienny
           </Button>
           <Button variant="secondary" onClick={onDownloadIdeasCsv} disabled={isPending}>
-            <Download className="h-4 w-4" /> Export ideas CSV
-          </Button>
-          <Button variant="danger" onClick={onPruneSnapshots} disabled={isPending}>
-            <Trash2 className="h-4 w-4" /> Prune snapshots 180d+
+            <Download className="h-4 w-4" /> Eksport pomyslow CSV
           </Button>
         </div>
         <div className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
@@ -362,7 +369,33 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md border border-border-subtle bg-surface-inset px-3 py-2">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="mt-1 break-words text-sm font-semibold text-foreground">{value}</div>
+      <div className="mt-1 break-words text-sm font-semibold tabular-nums text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function MaintenancePreview({ preview }: { preview: SettingsSummary["maintenancePreview"] }) {
+  const snapshots = preview.snapshots;
+  const losingAllSnapshots = snapshots.repositoriesLosingAllSnapshots;
+
+  return (
+    <div>
+      <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-5">
+        <InfoItem label="Wygasly research cache" value={String(preview.externalResearchCache.expiredEntries)} />
+        <InfoItem label={`Logi ${preview.notificationLogs.daysToKeep}d+`} value={String(preview.notificationLogs.oldEntries)} />
+        <InfoItem label={`Snapshoty ${snapshots.daysToKeep}d+`} value={String(snapshots.oldEntries)} />
+        <InfoItem label="Repo dotkniete" value={String(snapshots.affectedRepositories)} />
+        <InfoItem label="Repo bez historii" value={String(losingAllSnapshots)} />
+      </div>
+      <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+        Preview jest dry-run: pokazuje lokalne rekordy kwalifikujace sie do czyszczenia bez usuwania danych. Wygenerowano:{" "}
+        {formatOptionalDateTime(preview.generatedAt)}.
+      </p>
+      {losingAllSnapshots > 0 ? (
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground">
+          {losingAllSnapshots} repo straci wszystkie snapshoty po prune. Sprawdz, czy to akceptowalne przed potwierdzeniem.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -88,6 +88,24 @@ function isIdeasPanelTab(tab: TabKey) {
   return tab === "candidates" || tab === "ideas" || tab === "savedIdeas" || tab === "dismissedIdeas";
 }
 
+function buildPruneSnapshotsConfirmation(snapshotPreview?: SettingsPanelData["settingsSummary"]["maintenancePreview"]["snapshots"]) {
+  if (!snapshotPreview) {
+    return "Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.";
+  }
+
+  const losingHistory =
+    snapshotPreview.repositoriesLosingAllSnapshots > 0
+      ? `${snapshotPreview.repositoriesLosingAllSnapshots} repo straci wszystkie snapshoty.`
+      : "Zadne repo nie powinno stracic calej historii snapshotow.";
+
+  return [
+    `Usunac snapshoty starsze niz ${snapshotPreview.daysToKeep} dni? Te dane sa lokalne i nie beda odzyskane z historii.`,
+    "",
+    `Dry-run: ${snapshotPreview.oldEntries} snapshotow z ${snapshotPreview.affectedRepositories} repo.`,
+    losingHistory
+  ].join("\n");
+}
+
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [activeSection, setActiveSection] = useState<SectionKey>("repo");
   const [activeTab, setActiveTab] = useState<TabKey>("radar");
@@ -499,7 +517,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   }
 
   function pruneSnapshotsWithConfirmation() {
-    if (!window.confirm("Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.")) {
+    const snapshotPreview = settingsPanelData?.settingsSummary.maintenancePreview.snapshots;
+    if (!window.confirm(buildPruneSnapshotsConfirmation(snapshotPreview))) {
       return;
     }
     runAction(
