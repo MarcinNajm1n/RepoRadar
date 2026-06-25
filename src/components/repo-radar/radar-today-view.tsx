@@ -89,6 +89,19 @@ export function RadarTodayView({
             <p className="mt-2 text-xs font-medium text-muted-foreground">
               {cleanDisplayText(radarToday.nextAction.reason, { maxLength: 220 })}
             </p>
+            {radarToday.nextAction.signals.length ? (
+              <div className="mt-3">
+                <div className="text-xs font-semibold text-primary">Dlaczego teraz</div>
+                <ul className="mt-2 grid gap-1.5 text-xs leading-5 text-muted-foreground sm:grid-cols-2">
+                  {radarToday.nextAction.signals.map((signal, index) => (
+                    <li key={`${radarToday.nextAction.id}-signal-${index}`} className="flex min-w-0 gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                      <span className="min-w-0 break-words">{cleanDisplayText(signal, { maxLength: 140 })}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
           <NextActionButton
             radarToday={radarToday}

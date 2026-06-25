@@ -137,6 +137,7 @@ export type RadarNextAction = {
   title: string;
   description: string;
   reason: string;
+  signals: string[];
   actionLabel: string;
   repoId: string | null;
   ideaId: string | null;

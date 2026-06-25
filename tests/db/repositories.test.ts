@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRadarToday, mapEvidenceSource, mapRepository } from "../../src/lib/db/repositories";
+import { buildRadarToday, mapEvidenceSource, mapRepository, rankRadarNextActionCandidates } from "../../src/lib/db/repositories";
 import type { ActionItemListItem } from "../../src/types/action-item";
 import type { DashboardNotificationStatus, DashboardSettingsStatus, IdeaListItem } from "../../src/types/repository";
 
@@ -220,6 +220,47 @@ function actionItemRecord(overrides: Partial<ActionItemListItem> = {}): ActionIt
 }
 
 describe("buildRadarToday", () => {
+  it("ranks next action candidates by deterministic Radar priority", () => {
+    const repo = mapRepository(
+      repositoryRecord({
+        id: "repo_signal",
+        fullName: "owner/signal",
+        trendScore: 91,
+        initialMomentumScore: 65,
+        growth7d: 42,
+        snapshots: []
+      })
+    );
+    const candidates = rankRadarNextActionCandidates({
+      alerts: [
+        {
+          id: "github-token-missing",
+          level: "warning",
+          title: "Brak GitHub token",
+          message: "Skan moze szybciej trafic w rate limit bez lokalnego GITHUB_TOKEN."
+        }
+      ],
+      actionItems: [actionItemRecord({ id: "urgent", priority: 9, dueAt: "2026-06-16T13:00:00.000Z" })],
+      businessCandidates: [ideaRecord({ id: "idea_signal", opportunityScore: 94, confidenceScore: 5, usefulnessScore: 5 })],
+      topRepositories: [repo],
+      latestRepositories: [],
+      lastScan: null
+    });
+
+    expect(candidates.map((candidate) => candidate.kind)).toEqual(["alert", "task", "idea", "repo"]);
+    expect(candidates[0]).toMatchObject({
+      kind: "alert",
+      id: "alert:github-token-missing",
+      signals: [
+        "Alert ma poziom: ostrzezenie.",
+        "Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo."
+      ]
+    });
+    expect(candidates[1].signals).toContain("Ma najblizszy termin w aktywnej kolejce.");
+    expect(candidates[2].signals).toContain("Ocena okazji: 94.");
+    expect(candidates[3].signals).toContain("Wzrost 7d: +42 gwiazdek.");
+  });
+
   it("builds limited repository sections without ignored repositories", () => {
     const radar = buildRadarToday(
       {
@@ -242,6 +283,7 @@ describe("buildRadarToday", () => {
     expect(radar.highInitialMomentum.map((repo) => repo.fullName)).toContain("owner/b");
     expect(radar.topRepositories).toHaveLength(2);
     expect(radar.nextAction).toMatchObject({ kind: "repo", repoId: "repo_a" });
+    expect(radar.nextAction.signals).toContain("Ocena trendu: 90.");
   });
 
   it("sorts business candidates and filters snoozed action items", () => {

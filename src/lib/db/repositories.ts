@@ -293,85 +293,185 @@ function isActionItemVisibleNow(item: ActionItemListItem, now: Date) {
   return !item.snoozedUntil || new Date(item.snoozedUntil).getTime() <= now.getTime();
 }
 
-function buildNextAction(input: {
+type RadarNextActionSelectionInput = {
   alerts: RadarTodayData["alerts"];
   actionItems: ActionItemListItem[];
   topRepositories: RepositoryListItem[];
   businessCandidates: IdeaListItem[];
   latestRepositories: RepositoryListItem[];
   lastScan: DashboardLastScan;
-}): RadarNextAction {
-  const blockingAlert = input.alerts.find((alert) => alert.level === "critical") ?? input.alerts.find((alert) => alert.level === "warning");
-  if (blockingAlert) {
-    return {
-      id: `alert:${blockingAlert.id}`,
-      kind: "alert",
-      title: blockingAlert.title,
-      description: blockingAlert.message,
-      reason: "Najpierw usun blokery operacyjne, bo moga falszowac jakosc radaru.",
-      actionLabel: "Sprawdz alert",
-      repoId: null,
-      ideaId: null,
-      taskId: null
-    };
+};
+
+const radarNextActionPriority: Record<RadarNextAction["kind"], number> = {
+  alert: 0,
+  task: 1,
+  idea: 2,
+  repo: 3,
+  scan: 4
+};
+
+function formatAlertLevel(level: RadarTodayData["alerts"][number]["level"]) {
+  switch (level) {
+    case "critical":
+      return "krytyczny";
+    case "warning":
+      return "ostrzezenie";
+    case "info":
+    default:
+      return "informacyjny";
+  }
+}
+
+function formatSignalScore(value: number | null | undefined, fallback = "brak") {
+  return value === null || value === undefined ? fallback : String(value);
+}
+
+function formatSignalDelta(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
   }
 
-  const topTask = input.actionItems[0];
-  if (topTask) {
-    return {
-      id: `task:${topTask.id}`,
-      kind: "task",
-      title: topTask.title,
-      description: topTask.description ?? topTask.repoFullName ?? topTask.ideaTitle ?? "Zadanie bez dodatkowego opisu.",
-      reason: "To najwyzej ocenione aktywne zadanie w kolejce.",
-      actionLabel: "Przejdz do kolejki",
-      repoId: topTask.repoId,
-      ideaId: topTask.ideaId,
-      taskId: topTask.id
-    };
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function buildAlertNextAction(alert: RadarTodayData["alerts"][number]): RadarNextAction {
+  return {
+    id: `alert:${alert.id}`,
+    kind: "alert",
+    title: alert.title,
+    description: alert.message,
+    reason: "Najpierw usun blokery operacyjne, bo moga falszowac jakosc radaru.",
+    signals: [
+      `Alert ma poziom: ${formatAlertLevel(alert.level)}.`,
+      "Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo."
+    ],
+    actionLabel: "Sprawdz alert",
+    repoId: null,
+    ideaId: null,
+    taskId: null
+  };
+}
+
+function buildTaskNextAction(task: ActionItemListItem): RadarNextAction {
+  const signals = [`Priorytet zadania: ${task.priority}.`];
+
+  if (task.dueAt) {
+    signals.push("Ma najblizszy termin w aktywnej kolejce.");
+  } else {
+    signals.push("Jest najwyzej w aktywnej kolejce zadan.");
   }
 
-  const topIdea = input.businessCandidates[0];
-  if (topIdea) {
-    return {
-      id: `idea:${topIdea.id}`,
-      kind: "idea",
-      title: topIdea.title,
-      description: topIdea.applicationSummary ?? topIdea.problem,
-      reason: "Najmocniejszy kandydat biznesowy czeka na decyzje: rozwinac, zapisac albo odrzucic.",
-      actionLabel: "Otworz kandydata",
-      repoId: topIdea.sourceRepoId,
-      ideaId: topIdea.id,
-      taskId: null
-    };
-  }
-
-  const topRepo = input.topRepositories[0] ?? input.latestRepositories[0];
-  if (topRepo) {
-    return {
-      id: `repo:${topRepo.id}`,
-      kind: "repo",
-      title: topRepo.fullName,
-      description: topRepo.shortSummaryPl ?? topRepo.description ?? "Repo wymaga szybkiego briefu przed pelnym raportem.",
-      reason: topRepo.growth7d === null ? "Brak historii 7d, wiec zacznij od szybkiego briefu i README." : "Najmocniejszy aktualny sygnal repozytorium.",
-      actionLabel: "Otworz brief",
-      repoId: topRepo.id,
-      ideaId: null,
-      taskId: null
-    };
+  if (task.repoFullName) {
+    signals.push(`Powiazane repo: ${task.repoFullName}.`);
+  } else if (task.ideaTitle) {
+    signals.push(`Powiazany pomysl: ${task.ideaTitle}.`);
   }
 
   return {
+    id: `task:${task.id}`,
+    kind: "task",
+    title: task.title,
+    description: task.description ?? task.repoFullName ?? task.ideaTitle ?? "Zadanie bez dodatkowego opisu.",
+    reason: "To najwyzej ocenione aktywne zadanie w kolejce.",
+    signals,
+    actionLabel: "Przejdz do kolejki",
+    repoId: task.repoId,
+    ideaId: task.ideaId,
+    taskId: task.id
+  };
+}
+
+function buildIdeaNextAction(idea: IdeaListItem): RadarNextAction {
+  return {
+    id: `idea:${idea.id}`,
+    kind: "idea",
+    title: idea.title,
+    description: idea.applicationSummary ?? idea.problem,
+    reason: "Najmocniejszy kandydat biznesowy czeka na decyzje: rozwinac, zapisac albo odrzucic.",
+    signals: [
+      `Ocena okazji: ${formatSignalScore(idea.opportunityScore)}.`,
+      `Pewnosc: ${formatSignalScore(idea.confidenceScore)}/5.`,
+      `Uzytecznosc: ${idea.usefulnessScore}/5.`
+    ],
+    actionLabel: "Otworz kandydata",
+    repoId: idea.sourceRepoId,
+    ideaId: idea.id,
+    taskId: null
+  };
+}
+
+function buildRepoNextAction(repo: RepositoryListItem): RadarNextAction {
+  const growth7d = formatSignalDelta(repo.growth7d);
+  const signals = [`Ocena trendu: ${repo.trendScore}.`, `Momentum startowe: ${repo.initialMomentumScore}.`];
+
+  if (growth7d === null) {
+    signals.push("Brak historii 7d, wiec zacznij od szybkiego briefu.");
+  } else {
+    signals.push(`Wzrost 7d: ${growth7d} gwiazdek.`);
+  }
+
+  if (repo.status === "NEW") {
+    signals.push("Status NEW: wymaga pierwszej decyzji.");
+  }
+
+  return {
+    id: `repo:${repo.id}`,
+    kind: "repo",
+    title: repo.fullName,
+    description: repo.shortSummaryPl ?? repo.description ?? "Repo wymaga szybkiego briefu przed pelnym raportem.",
+    reason: repo.growth7d === null ? "Brak historii 7d, wiec zacznij od szybkiego briefu i README." : "Najmocniejszy aktualny sygnal repozytorium.",
+    signals,
+    actionLabel: "Otworz brief",
+    repoId: repo.id,
+    ideaId: null,
+    taskId: null
+  };
+}
+
+function buildScanNextAction(lastScan: DashboardLastScan): RadarNextAction {
+  return {
     id: "scan:run",
     kind: "scan",
-    title: input.lastScan ? "Odswiez radar" : "Uruchom pierwszy scan",
-    description: input.lastScan ? "Brak aktywnych decyzji. Nowy scan moze dostarczyc swieze sygnaly." : "Radar nie ma jeszcze danych skanu.",
+    title: lastScan ? "Odswiez radar" : "Uruchom pierwszy scan",
+    description: lastScan ? "Brak aktywnych decyzji. Nowy scan moze dostarczyc swieze sygnaly." : "Radar nie ma jeszcze danych skanu.",
     reason: "Bez swiezych danych nie ma wiarygodnej nastepnej decyzji.",
+    signals: lastScan
+      ? ["Brak alertow blokujacych, zadan, kandydatow i repo w aktualnym rankingu.", "Nowy scan moze dostarczyc swieze sygnaly."]
+      : ["Brak danych skanu w lokalnej bazie.", "Pierwszy scan jest wymagany przed rankingiem repo."],
     actionLabel: "Uruchom scan",
     repoId: null,
     ideaId: null,
     taskId: null
   };
+}
+
+export function rankRadarNextActionCandidates(input: RadarNextActionSelectionInput): RadarNextAction[] {
+  const candidates: RadarNextAction[] = [];
+  const blockingAlert = input.alerts.find((alert) => alert.level === "critical") ?? input.alerts.find((alert) => alert.level === "warning");
+  if (blockingAlert) {
+    candidates.push(buildAlertNextAction(blockingAlert));
+  }
+
+  const topTask = input.actionItems[0];
+  if (topTask) {
+    candidates.push(buildTaskNextAction(topTask));
+  }
+
+  const topIdea = input.businessCandidates[0];
+  if (topIdea) {
+    candidates.push(buildIdeaNextAction(topIdea));
+  }
+
+  const topRepo = input.topRepositories[0] ?? input.latestRepositories[0];
+  if (topRepo) {
+    candidates.push(buildRepoNextAction(topRepo));
+  }
+
+  return candidates.sort((a, b) => radarNextActionPriority[a.kind] - radarNextActionPriority[b.kind]);
+}
+
+function buildNextAction(input: RadarNextActionSelectionInput): RadarNextAction {
+  return rankRadarNextActionCandidates(input)[0] ?? buildScanNextAction(input.lastScan);
 }
 
 export function buildRadarToday(
