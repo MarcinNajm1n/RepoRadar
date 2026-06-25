@@ -137,3 +137,102 @@ select {
   white-space: pre-wrap;
   line-height: 1.6;
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .print-hidden {
+    display: none !important;
+  }
+
+  .print-only {
+    display: revert !important;
+  }
+
+  .print-app-shell {
+    min-height: auto !important;
+    background: #fff !important;
+  }
+
+  .print-app-frame {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-app-main {
+    display: block !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .print-report-overlay {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+
+  .print-report-dialog {
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    padding: 0 !important;
+  }
+
+  .print-report-layout {
+    display: block !important;
+  }
+
+  .print-report-body {
+    color: #111827 !important;
+  }
+
+  .print-report-body :where(section, article, details, pre) {
+    background: #fff !important;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+  }
+
+  .print-report-body :where(.print-report-surface, .print-report-proof) {
+    background: #fff !important;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+  }
+
+  .print-report-body :where(h1, h2, h3) {
+    break-after: avoid;
+  }
+
+  .print-report-body :where(.rounded-md, .rounded-lg) {
+    break-inside: avoid-page;
+  }
+
+  .print-report-body :where(p, li, span, h1, h2, h3, h4, h5, h6) {
+    color: #111827 !important;
+  }
+
+  .repo-report {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}

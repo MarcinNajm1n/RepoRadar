@@ -20,13 +20,13 @@ export function EvidenceCard({ source }: { source: EvidenceDisplaySource }) {
       <p className="mt-1 text-xs text-muted-foreground">
         {[source.displayPublisher, source.publishedAt ? formatDisplayDate(source.publishedAt) : null].filter(Boolean).join(" | ")}
       </p>
-      <p className="mt-2 rounded border border-border bg-muted px-2 py-1 text-xs">{source.displayWhatItProves}</p>
+      <p className="print-report-proof mt-2 rounded border border-border bg-muted px-2 py-1 text-xs">{source.displayWhatItProves}</p>
       <p className="mt-2 line-clamp-4 text-sm text-muted-foreground">{source.displaySnippet}</p>
     </>
   );
 
   if (!safeUrl) {
-    return <div className="block rounded-md border border-border bg-background p-3 text-sm">{content}</div>;
+    return <div className="print-report-surface block rounded-md border border-border bg-background p-3 text-sm">{content}</div>;
   }
 
   return (
@@ -34,7 +34,7 @@ export function EvidenceCard({ source }: { source: EvidenceDisplaySource }) {
       href={safeUrl}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-md border border-border bg-background p-3 text-sm transition hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="print-report-surface block rounded-md border border-border bg-background p-3 text-sm transition hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {content}
     </a>

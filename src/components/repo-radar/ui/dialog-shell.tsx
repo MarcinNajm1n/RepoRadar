@@ -18,12 +18,14 @@ export function DialogShell({
   titleId,
   children,
   onClose,
-  className
+  className,
+  overlayClassName
 }: {
   titleId: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   onClose: () => void;
   className?: string;
+  overlayClassName?: string;
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -110,7 +112,7 @@ export function DialogShell({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" onClick={closeFromBackdrop}>
+    <div className={cn("fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4", overlayClassName)} onClick={closeFromBackdrop}>
       <div
         ref={dialogRef}
         role="dialog"

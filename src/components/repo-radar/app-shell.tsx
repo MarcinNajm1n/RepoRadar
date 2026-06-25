@@ -22,8 +22,8 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-surface-canvas text-foreground">
-      <div className="mx-auto flex w-full max-w-[1500px] gap-4 px-4 py-4 sm:px-5 lg:gap-5 lg:py-5">
+    <main className="print-app-shell min-h-screen bg-surface-canvas text-foreground">
+      <div className="print-app-frame mx-auto flex w-full max-w-[1500px] gap-4 px-4 py-4 sm:px-5 lg:gap-5 lg:py-5">
         <Sidebar
           activeSection={activeSection}
           activeTab={activeTab}
@@ -31,8 +31,8 @@ export function AppShell({
           onSectionChange={onSectionChange}
           onTabChange={onTabChange}
         />
-        <section className="min-w-0 flex-1">
-          <div className="mb-4 lg:hidden">
+        <section className="print-app-main min-w-0 flex-1">
+          <div className="print-hidden mb-4 lg:hidden">
             <div className="mb-2 grid grid-cols-2 gap-2">
               {(["repo", "ideas"] as SectionKey[]).map((section) => (
                 <button

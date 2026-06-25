@@ -56,7 +56,7 @@ import { EvidencePanel } from "@/components/repo-radar/evidence-panel";
 import { ReportView } from "@/components/repo-radar/report-view";
 import { getTabLabel, tabs } from "@/components/repo-radar/navigation";
 import type { SectionKey, TabKey } from "@/components/repo-radar/navigation";
-import { Button, DialogShell, SectionCard, SkeletonBlock, SkeletonText } from "@/components/repo-radar/ui";
+import { Badge, Button, DialogShell, SectionCard, SkeletonBlock, SkeletonText } from "@/components/repo-radar/ui";
 import { useFeedbackAction } from "@/components/repo-radar/hooks/use-feedback-action";
 import { isRepositoryListTab, useRepositoryBrowser } from "@/components/repo-radar/hooks/use-repository-browser";
 
@@ -540,42 +540,43 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       onSectionChange={setActiveSection}
       onTabChange={setActiveTab}
     >
-      <TopBar
-        title={getTabLabel(currentTab)}
-        description={lastScanDescription}
-        feedback={feedback}
-        stats={topBarStats}
-        actions={
-          <>
-            <Button variant="secondary" onClick={openCommandPalette} disabled={isPending}>
-              <Command className="h-4 w-4" />
-              Komendy
-              <kbd aria-hidden="true" className="ml-1 rounded border border-border-subtle px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                Ctrl K
-              </kbd>
-            </Button>
-            <Button onClick={runScan} disabled={isPending}>
-              <RefreshCw className={cn("h-4 w-4", isPending && "animate-spin")} />
-              Uruchom scan
-            </Button>
-          </>
-        }
-      />
+      <div className={report ? "print-hidden" : undefined}>
+        <TopBar
+          title={getTabLabel(currentTab)}
+          description={lastScanDescription}
+          feedback={feedback}
+          stats={topBarStats}
+          actions={
+            <>
+              <Button variant="secondary" onClick={openCommandPalette} disabled={isPending}>
+                <Command className="h-4 w-4" />
+                Komendy
+                <kbd aria-hidden="true" className="ml-1 rounded border border-border-subtle px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  Ctrl K
+                </kbd>
+              </Button>
+              <Button onClick={runScan} disabled={isPending}>
+                <RefreshCw className={cn("h-4 w-4", isPending && "animate-spin")} />
+                Uruchom scan
+              </Button>
+            </>
+          }
+        />
 
-      <CommandPalette
-        key={commandPaletteOpenKey}
-        isOpen={isCommandPaletteOpen}
-        repositories={initialData.repositories}
-        isPending={isPending}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onRunScan={runScan}
-        onOpenTab={switchToTab}
-        onOpenDailyBriefing={openDailyBriefing}
-        onCreateWeeklyReport={createWeeklyReport}
-        onCreatePortfolioBrief={openPortfolioBrief}
-        onDownloadIdeasCsv={downloadIdeasCsv}
-        onSearchRepositories={searchRepositoriesFromCommand}
-      />
+        <CommandPalette
+          key={commandPaletteOpenKey}
+          isOpen={isCommandPaletteOpen}
+          repositories={initialData.repositories}
+          isPending={isPending}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          onRunScan={runScan}
+          onOpenTab={switchToTab}
+          onOpenDailyBriefing={openDailyBriefing}
+          onCreateWeeklyReport={createWeeklyReport}
+          onCreatePortfolioBrief={openPortfolioBrief}
+          onDownloadIdeasCsv={downloadIdeasCsv}
+          onSearchRepositories={searchRepositoriesFromCommand}
+        />
 
       {activeTab === "radar" ? (
         <RadarTodayView
@@ -907,10 +908,16 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
       {pendingReportTitle && !report ? (
         <ReportLoadingDialog title={pendingReportTitle} onClose={() => setPendingReportTitle(null)} />
       ) : null}
+      </div>
 
       {report ? (
-        <DialogShell titleId="repo-report-dialog-title" onClose={() => setReport(null)} className="max-w-5xl">
-          <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-border-subtle bg-surface-overlay pb-4">
+        <DialogShell
+          titleId="repo-report-dialog-title"
+          onClose={() => setReport(null)}
+          className="print-report-dialog max-w-5xl"
+          overlayClassName="print-report-overlay"
+        >
+          <div className="print-hidden sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-border-subtle bg-surface-overlay pb-4">
             <div>
               <h2 id="repo-report-dialog-title" className="text-xl font-semibold">
                 {report.title}
@@ -927,7 +934,9 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
               </Button>
             </div>
           </div>
-          <ReportView content={report.content} sources={report.evidenceSources} />
+          <div className="print-report-content">
+            <ReportView content={report.content} sources={report.evidenceSources} />
+          </div>
         </DialogShell>
       ) : null}
     </AppShell>
@@ -959,6 +968,13 @@ function LazyPanelState({
         {isLoading ? (
           <div className="space-y-4" role="status" aria-live="polite">
             <span className="sr-only">{loadingText}</span>
+            <div className="rounded-md border border-info/30 bg-info/10 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="info" variant="status">ladowanie</Badge>
+                <p className="text-sm font-medium text-foreground">{loadingText}</p>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Panel doczytuje dane dopiero po otwarciu tego widoku.</p>
+            </div>
             <div className="grid gap-3 md:grid-cols-3">
               <SkeletonBlock className="h-16" />
               <SkeletonBlock className="h-16" />
@@ -971,8 +987,12 @@ function LazyPanelState({
             </div>
           </div>
         ) : (
-          <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
-            <p className="text-sm text-muted-foreground">{errorText}</p>
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="warning" variant="status">do ponowienia</Badge>
+              <p className="text-sm font-medium text-foreground">{errorText}</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Dane nie zostaly zapisane w stanie widoku. Sprobuj pobrac panel ponownie.</p>
             <Button className="mt-3" variant="secondary" size="sm" onClick={onRetryLoad} disabled={isPending}>
               Ponow pobieranie
             </Button>
@@ -985,14 +1005,18 @@ function LazyPanelState({
 
 function ReportLoadingDialog({ title, onClose }: { title: string; onClose: () => void }) {
   return (
-    <DialogShell titleId="repo-report-loading-title" onClose={onClose} className="max-w-4xl">
+    <DialogShell titleId="repo-report-loading-title" onClose={onClose} className="max-w-4xl" overlayClassName="print-hidden">
       <div className="border-b border-border-subtle pb-4">
-        <h2 id="repo-report-loading-title" className="text-xl font-semibold">
-          {title}
-        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="repo-report-loading-title" className="text-xl font-semibold">
+            {title}
+          </h2>
+          <Badge tone="info" variant="status">ladowanie</Badge>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">Przygotowuje tresc, sekcje i lokalny zapis raportu...</p>
       </div>
-      <div className="mt-5 space-y-5">
+      <div className="mt-5 space-y-5" role="status" aria-live="polite">
+        <span className="sr-only">Raport jest przygotowywany.</span>
         <div className="grid gap-3 sm:grid-cols-3">
           <SkeletonBlock className="h-16" />
           <SkeletonBlock className="h-16" />

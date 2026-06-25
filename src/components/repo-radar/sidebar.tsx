@@ -21,7 +21,7 @@ export function Sidebar({
   const sectionTabs = getTabsForSection(activeSection);
 
   return (
-    <aside className="hidden w-72 shrink-0 lg:block" aria-label="Nawigacja RepoRadar">
+    <aside className="print-hidden hidden w-72 shrink-0 lg:block" aria-label="Nawigacja RepoRadar">
       <div className="sticky top-5 rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
         <div className="mb-5 flex items-center gap-3 px-1">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
