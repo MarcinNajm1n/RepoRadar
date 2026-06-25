@@ -18,6 +18,7 @@ import {
   buildRepositoryCacheFingerprint
 } from "./cache-keys";
 import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets";
+import { formatOpenAiBudgetWarning, getRequiredOpenAiCallsForAction } from "./budget-status";
 import {
   attachResearchRunsToIdea,
   attachResearchRunsToReport,
@@ -35,7 +36,14 @@ async function ensureOpenAiBudget(requiredCalls = 1) {
   const config = getConfig();
   const usedToday = await countOpenAiAnalysesToday();
   if (usedToday + requiredCalls > config.openAiDailyAnalysisLimit) {
-    throw new Error(`Daily OpenAI analysis limit reached (${config.openAiDailyAnalysisLimit})`);
+    throw new Error(
+      formatOpenAiBudgetWarning({
+        label: "OpenAI",
+        requiredCalls,
+        dailyLimit: config.openAiDailyAnalysisLimit,
+        usedToday
+      })
+    );
   }
 }
 
@@ -48,15 +56,6 @@ function inputHashes(kind: string, context: string, repository: Awaited<ReturnTy
     current,
     lookup: current === legacy ? [current] : [current, legacy]
   };
-}
-
-function requiredOpenAiCallsForOnDemandGeneration() {
-  const config = getConfig();
-  if (!config.marketResearchEnabled || config.marketResearchProvider === "none" || config.marketResearchProvider === "reddit") {
-    return 1;
-  }
-
-  return 2;
 }
 
 function buildResearchContext(
@@ -165,7 +164,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
     }
   }
 
-  await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+  await ensureOpenAiBudget(getRequiredOpenAiCallsForAction("repo-report"));
   const research = await getMarketResearchForRepository(buildResearchContext("repo-report", repository, context, "full"));
   const reportContext = applyOpenAiActionBudget(
     [context, "Market research:", formatMarketResearchForPrompt(research)].join("\n\n"),
@@ -257,7 +256,7 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
   const research = cached
     ? null
     : await (async () => {
-        await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+        await ensureOpenAiBudget(getRequiredOpenAiCallsForAction("idea"));
         return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
       })();
   const ideaContext = applyOpenAiActionBudget(
@@ -503,7 +502,7 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
   const research = cached
     ? null
     : await (async () => {
-        await ensureOpenAiBudget(requiredOpenAiCallsForOnDemandGeneration());
+        await ensureOpenAiBudget(getRequiredOpenAiCallsForAction("idea-promote"));
         return getMarketResearchForRepository(buildResearchContext("idea", repository, context, "full"));
       })();
   const ideaContext = applyOpenAiActionBudget(

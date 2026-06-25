@@ -1,4 +1,5 @@
 import { prisma } from "./client";
+import { OPENAI_DAILY_ANALYSIS_CACHE_KINDS, OPENAI_DAILY_ANALYSIS_RESEARCH_PROVIDERS } from "@/lib/openai/token-budgets";
 
 export async function getCachedOpenAiOutput(kind: string, repoId: string | null, inputHash: string, model: string) {
   return prisma.openAiCache.findFirst({
@@ -35,12 +36,25 @@ export async function countOpenAiAnalysesToday() {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
 
-  return prisma.openAiCache.count({
-    where: {
-      kind: { in: ["summary", "repo-report", "idea"] },
-      createdAt: {
-        gte: start
+  const [cachedOutputs, researchRuns] = await Promise.all([
+    prisma.openAiCache.count({
+      where: {
+        kind: { in: [...OPENAI_DAILY_ANALYSIS_CACHE_KINDS] },
+        createdAt: {
+          gte: start
+        }
       }
-    }
-  });
+    }),
+    prisma.marketResearchRun.count({
+      where: {
+        provider: { in: [...OPENAI_DAILY_ANALYSIS_RESEARCH_PROVIDERS] },
+        status: { in: ["RUNNING", "SUCCESS", "FAILED"] },
+        startedAt: {
+          gte: start
+        }
+      }
+    })
+  ]);
+
+  return cachedOutputs + researchRuns;
 }

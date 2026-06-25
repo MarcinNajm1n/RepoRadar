@@ -32,6 +32,7 @@ import {
   generateOpportunityCandidateForRepository,
   promoteCandidateToFullIdea
 } from "@/lib/openai/repository-analysis";
+import { assertOpenAiBudgetForAction } from "@/lib/openai/budget-status";
 import { createDailyBriefing } from "@/lib/reports/briefing";
 import { createPortfolioBrief } from "@/lib/reports/portfolio-brief";
 import { createRepoQuickBrief } from "@/lib/reports/repo-quick-brief";
@@ -81,6 +82,7 @@ export async function getWeeklyReportsPanelDataAction() {
 }
 
 export async function generateReportAction(repoId: string, force = false) {
+  await assertOpenAiBudgetForAction("repo-report");
   const report = await runAiJob(
     { type: "REPORT", repoId, priority: force ? 80 : 60, dedupeKey: `report:${repoId}:${force ? "force" : "default"}` },
     () => generateFullReportForRepository(repoId, force),
@@ -112,6 +114,7 @@ export async function generateQuickBriefAction(repoId: string) {
 }
 
 export async function generateIdeaAction(repoId: string, force = false) {
+  await assertOpenAiBudgetForAction("idea");
   const idea = await runAiJob(
     { type: "IDEA", repoId, priority: force ? 80 : 50, dedupeKey: `idea:${repoId}:${force ? "force" : "default"}` },
     () => generateIdeaForRepository(repoId, force),
@@ -125,6 +128,7 @@ export async function generateIdeaAction(repoId: string, force = false) {
 }
 
 export async function generateOpportunityCandidateAction(repoId: string, force = false) {
+  await assertOpenAiBudgetForAction("opportunity-research");
   const result = await runAiJob(
     { type: "RESEARCH", repoId, priority: force ? 70 : 40, dedupeKey: `research:${repoId}:${force ? "force" : "default"}` },
     () => generateOpportunityCandidateForRepository(repoId, force),
@@ -135,6 +139,7 @@ export async function generateOpportunityCandidateAction(repoId: string, force =
 }
 
 export async function promoteCandidateToFullIdeaAction(ideaId: string, force = false) {
+  await assertOpenAiBudgetForAction("idea-promote");
   const idea = await promoteCandidateToFullIdea(ideaId, force);
   revalidatePath("/");
   return {

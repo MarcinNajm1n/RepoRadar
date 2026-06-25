@@ -11,6 +11,8 @@ export type OpenAiActionKind = OpenAiActionBudgetKey;
 export type OpenAiActionBudget = {
   key: OpenAiActionBudgetKey;
   label: string;
+  requiredCalls: number;
+  requiredCallsWithoutResearch?: number;
   maxInputChars: number;
   maxOutputTokens: number;
   expectedCalls: string;
@@ -21,6 +23,7 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   summary: {
     key: "summary",
     label: "Summary",
+    requiredCalls: 1,
     maxInputChars: 12000,
     maxOutputTokens: 350,
     expectedCalls: "1 call"
@@ -28,6 +31,8 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   "repo-report": {
     key: "repo-report",
     label: "Full report",
+    requiredCalls: 2,
+    requiredCallsWithoutResearch: 1,
     maxInputChars: 28000,
     maxOutputTokens: 2400,
     expectedCalls: "1-2 calls",
@@ -36,6 +41,8 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   idea: {
     key: "idea",
     label: "Idea",
+    requiredCalls: 2,
+    requiredCallsWithoutResearch: 1,
     maxInputChars: 22000,
     maxOutputTokens: 1600,
     expectedCalls: "1-2 calls",
@@ -44,6 +51,8 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   "idea-promote": {
     key: "idea-promote",
     label: "Idea promotion",
+    requiredCalls: 2,
+    requiredCallsWithoutResearch: 1,
     maxInputChars: 24000,
     maxOutputTokens: 1800,
     expectedCalls: "1-2 calls",
@@ -52,6 +61,8 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   "opportunity-research": {
     key: "opportunity-research",
     label: "Research",
+    requiredCalls: 1,
+    requiredCallsWithoutResearch: 0,
     maxInputChars: 16000,
     maxOutputTokens: 1100,
     expectedCalls: "0-1 call"
@@ -59,11 +70,23 @@ export const OPENAI_ACTION_BUDGETS: Record<OpenAiActionBudgetKey, OpenAiActionBu
   "weekly-report": {
     key: "weekly-report",
     label: "Weekly report",
+    requiredCalls: 0,
     maxInputChars: 0,
     maxOutputTokens: 0,
     expectedCalls: "0 calls"
   }
 };
+
+export const OPENAI_DAILY_ANALYSIS_CACHE_KINDS = [
+  "summary",
+  "repo-report",
+  "idea",
+  "idea:v2",
+  "idea-promote",
+  "opportunity-research"
+] as const;
+
+export const OPENAI_DAILY_ANALYSIS_RESEARCH_PROVIDERS = ["openai-web-search", "mcp-web-research"] as const;
 
 export function getOpenAiActionBudget(key: OpenAiActionBudgetKey) {
   return OPENAI_ACTION_BUDGETS[key];
