@@ -108,6 +108,8 @@ describe("RepoRow long content rendering", () => {
 
     expect(html).toContain('id="repo-details-repo_long"');
     expect(html).toContain("Dlaczego radar to pokazuje?");
+    expect(html).toContain("Priorytet AI");
+    expect(html).toContain("w kolejce automatycznej");
     expect(html).toContain("Brief");
     expect(html).toContain("Ignoruj");
   });

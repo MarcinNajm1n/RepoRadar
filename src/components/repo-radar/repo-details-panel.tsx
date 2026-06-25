@@ -4,6 +4,7 @@ import type { RepositoryListItem, RepositoryTimelineItem } from "@/types/reposit
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { buildRepositoryRadarReasons } from "@/lib/display/radar-reason";
 import { formatDisplayDate, formatGrowth, formatStars } from "@/lib/display/formatters";
+import { getAiPriorityReasons } from "@/lib/openai/priority";
 import { Badge, ScoreChip, TextClamp } from "./ui";
 import { RepoCardActions } from "./repo-card-actions";
 
@@ -82,6 +83,7 @@ export function RepoDetailsPanel({
           </section>
 
           <RadarReasonPanel repo={repo} />
+          <AiPriorityPanel repo={repo} />
           <RepositoryTrendMiniChart repo={repo} timeline={timeline} isLoading={isTimelineLoading} />
           <RepositoryTimeline timeline={timeline} isLoading={isTimelineLoading} />
         </div>
@@ -140,6 +142,41 @@ export function RepoDetailsPanel({
         />
       </div>
     </div>
+  );
+}
+
+function AiPriorityPanel({ repo }: { repo: RepositoryListItem }) {
+  const reasons = getAiPriorityReasons(repo);
+  const isPriority = reasons.length > 0;
+
+  return (
+    <section className="rounded-md border border-border-subtle bg-surface-panel p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold text-foreground">Priorytet AI</h4>
+        <Badge tone={isPriority ? "accent" : "neutral"} variant="status">
+          {isPriority ? "w kolejce automatycznej" : "poza kolejka automatyczna"}
+        </Badge>
+      </div>
+      <p className="mt-2 text-sm leading-5 text-muted-foreground">
+        To kwalifikacja do automatycznych analiz AI. Reczne akcje: brief, raport, pomysl i research pozostaja dostepne niezaleznie
+        od tego statusu.
+      </p>
+      {isPriority ? (
+        <ul className="mt-3 space-y-2">
+          {reasons.map((reason) => (
+            <li key={reason.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <Badge tone="info">{reason.label}</Badge>
+              <span className="text-muted-foreground">{reason.detail}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset px-3 py-2 text-sm text-muted-foreground">
+          Repo nie trafia teraz do automatycznej kolejki AI, bo nie przekracza progow trendu, wzrostu ani statusu recznego. Nadal
+          mozesz uruchomic brief, raport, pomysl albo research recznie.
+        </p>
+      )}
+    </section>
   );
 }
 
