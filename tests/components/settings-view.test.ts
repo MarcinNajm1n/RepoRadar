@@ -168,6 +168,27 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
         repositoriesLosingAllSnapshots: 2
       }
     },
+    scheduler: {
+      taskName: "RepoRadar Daily Scan",
+      platform: "win32",
+      status: "missing",
+      installed: false,
+      canQuery: true,
+      state: null,
+      lastRunAt: null,
+      nextRunAt: null,
+      lastResultCode: null,
+      lastResultLabel: "brak danych",
+      missedRuns: null,
+      runnerScript: "C:\\RepoRadar\\scripts\\run-scheduled-scan.ps1",
+      logDirectory: "C:\\RepoRadar\\logs\\scans",
+      latestLogPath: "C:\\RepoRadar\\logs\\scans\\scan-20260625-090000.log",
+      latestLogUpdatedAt: "2026-06-25T09:05:00.000Z",
+      checkCommand: 'schtasks /Query /TN "RepoRadar Daily Scan" /V /FO LIST',
+      runCommand: 'schtasks /Run /TN "RepoRadar Daily Scan"',
+      note: "Zadanie nie jest zarejestrowane.",
+      error: null
+    },
     githubRateLimit: null,
     ...overrides
   };
@@ -228,5 +249,34 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("Ponow Badanie / owner/research");
     expect(html).toContain("(ok. 2 calls)");
     expect(html).toContain("Provider failed");
+  });
+
+  it("renders Windows scheduler status and diagnostic commands", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        settingsSummary: settingsSummary(),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain("Scheduler Windows");
+    expect(html).toContain("brak zadania");
+    expect(html).toContain("RepoRadar Daily Scan");
+    expect(html).toContain("scan-20260625-090000.log");
+    expect(html).toContain("Sprawdz status");
+    expect(html).toContain("Uruchom recznie");
+    expect(html).toContain("schtasks /Query /TN");
+    expect(html).toContain("schtasks /Run /TN");
   });
 });

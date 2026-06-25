@@ -15,6 +15,7 @@ import { getOpenAiCacheSummary } from "./openai-cache";
 import { recordRepositoryStatusAudit } from "./repository-audit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import { getMaintenancePreview } from "@/lib/maintenance";
+import { getWindowsSchedulerStatus } from "@/lib/scheduler/windows-task";
 import type { ActionItemListItem } from "@/types/action-item";
 import type {
   DashboardData,
@@ -690,6 +691,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     openAiCache,
     observability,
     graphify,
+    scheduler,
     maintenancePreview
   ] = await Promise.all([
     getAllSettings(),
@@ -701,6 +703,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     getOpenAiCacheSummary(),
     getObservabilitySummary(),
     getGraphifyMaintenanceSummary(),
+    getWindowsSchedulerStatus(),
     getMaintenancePreview()
   ]);
 
@@ -727,6 +730,7 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
     observability,
     graphify,
     maintenancePreview,
+    scheduler,
     githubRateLimit
   };
 }

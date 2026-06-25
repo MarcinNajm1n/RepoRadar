@@ -330,6 +330,28 @@ export type OpenAiCacheSummary = {
   }[];
 };
 
+export type SchedulerStatusSummary = {
+  taskName: string;
+  platform: string;
+  status: "ready" | "missing" | "unavailable" | "error";
+  installed: boolean;
+  canQuery: boolean;
+  state: string | null;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  lastResultCode: number | null;
+  lastResultLabel: string;
+  missedRuns: number | null;
+  runnerScript: string;
+  logDirectory: string;
+  latestLogPath: string | null;
+  latestLogUpdatedAt: string | null;
+  checkCommand: string;
+  runCommand: string;
+  note: string;
+  error: string | null;
+};
+
 export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
@@ -353,6 +375,7 @@ export type SettingsSummary = {
   observability: ObservabilitySummary;
   graphify: GraphifyMaintenanceSummary;
   maintenancePreview: MaintenancePreviewSummary;
+  scheduler: SchedulerStatusSummary;
   githubRateLimit: {
     checkedAt: string;
     status: number;

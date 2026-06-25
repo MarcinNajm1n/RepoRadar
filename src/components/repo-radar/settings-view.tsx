@@ -147,12 +147,16 @@ export function SettingsView({
             <InfoItem label="UI" value="Polski, desktop-first" />
             <InfoItem label="Motyw" value="preferencje systemu" />
             <InfoItem label="Reports dir" value={settingsSummary.reportsDir} />
-            <InfoItem label="Scheduler" value="scripts/register-windows-task.ps1" />
+            <InfoItem label="Scheduler" value={formatSchedulerShortStatus(settingsSummary.scheduler)} />
           </div>
           <div className="mt-3 flex items-center gap-2 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
             <Moon className="h-4 w-4" />
             Ciemny motyw korzysta z ustawień systemu.
           </div>
+        </SettingsPanel>
+
+        <SettingsPanel title="Scheduler Windows" className={activeSection === "configuration" ? "xl:col-span-2" : "hidden"}>
+          <SchedulerDiagnostics scheduler={settingsSummary.scheduler} />
         </SettingsPanel>
 
         <SettingsPanel title="Business Research" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
@@ -378,6 +382,52 @@ function InfoItem({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-md border border-border-subtle bg-surface-inset px-3 py-2">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="mt-1 break-words text-sm font-semibold tabular-nums text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function SchedulerDiagnostics({ scheduler }: { scheduler: SettingsSummary["scheduler"] }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
+        <InfoItem label="Status" value={formatSchedulerShortStatus(scheduler)} />
+        <InfoItem label="Task" value={scheduler.taskName} />
+        <InfoItem label="Stan" value={scheduler.state ?? "brak danych"} />
+        <InfoItem label="Ostatni wynik" value={scheduler.lastResultLabel} />
+        <InfoItem label="Ostatni run" value={formatOptionalDateTime(scheduler.lastRunAt)} />
+        <InfoItem label="Nastepny run" value={formatOptionalDateTime(scheduler.nextRunAt)} />
+        <InfoItem label="Missed runs" value={scheduler.missedRuns === null ? "brak danych" : String(scheduler.missedRuns)} />
+        <InfoItem label="Ostatni log" value={scheduler.latestLogPath ?? "brak logow"} />
+      </div>
+
+      <div className="rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Badge tone={getSchedulerBadgeTone(scheduler.status)} variant="status">
+            {formatSchedulerShortStatus(scheduler)}
+          </Badge>
+          <span>{scheduler.note}</span>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Sprawdz status</div>
+            <code className="block break-words rounded-md border border-border-subtle bg-surface-panel p-2 text-xs text-foreground">
+              {scheduler.checkCommand}
+            </code>
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Uruchom recznie</div>
+            <code className="block break-words rounded-md border border-border-subtle bg-surface-panel p-2 text-xs text-foreground">
+              {scheduler.runCommand}
+            </code>
+          </div>
+        </div>
+      </div>
+
+      {scheduler.error ? (
+        <p className="break-words rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {scheduler.error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -688,6 +738,35 @@ function formatGitHubRateLimit(rateLimit: SettingsSummary["githubRateLimit"]) {
   const limit = rateLimit.limit ?? "?";
   const reset = rateLimit.resetAt ? new Date(rateLimit.resetAt).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?";
   return `${remaining}/${limit}, reset ${reset}`;
+}
+
+function formatSchedulerShortStatus(scheduler: SettingsSummary["scheduler"]) {
+  switch (scheduler.status) {
+    case "ready":
+      return "zarejestrowany";
+    case "missing":
+      return "brak zadania";
+    case "unavailable":
+      return "tylko Windows";
+    case "error":
+      return "blad odczytu";
+    default:
+      return scheduler.status;
+  }
+}
+
+function getSchedulerBadgeTone(status: SettingsSummary["scheduler"]["status"]): BadgeTone {
+  switch (status) {
+    case "ready":
+      return "success";
+    case "missing":
+      return "warning";
+    case "error":
+      return "danger";
+    case "unavailable":
+    default:
+      return "neutral";
+  }
 }
 
 function formatAiJobSummary(summary: SettingsSummary["aiJobSummary"]) {
