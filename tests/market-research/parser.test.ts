@@ -44,4 +44,35 @@ describe("parseMarketResearchResult", () => {
     expect(result.sources[0].providerItemId).toBe("post_1");
     expect(result.confidenceScore).toBe(4);
   });
+
+  it("keeps blank and non-finite numeric fields as missing data", () => {
+    const result = parseMarketResearchResult(
+      "openai-web-search",
+      JSON.stringify({
+        summary: "Demand signal",
+        confidenceScore: " ",
+        independentSourceCount: "Infinity",
+        sources: [
+          {
+            sourceType: "web",
+            title: "Discussion",
+            url: "https://example.com/post",
+            snippet: "Users discuss workflow gaps.",
+            relevanceScore: "",
+            sourceConfidence: "NaN",
+            sourceRank: "205.4"
+          }
+        ]
+      }),
+      1
+    );
+
+    expect(result.confidenceScore).toBeNull();
+    expect(result.independentSourceCount).toBeUndefined();
+    expect(result.sources[0]).toMatchObject({
+      relevanceScore: null,
+      sourceConfidence: null,
+      sourceRank: 200
+    });
+  });
 });

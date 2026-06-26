@@ -28,6 +28,13 @@ function stringArray(value: unknown, maxItems: number, maxLength: number) {
 }
 
 function numberOrNull(value: unknown, min: number, max: number) {
+  if (typeof value !== "number" && typeof value !== "string") {
+    return null;
+  }
+  if (typeof value === "string" && !value.trim()) {
+    return null;
+  }
+
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(clamp(parsed, min, max)) : null;
 }
