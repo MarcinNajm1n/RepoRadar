@@ -120,6 +120,18 @@ describe("GitHubClient", () => {
     });
   });
 
+  it("rejects invalid README repository identifiers before fetching", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const client = new GitHubClient(undefined);
+
+    await expect(client.getReadme("owner/path", "repo")).rejects.toThrow("Invalid GitHub repository identifier");
+    await expect(client.getReadme("owner", "../repo")).rejects.toThrow("Invalid GitHub repository identifier");
+    await expect(client.getReadme("owner", "repo?ref=main")).rejects.toThrow("Invalid GitHub repository identifier");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("honors date-form Retry-After headers without producing NaN delays", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-16T12:00:00Z"));

@@ -184,6 +184,12 @@ function isMatchingRepositoryFullName(value: unknown, owner: string, name: strin
   return value === `${owner}/${name}`;
 }
 
+function assertValidGitHubRepositoryIdentifier(owner: string, repo: string) {
+  if (!isGitHubOwnerLogin(owner) || !isGitHubRepositoryName(repo)) {
+    throw new Error("Invalid GitHub repository identifier");
+  }
+}
+
 function isUsableGitHubSearchItem(value: unknown): value is GitHubRepositoryItem {
   if (!isRecord(value) || !isRecord(value.owner)) {
     return false;
@@ -291,6 +297,8 @@ export class GitHubClient {
   }
 
   async getReadme(owner: string, repo: string): Promise<GitHubReadmeResult | null> {
+    assertValidGitHubRepositoryIdentifier(owner, repo);
+
     try {
       const text = await this.request<string>(`/repos/${owner}/${repo}/readme`, {
         accept: "application/vnd.github.raw",
