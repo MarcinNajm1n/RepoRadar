@@ -29,8 +29,8 @@ export function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-export function sanitizeExternalText(value: string | null | undefined, maxLength = 12000) {
-  if (value === null || value === undefined) {
+export function sanitizeExternalText(value: unknown, maxLength = 12000) {
+  if (typeof value !== "string") {
     return null;
   }
 
@@ -47,14 +47,18 @@ export function sanitizeExternalText(value: string | null | undefined, maxLength
   return truncateText(cleaned, maxLength);
 }
 
-export function sanitizeExternalStringArray(values: string[] | undefined, maxItems = 30) {
-  return (values ?? [])
+export function sanitizeExternalStringArray(values: unknown, maxItems = 30) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
     .map((value) => sanitizeExternalText(value, 80))
     .filter((value): value is string => Boolean(value))
     .slice(0, maxItems);
 }
 
-export function sanitizeExternalUrl(value: string | null | undefined, maxLength = 700) {
+export function sanitizeExternalUrl(value: unknown, maxLength = 700) {
   const cleaned = sanitizeExternalText(value, maxLength);
   if (!cleaned) {
     return null;

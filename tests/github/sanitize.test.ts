@@ -13,6 +13,11 @@ describe("sanitizeExternalText", () => {
 
     expect(result).toHaveLength(10);
   });
+
+  it("ignores non-string runtime payloads", () => {
+    expect(sanitizeExternalText(123)).toBeNull();
+    expect(sanitizeExternalText({ text: "ai" })).toBeNull();
+  });
 });
 
 describe("sanitizeExternalStringArray", () => {
@@ -21,6 +26,11 @@ describe("sanitizeExternalStringArray", () => {
 
     expect(result).toEqual(["ai", "bad/x"]);
   });
+
+  it("ignores non-array and non-string runtime payloads", () => {
+    expect(sanitizeExternalStringArray("ai")).toEqual([]);
+    expect(sanitizeExternalStringArray(["ai", 42, null, "mcp"])).toEqual(["ai", "mcp"]);
+  });
 });
 
 describe("sanitizeExternalUrl", () => {
@@ -28,5 +38,6 @@ describe("sanitizeExternalUrl", () => {
     expect(sanitizeExternalUrl("https://github.com/openai/openai")).toBe("https://github.com/openai/openai");
     expect(sanitizeExternalUrl("javascript:alert(1)")).toBeNull();
     expect(sanitizeExternalUrl("not a url")).toBeNull();
+    expect(sanitizeExternalUrl({ href: "https://github.com/openai/openai" })).toBeNull();
   });
 });
