@@ -35,8 +35,26 @@ function extractAtomLink(block: string) {
   return href ? decodeHtmlEntities(href) : "";
 }
 
+function feedHost(feedUrl: string) {
+  try {
+    return new URL(feedUrl).hostname;
+  } catch {
+    return "RSS";
+  }
+}
+
+function publishedDate(value: string) {
+  const cleanValue = sanitizeExternalText(value, 80);
+  if (!cleanValue) {
+    return null;
+  }
+
+  const date = new Date(cleanValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 function parseFeedEntries(xml: string, feedUrl: string): FeedEntry[] {
-  const publisher = extractTag(xml, "title") || new URL(feedUrl).hostname;
+  const publisher = extractTag(xml, "title") || feedHost(feedUrl);
   const rssBlocks = Array.from(xml.matchAll(/<item[\s\S]*?<\/item>/gi)).map((match) => match[0]);
   const atomBlocks = Array.from(xml.matchAll(/<entry[\s\S]*?<\/entry>/gi)).map((match) => match[0]);
   const blocks = rssBlocks.length ? rssBlocks : atomBlocks;
@@ -57,7 +75,7 @@ function parseFeedEntries(xml: string, feedUrl: string): FeedEntry[] {
         title,
         url,
         publisher: sanitizeExternalText(publisher, 160),
-        publishedAt: sanitizeExternalText(extractTag(block, "pubDate") || extractTag(block, "published") || extractTag(block, "updated"), 80),
+        publishedAt: publishedDate(extractTag(block, "pubDate") || extractTag(block, "published") || extractTag(block, "updated")),
         snippet
       };
     });
