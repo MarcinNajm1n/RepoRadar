@@ -503,6 +503,12 @@ describe("buildRadarToday", () => {
       title: "Discord webhook ma bledny URL",
       message: expect.stringContaining("Po zmianie zrestartuj npm run dev")
     });
+    expect(radar.alerts.find((alert) => alert.id === "openai-missing")).toMatchObject({
+      level: "info",
+      title: "OpenAI jest opcjonalne",
+      message: expect.stringContaining("Scan, scoring i kolejka dzialaja bez klucza")
+    });
+    expect(radar.alerts.find((alert) => alert.id === "openai-missing")?.message).toContain("po zmianie zrestartuj npm run dev");
     expect(radar.nextAction).toMatchObject({ kind: "alert", id: "alert:last-scan-failed" });
   });
 

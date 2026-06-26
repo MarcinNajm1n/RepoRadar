@@ -683,8 +683,8 @@ export function buildRadarToday(
     alerts.push({
       id: "openai-missing",
       level: "info",
-      title: "OpenAI nie jest skonfigurowane",
-      message: "Raporty AI i pelne pomysly beda niedostepne do czasu ustawienia OPENAI_API_KEY."
+      title: "OpenAI jest opcjonalne",
+      message: "Scan, scoring i kolejka dzialaja bez klucza. Dodaj OPENAI_API_KEY w .env tylko dla raportow, briefow i pomyslow AI na zadanie; po zmianie zrestartuj npm run dev."
     });
   }
   if (input.settingsStatus.discordWebhookStatus === "invalid") {
