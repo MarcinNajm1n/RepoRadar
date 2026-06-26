@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearGitHubRuntimeCacheStats, getGitHubRuntimeCacheStats, GitHubClient, searchGitHubRepositories } from "../../src/lib/github/client";
 import { clearGitHubRateLimitSnapshot, getLastGitHubRateLimitSnapshot } from "../../src/lib/github/rate-limit";
-import type { GitHubRepositoryItem } from "../../src/lib/github/types";
+import type { GitHubRepositoryItem, SearchOptions } from "../../src/lib/github/types";
 
 const originalFetch = global.fetch;
 
@@ -40,6 +40,40 @@ describe("GitHubClient", () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]));
     expect(url.searchParams.get("sort")).toBe("updated");
     expect(url.searchParams.get("order")).toBe("desc");
+  });
+
+  it("normalizes search request options before fetching", async () => {
+    const fetchMock = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return new Response(JSON.stringify({ total_count: 0, incomplete_results: false, items: [] }), { status: 200 });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await new GitHubClient(undefined).searchRepositories({
+      query: "  ai\u0000 agent  ",
+      sort: "unexpected",
+      order: "asc",
+      perPage: 999.7,
+      page: -3
+    } as unknown as SearchOptions);
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("q")).toBe("ai agent");
+    expect(url.searchParams.get("sort")).toBe("stars");
+    expect(url.searchParams.get("order")).toBe("desc");
+    expect(url.searchParams.get("per_page")).toBe("100");
+    expect(url.searchParams.get("page")).toBe("1");
+  });
+
+  it("rejects invalid search queries before fetching", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const client = new GitHubClient(undefined);
+
+    await expect(client.searchRepositories({ query: "   " })).rejects.toThrow("Invalid GitHub search query");
+    await expect(client.searchRepositories({ query: "a".repeat(513) })).rejects.toThrow("Invalid GitHub search query");
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("captures the latest GitHub rate limit headers", async () => {

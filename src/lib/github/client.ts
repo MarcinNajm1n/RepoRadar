@@ -19,6 +19,9 @@ const MAX_CONDITIONAL_CACHE_ENTRIES = 200;
 const MAX_GITHUB_JSON_RESPONSE_BYTES = 5_000_000;
 const MAX_GITHUB_RAW_RESPONSE_BYTES = 500_000;
 const MAX_GITHUB_ERROR_RESPONSE_BYTES = 16_000;
+const MAX_GITHUB_SEARCH_QUERY_LENGTH = 512;
+const MAX_GITHUB_SEARCH_PAGE = 10;
+const MAX_GITHUB_SEARCH_PER_PAGE = 100;
 const GITHUB_OWNER_LOGIN_PATTERN = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i;
 const GITHUB_REPOSITORY_NAME_PATTERN = /^[a-z\d._-]{1,100}$/i;
 
@@ -190,6 +193,29 @@ function assertValidGitHubRepositoryIdentifier(owner: string, repo: string) {
   }
 }
 
+function normalizeGitHubSearchQuery(value: unknown) {
+  if (typeof value !== "string") {
+    throw new Error("Invalid GitHub search query");
+  }
+
+  const query = sanitizeExternalText(value, MAX_GITHUB_SEARCH_QUERY_LENGTH + 1);
+  if (!query || query.length > MAX_GITHUB_SEARCH_QUERY_LENGTH) {
+    throw new Error("Invalid GitHub search query");
+  }
+
+  return query;
+}
+
+function normalizeGitHubSearchSort(value: unknown): GitHubSearchQuerySpec["sort"] {
+  return value === "updated" ? "updated" : "stars";
+}
+
+function normalizeGitHubSearchInteger(value: unknown, fallback: number, min: number, max: number) {
+  const numeric = Number(value);
+  const parsed = Number.isFinite(numeric) ? Math.trunc(numeric) : fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
 function isUsableGitHubSearchItem(value: unknown): value is GitHubRepositoryItem {
   if (!isRecord(value) || !isRecord(value.owner)) {
     return false;
@@ -285,12 +311,16 @@ export class GitHubClient {
   }
 
   async searchRepositories(options: SearchOptions): Promise<GitHubSearchResponse> {
+    const query = normalizeGitHubSearchQuery(options.query);
+    const sort = normalizeGitHubSearchSort(options.sort);
+    const perPage = normalizeGitHubSearchInteger(options.perPage, 100, 1, MAX_GITHUB_SEARCH_PER_PAGE);
+    const page = normalizeGitHubSearchInteger(options.page, 1, 1, MAX_GITHUB_SEARCH_PAGE);
     const params = new URLSearchParams({
-      q: options.query,
-      sort: options.sort ?? "stars",
-      order: options.order ?? "desc",
-      per_page: String(options.perPage ?? 100),
-      page: String(options.page ?? 1)
+      q: query,
+      sort,
+      order: "desc",
+      per_page: String(perPage),
+      page: String(page)
     });
 
     return this.request<GitHubSearchResponse>(`/search/repositories?${params.toString()}`);
@@ -338,9 +368,10 @@ export function clearGitHubRuntimeCacheStats() {
 export async function searchGitHubRepositories(queries: GitHubSearchQuerySpec[], maxPages = 1) {
   const client = new GitHubClient();
   const discovered: DiscoveredGitHubRepository[] = [];
+  const pageCount = normalizeGitHubSearchInteger(maxPages, 1, 1, MAX_GITHUB_SEARCH_PAGE);
 
   for (const spec of queries) {
-    for (let page = 1; page <= maxPages; page += 1) {
+    for (let page = 1; page <= pageCount; page += 1) {
       const result = await client.searchRepositories({
         query: spec.query,
         sort: spec.sort,
