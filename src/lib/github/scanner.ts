@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { getConfig } from "@/lib/config";
 import { runAiJob } from "@/lib/db/ai-jobs";
 import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
+import { sanitizeGitHubRepositoryUrl } from "@/lib/github/sanitize";
 import { calculateGrowth } from "@/lib/scoring/growth";
 import { calculateTrendScore } from "@/lib/scoring/trend-score";
 import { generateShortSummaryForRepository } from "@/lib/openai/repository-analysis";
@@ -56,10 +57,10 @@ async function upsertRepositoryFromGitHub(
   matchedProfiles: GitHubSearchProfile[]
 ) {
   const config = getConfig();
-  const fullName = sanitizeExternalText(item.full_name, 300) ?? item.full_name;
-  const owner = sanitizeExternalText(item.owner.login, 180) ?? item.owner.login;
-  const name = sanitizeExternalText(item.name, 180) ?? item.name;
-  const url = sanitizeExternalText(item.html_url, 500) ?? item.html_url;
+  const fullName = sanitizeExternalText(item.full_name, 300) ?? `github:${item.id}`;
+  const owner = sanitizeExternalText(item.owner?.login, 180) ?? "unknown-owner";
+  const name = sanitizeExternalText(item.name, 180) ?? `repo-${item.id}`;
+  const url = sanitizeGitHubRepositoryUrl(fullName);
   const description = sanitizeExternalText(item.description, 2000);
   const primaryLanguage = sanitizeExternalText(item.language, 120);
   const readmeExcerpt = sanitizeExternalText(readme?.excerpt, 2400);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sanitizeGitHubRepositoryUrl } from "../../src/lib/github/sanitize";
 import { sanitizeExternalStringArray, sanitizeExternalText, sanitizeExternalUrl } from "../../src/lib/utils";
 
 describe("sanitizeExternalText", () => {
@@ -39,5 +40,22 @@ describe("sanitizeExternalUrl", () => {
     expect(sanitizeExternalUrl("javascript:alert(1)")).toBeNull();
     expect(sanitizeExternalUrl("not a url")).toBeNull();
     expect(sanitizeExternalUrl({ href: "https://github.com/openai/openai" })).toBeNull();
+  });
+});
+
+describe("sanitizeGitHubRepositoryUrl", () => {
+  it("builds canonical GitHub repository URLs from full_name", () => {
+    expect(sanitizeGitHubRepositoryUrl("openai/openai-cookbook")).toBe("https://github.com/openai/openai-cookbook");
+  });
+
+  it("returns only the canonical repository root URL", () => {
+    expect(sanitizeGitHubRepositoryUrl("owner/toolkit")).toBe("https://github.com/owner/toolkit");
+  });
+
+  it("uses a neutral GitHub URL when full_name is malformed", () => {
+    expect(sanitizeGitHubRepositoryUrl("bad full name")).toBe("https://github.com/");
+    expect(sanitizeGitHubRepositoryUrl("owner/toolkit?x=y")).toBe("https://github.com/");
+    expect(sanitizeGitHubRepositoryUrl("owner/toolkit#readme")).toBe("https://github.com/");
+    expect(sanitizeGitHubRepositoryUrl({ fullName: "owner/toolkit" })).toBe("https://github.com/");
   });
 });
