@@ -99,6 +99,27 @@ describe("GitHubClient", () => {
     });
   });
 
+  it("rejects oversized raw README responses before caching them", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("short", {
+          status: 200,
+          headers: {
+            "content-length": "500001",
+            etag: '"readme-v1"'
+          }
+        })
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(new GitHubClient(undefined).getReadme("owner", "repo")).rejects.toThrow("GitHub response exceeds 500000 bytes");
+    expect(getGitHubRuntimeCacheStats()).toMatchObject({
+      requests: 1,
+      cacheWrites: 0,
+      cacheEntries: 0
+    });
+  });
+
   it("honors date-form Retry-After headers without producing NaN delays", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-16T12:00:00Z"));

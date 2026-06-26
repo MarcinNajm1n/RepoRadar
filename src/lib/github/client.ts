@@ -16,6 +16,9 @@ import { sanitizeGitHubCount } from "./sanitize";
 const GITHUB_API = "https://api.github.com";
 const MAX_GITHUB_RETRY_DELAY_MS = 30_000;
 const MAX_CONDITIONAL_CACHE_ENTRIES = 200;
+const MAX_GITHUB_JSON_RESPONSE_BYTES = 5_000_000;
+const MAX_GITHUB_RAW_RESPONSE_BYTES = 500_000;
+const MAX_GITHUB_ERROR_RESPONSE_BYTES = 16_000;
 const GITHUB_OWNER_LOGIN_PATTERN = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i;
 const GITHUB_REPOSITORY_NAME_PATTERN = /^[a-z\d._-]{1,100}$/i;
 
@@ -99,6 +102,60 @@ function writeCachedResponse(cacheKey: string, response: Response, body: string)
     lastModified
   });
   runtimeCacheStats.cacheWrites += 1;
+}
+
+function responseBodyLimit(accept: string) {
+  return accept === "application/vnd.github.raw" ? MAX_GITHUB_RAW_RESPONSE_BYTES : MAX_GITHUB_JSON_RESPONSE_BYTES;
+}
+
+function assertContentLengthWithinLimit(response: Response, maxBytes: number) {
+  const rawContentLength = response.headers.get("content-length");
+  if (!rawContentLength) {
+    return;
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`GitHub response exceeds ${maxBytes} bytes`);
+  }
+}
+
+async function readResponseTextWithLimit(response: Response, maxBytes: number) {
+  assertContentLengthWithinLimit(response, maxBytes);
+
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new Error(`GitHub response exceeds ${maxBytes} bytes`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(`GitHub response exceeds ${maxBytes} bytes`);
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function formatRateLimitReset(response: Response) {
@@ -190,7 +247,7 @@ export class GitHubClient {
       }
 
       if (response.ok) {
-        const body = await response.text();
+        const body = await readResponseTextWithLimit(response, responseBodyLimit(accept));
         writeCachedResponse(cacheKey, response, body);
 
         if (accept === "application/vnd.github.raw") {
@@ -201,7 +258,7 @@ export class GitHubClient {
       }
 
       const rateLimited = response.status === 403 || response.status === 429;
-      const body = await response.text().catch(() => "");
+      const body = await readResponseTextWithLimit(response, MAX_GITHUB_ERROR_RESPONSE_BYTES).catch(() => "");
       lastError = new Error(`GitHub API ${response.status}: ${body.slice(0, 240)}`);
 
       if (rateLimited && attempt < maxAttempts - 1) {
