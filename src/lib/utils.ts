@@ -134,13 +134,32 @@ function isBlockedIpv6Host(hostname: string) {
     return true;
   }
 
-  const firstHextetRaw = withoutZone.split(":").find(Boolean) ?? "";
+  if (withoutZone.startsWith("::") && !withoutZone.toLowerCase().startsWith("::ffff:")) {
+    return true;
+  }
+
+  const hextets = withoutZone.split(":").filter(Boolean);
+  const firstHextetRaw = hextets[0] ?? "";
   const firstHextet = Number.parseInt(firstHextetRaw, 16);
   if (Number.isFinite(firstHextet)) {
+    const secondHextet = Number.parseInt(hextets[1] ?? "", 16);
     if ((firstHextet & 0xfe00) === 0xfc00) {
       return true;
     }
     if ((firstHextet & 0xffc0) === 0xfe80) {
+      return true;
+    }
+    if (
+      firstHextet === 0x0100 ||
+      firstHextet === 0x2002 ||
+      firstHextet >= 0xff00 ||
+      (firstHextet === 0x0064 && secondHextet === 0xff9b) ||
+      (firstHextet === 0x2001 &&
+        (secondHextet === 0x0000 ||
+          secondHextet === 0x0002 ||
+          secondHextet === 0x0db8 ||
+          (secondHextet >= 0x0010 && secondHextet <= 0x002f)))
+    ) {
       return true;
     }
   }

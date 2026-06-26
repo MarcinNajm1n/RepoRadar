@@ -18,6 +18,16 @@ describe("sanitizeExternalUrl", () => {
     expect(sanitizeExternalUrl("javascript:alert(1)")).toBeNull();
   });
 
+  it("blocks special-use IPv6 literal targets", () => {
+    expect(sanitizeExternalUrl("http://[::2]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[64:ff9b::7f00:1]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[100::1]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[2001:db8::1]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[2001:0000:4136:e378:8000:63bf:3fff:fdd2]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[2002:0a00:0001::]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://[ff02::1]/metadata")).toBeNull();
+  });
+
   it("blocks URLs with embedded credentials", () => {
     expect(sanitizeExternalUrl("https://token@example.com/repo")).toBeNull();
     expect(sanitizeExternalUrl("https://user:secret@example.com/repo")).toBeNull();
@@ -27,5 +37,6 @@ describe("sanitizeExternalUrl", () => {
   it("allows public http and https URLs", () => {
     expect(sanitizeExternalUrl("https://example.com/post")).toBe("https://example.com/post");
     expect(sanitizeExternalUrl("http://example.org/feed")).toBe("http://example.org/feed");
+    expect(sanitizeExternalUrl("https://[2606:4700:4700::1111]/dns-query")).toBe("https://[2606:4700:4700::1111]/dns-query");
   });
 });
