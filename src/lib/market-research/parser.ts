@@ -1,4 +1,4 @@
-import { clamp, safeJsonParse, sanitizeExternalText, sanitizeExternalUrl, truncateText } from "@/lib/utils";
+import { clamp, safeJsonParse, sanitizeExternalText, sanitizeExternalUrl } from "@/lib/utils";
 import type { MarketResearchResult, MarketResearchSourceInput } from "./types";
 
 function extractJsonObject(value: string) {
@@ -22,7 +22,7 @@ function stringArray(value: unknown, maxItems: number, maxLength: number) {
   }
 
   return value
-    .map((item) => sanitizeExternalText(String(item), maxLength))
+    .map((item) => sanitizeExternalText(item, maxLength))
     .filter((item): item is string => Boolean(item))
     .slice(0, maxItems);
 }
@@ -45,49 +45,48 @@ function sanitizeSource(value: unknown): MarketResearchSourceInput | null {
   }
 
   const record = value as Record<string, unknown>;
-  const url = sanitizeExternalUrl(String(record.url ?? ""));
-  const title = sanitizeExternalText(String(record.title ?? ""), 240);
-  const snippet = sanitizeExternalText(String(record.snippet ?? ""), 1200);
+  const url = sanitizeExternalUrl(record.url);
+  const title = sanitizeExternalText(record.title, 240);
+  const snippet = sanitizeExternalText(record.snippet, 1200);
 
   if (!url || !title || !snippet) {
     return null;
   }
 
-  const publishedAt = sanitizeExternalText(String(record.publishedAt ?? ""), 64);
+  const publishedAt = sanitizeExternalText(record.publishedAt, 64);
 
   return {
-    sourceType: sanitizeExternalText(String(record.sourceType ?? "web"), 60) ?? "web",
+    sourceType: sanitizeExternalText(record.sourceType, 60) || "web",
     title,
     url,
-    publisher: sanitizeExternalText(String(record.publisher ?? ""), 160),
+    publisher: sanitizeExternalText(record.publisher, 160),
     publishedAt: publishedAt || null,
     snippet,
-    sentiment: sanitizeExternalText(String(record.sentiment ?? ""), 40),
+    sentiment: sanitizeExternalText(record.sentiment, 40),
     relevanceScore: numberOrNull(record.relevanceScore, 0, 100),
-    canonicalUrl: sanitizeExternalUrl(String(record.canonicalUrl ?? "")),
-    sourceKey: sanitizeExternalText(String(record.sourceKey ?? ""), 240),
-    evidenceKind: sanitizeExternalText(String(record.evidenceKind ?? ""), 80),
-    whatItProves: sanitizeExternalText(String(record.whatItProves ?? ""), 400),
+    canonicalUrl: sanitizeExternalUrl(record.canonicalUrl),
+    sourceKey: sanitizeExternalText(record.sourceKey, 240),
+    evidenceKind: sanitizeExternalText(record.evidenceKind, 80),
+    whatItProves: sanitizeExternalText(record.whatItProves, 400),
     sourceConfidence: numberOrNull(record.sourceConfidence, 0, 100),
     sourceRank: numberOrNull(record.sourceRank, 0, 200),
-    providerItemId: sanitizeExternalText(String(record.providerItemId ?? ""), 240)
+    providerItemId: sanitizeExternalText(record.providerItemId, 240)
   };
 }
 
 export function parseMarketResearchResult(provider: string, content: string, maxSources: number): MarketResearchResult {
   const parsed = safeJsonParse<Record<string, unknown>>(extractJsonObject(content), {});
+  const fallbackSummary = sanitizeExternalText(content.replace(/\s+/g, " ").trim(), 1200) ?? "";
   const sources = Array.isArray(parsed.sources)
     ? parsed.sources.map(sanitizeSource).filter((source): source is MarketResearchSourceInput => Boolean(source)).slice(0, maxSources)
     : [];
 
   return {
     provider,
-    summary:
-      sanitizeExternalText(String(parsed.summary ?? ""), 2000) ??
-      truncateText(content.replace(/\s+/g, " ").trim(), 1200),
+    summary: sanitizeExternalText(parsed.summary, 2000) || fallbackSummary,
     signals: stringArray(parsed.signals, 8, 300),
     userProblems: stringArray(parsed.userProblems, 8, 300),
-    sentiment: sanitizeExternalText(String(parsed.sentiment ?? "neutral"), 120) ?? "neutral",
+    sentiment: sanitizeExternalText(parsed.sentiment, 120) || "neutral",
     demandEvidence: stringArray(parsed.demandEvidence, 8, 300),
     validationRisks: stringArray(parsed.validationRisks, 8, 300),
     confidenceScore: numberOrNull(parsed.confidenceScore, 1, 5),
@@ -95,8 +94,8 @@ export function parseMarketResearchResult(provider: string, content: string, max
     queries: stringArray(parsed.queries, 12, 180),
     providers: stringArray(parsed.providers, 8, 80),
     independentSourceCount: numberOrNull(parsed.independentSourceCount, 0, 100) ?? undefined,
-    evidenceSummary: sanitizeExternalText(String(parsed.evidenceSummary ?? ""), 1200),
-    conflictSummary: sanitizeExternalText(String(parsed.conflictSummary ?? ""), 1200)
+    evidenceSummary: sanitizeExternalText(parsed.evidenceSummary, 1200),
+    conflictSummary: sanitizeExternalText(parsed.conflictSummary, 1200)
   };
 }
 
