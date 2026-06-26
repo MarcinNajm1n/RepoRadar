@@ -548,8 +548,10 @@ describe("buildRadarToday", () => {
     expect(radar.firstRun.steps.find((step) => step.id === "openai")).toMatchObject({
       status: "optional",
       priority: "optional",
-      action: "open_settings"
+      action: "open_settings",
+      description: expect.stringContaining("Dodaj OPENAI_API_KEY w .env tylko dla funkcji AI na zadanie")
     });
+    expect(radar.firstRun.steps.find((step) => step.id === "openai")?.description).toContain("zrestartuj npm run dev");
   });
 
   it("hides first-run onboarding once local data, scan, and GitHub config are ready", () => {

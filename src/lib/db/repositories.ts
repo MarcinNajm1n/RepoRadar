@@ -586,7 +586,7 @@ function buildFirstRunOnboarding(input: {
       title: "AI tylko na zadanie",
       description: input.settingsStatus.openAiConfigured
         ? "OPENAI_API_KEY jest gotowy dla briefow, raportow i pomyslow."
-        : "OpenAI jest opcjonalne; bez klucza nadal dziala scan, scoring i kolejka.",
+        : "OpenAI jest opcjonalne; bez klucza nadal dziala scan, scoring i kolejka. Dodaj OPENAI_API_KEY w .env tylko dla funkcji AI na zadanie i zrestartuj npm run dev.",
       status: input.settingsStatus.openAiConfigured ? "done" : "optional",
       priority: "optional",
       action: "open_settings",
