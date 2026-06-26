@@ -81,13 +81,21 @@ export async function getMaintenancePreview(
   };
 }
 
-export async function clearExpiredExternalCache() {
+export async function clearExpiredExternalCache(options: { confirmed?: boolean } = {}) {
+  if (options.confirmed !== true) {
+    throw new Error("External research cache cleanup requires explicit confirmation.");
+  }
+
   const result = await deleteExpiredExternalResearchCache();
   return { deletedCount: result.count };
 }
 
-export async function clearOldNotificationLogs(daysToKeep = 30) {
-  const days = notificationLogRetentionDays(daysToKeep);
+export async function clearOldNotificationLogs(options: { daysToKeep?: number; confirmed?: boolean } = {}) {
+  if (options.confirmed !== true) {
+    throw new Error("Notification log cleanup requires explicit confirmation.");
+  }
+
+  const days = notificationLogRetentionDays(options.daysToKeep);
   const cutoff = retentionCutoff(new Date(), days);
   const result = await prisma.notificationLog.deleteMany({
     where: {

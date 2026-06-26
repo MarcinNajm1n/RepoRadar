@@ -238,7 +238,7 @@ export async function clearExpiredExternalCacheAction(options: { confirmed?: boo
     throw new Error("External research cache cleanup requires explicit confirmation.");
   }
 
-  const result = await clearExpiredExternalCache();
+  const result = await clearExpiredExternalCache({ confirmed: true });
   revalidatePath("/");
   return result;
 }
@@ -249,7 +249,7 @@ export async function clearOldNotificationLogsAction(options: { daysToKeep?: num
   }
 
   const daysToKeep = options.daysToKeep ?? 30;
-  const result = await clearOldNotificationLogs(daysToKeep);
+  const result = await clearOldNotificationLogs({ daysToKeep, confirmed: true });
   revalidatePath("/");
   return result;
 }

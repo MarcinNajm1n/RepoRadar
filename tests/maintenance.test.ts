@@ -22,7 +22,7 @@ vi.mock("@/lib/db/client", () => ({
   prisma: mocks.prisma
 }));
 
-import { getMaintenancePreview, pruneOldSnapshots } from "../src/lib/maintenance";
+import { clearExpiredExternalCache, clearOldNotificationLogs, getMaintenancePreview, pruneOldSnapshots } from "../src/lib/maintenance";
 
 describe("maintenance preview", () => {
   beforeEach(() => {
@@ -81,6 +81,46 @@ describe("maintenance preview", () => {
     expect(preview.snapshots.repositoriesLosingAllSnapshots).toBe(0);
     expect(mocks.prisma.repoSnapshot.findMany).toHaveBeenCalledTimes(2);
     expect(mocks.prisma.repoSnapshot.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("requires strict boolean confirmation before clearing expired external research cache", async () => {
+    await expect(clearExpiredExternalCache({ confirmed: "true" } as unknown as { confirmed?: boolean })).rejects.toThrow(
+      "External research cache cleanup requires explicit confirmation"
+    );
+
+    expect(mocks.prisma.externalResearchCache.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("clears expired external research cache only after explicit confirmation", async () => {
+    mocks.prisma.externalResearchCache.deleteMany.mockResolvedValue({ count: 3 });
+
+    await expect(clearExpiredExternalCache({ confirmed: true })).resolves.toEqual({ deletedCount: 3 });
+
+    expect(mocks.prisma.externalResearchCache.deleteMany).toHaveBeenCalledWith({
+      where: {
+        expiresAt: { lt: expect.any(Date) }
+      }
+    });
+  });
+
+  it("requires strict boolean confirmation before clearing old notification logs", async () => {
+    await expect(
+      clearOldNotificationLogs({ daysToKeep: 45, confirmed: 1 } as unknown as { daysToKeep?: number; confirmed?: boolean })
+    ).rejects.toThrow("Notification log cleanup requires explicit confirmation");
+
+    expect(mocks.prisma.notificationLog.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("clears old notification logs only after explicit confirmation", async () => {
+    mocks.prisma.notificationLog.deleteMany.mockResolvedValue({ count: 4 });
+
+    await expect(clearOldNotificationLogs({ daysToKeep: 45, confirmed: true })).resolves.toMatchObject({ deletedCount: 4 });
+
+    expect(mocks.prisma.notificationLog.deleteMany).toHaveBeenCalledWith({
+      where: {
+        createdAt: { lt: expect.any(Date) }
+      }
+    });
   });
 
   it("requires strict boolean confirmation before pruning snapshots", async () => {

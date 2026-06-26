@@ -185,7 +185,7 @@ describe("maintenance action confirmations", () => {
   it("clears expired external research cache when confirmed", async () => {
     await expect(clearExpiredExternalCacheAction({ confirmed: true })).resolves.toEqual({ deletedCount: 3 });
 
-    expect(mocks.clearExpiredExternalCache).toHaveBeenCalledTimes(1);
+    expect(mocks.clearExpiredExternalCache).toHaveBeenCalledWith({ confirmed: true });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
   });
 
@@ -204,7 +204,7 @@ describe("maintenance action confirmations", () => {
       cutoff: "2026-05-12T00:00:00.000Z"
     });
 
-    expect(mocks.clearOldNotificationLogs).toHaveBeenCalledWith(45);
+    expect(mocks.clearOldNotificationLogs).toHaveBeenCalledWith({ daysToKeep: 45, confirmed: true });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
   });
 
