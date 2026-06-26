@@ -193,7 +193,7 @@ export function mapRepository(repository: RepositoryRecord): RepositoryListItem 
   };
 }
 
-function mapIdea(
+export function mapIdea(
   idea: Awaited<ReturnType<typeof prisma.idea.findMany>>[number] & {
     repository?: { fullName: string };
     marketResearchSources?: EvidenceSourceRecord[];
@@ -220,8 +220,8 @@ function mapIdea(
     researchMode: idea.researchMode,
     marketSummary: idea.marketSummary,
     suggestedStack: idea.suggestedStack,
-    firstSteps: safeJsonParse<string[]>(idea.firstStepsJson, []),
-    evidenceIds: safeJsonParse<string[]>(idea.evidenceIdsJson, []),
+    firstSteps: parseStoredStringArray(idea.firstStepsJson),
+    evidenceIds: parseStoredStringArray(idea.evidenceIdsJson),
     evidenceSources: idea.marketResearchSources?.map(mapEvidenceSource) ?? [],
     status: idea.status,
     lastResearchAt: idea.lastResearchAt?.toISOString() ?? null,
@@ -229,7 +229,7 @@ function mapIdea(
   };
 }
 
-function mapReport(report: Awaited<ReturnType<typeof prisma.report.findMany>>[number]): ReportListItem {
+export function mapReport(report: Awaited<ReturnType<typeof prisma.report.findMany>>[number]): ReportListItem {
   return {
     id: report.id,
     type: report.type,
@@ -239,7 +239,7 @@ function mapReport(report: Awaited<ReturnType<typeof prisma.report.findMany>>[nu
     contentMarkdown: report.contentMarkdown,
     summary: report.summary,
     repoCount: report.repoCount,
-    topRepoIds: safeJsonParse<string[]>(report.topRepoIdsJson, []),
+    topRepoIds: parseStoredStringArray(report.topRepoIdsJson),
     createdAt: report.createdAt.toISOString()
   };
 }

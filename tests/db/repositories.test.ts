@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRadarToday, mapEvidenceSource, mapRepository, rankRadarNextActionCandidates } from "../../src/lib/db/repositories";
+import { buildRadarToday, mapEvidenceSource, mapIdea, mapReport, mapRepository, rankRadarNextActionCandidates } from "../../src/lib/db/repositories";
 import type { ActionItemListItem } from "../../src/types/action-item";
 import type { DashboardNotificationStatus, DashboardSettingsStatus, IdeaListItem } from "../../src/types/repository";
 
@@ -61,6 +61,55 @@ function repositoryRecord(overrides: Record<string, unknown> = {}) {
     snapshots: [{ growth24h: null, growth7d: null, growthPercent7d: null }],
     ...overrides
   };
+}
+
+function rawIdeaRecord(overrides: Record<string, unknown> = {}): Parameters<typeof mapIdea>[0] {
+  return {
+    id: "idea_1",
+    sourceRepoId: "repo_1",
+    title: "Workflow automation",
+    problem: "Manual work",
+    proposedSolution: "Automate it",
+    targetUser: "Developers",
+    mvpScope: "Small dashboard",
+    monetizationPotential: "B2B subscription",
+    difficulty: 2,
+    usefulnessScore: 4,
+    riskScore: 2,
+    suggestedStack: "Next.js",
+    firstStepsJson: JSON.stringify(["Validate market", "Build demo"]),
+    marketSummary: null,
+    evidenceIdsJson: JSON.stringify(["source_1"]),
+    confidenceScore: 4,
+    opportunityScore: 80,
+    opportunityBreakdownJson: "{}",
+    applicationSummary: null,
+    businessRationale: null,
+    researchMode: "light",
+    status: "CANDIDATE",
+    lastResearchAt: null,
+    createdAt: now,
+    repository: { fullName: "owner/tool" },
+    marketResearchSources: [],
+    ...overrides
+  } as Parameters<typeof mapIdea>[0];
+}
+
+function rawReportRecord(overrides: Record<string, unknown> = {}): Parameters<typeof mapReport>[0] {
+  return {
+    id: "report_1",
+    type: "weekly",
+    repoId: null,
+    title: "Weekly report",
+    markdownPath: "reports/weekly.md",
+    contentMarkdown: "# Weekly",
+    summary: null,
+    repoCount: 2,
+    topRepoIdsJson: JSON.stringify(["repo_1", "repo_2"]),
+    inputHash: null,
+    createdAt: now,
+    ...overrides
+  } as Parameters<typeof mapReport>[0];
 }
 
 describe("mapRepository", () => {
@@ -153,6 +202,30 @@ describe("mapRepository", () => {
       sourceConfidence: 82,
       sourceRank: 110
     });
+  });
+});
+
+describe("stored string array mapping", () => {
+  it("sanitizes idea first steps and evidence ids before display", () => {
+    const mapped = mapIdea(
+      rawIdeaRecord({
+        firstStepsJson: JSON.stringify([" Validate market ", 42, { label: "bad" }, "ship\u0000demo"]),
+        evidenceIdsJson: JSON.stringify([" source_1 ", null, ["bad"], "source\u0001two"])
+      })
+    );
+
+    expect(mapped.firstSteps).toEqual(["Validate market", "shipdemo"]);
+    expect(mapped.evidenceIds).toEqual(["source_1", "source two"]);
+  });
+
+  it("sanitizes report top repository ids before comparisons", () => {
+    const mapped = mapReport(
+      rawReportRecord({
+        topRepoIdsJson: JSON.stringify([" repo_1 ", 33, { id: "repo_bad" }, "repo\u0002two"])
+      })
+    );
+
+    expect(mapped.topRepoIds).toEqual(["repo_1", "repo two"]);
   });
 });
 
