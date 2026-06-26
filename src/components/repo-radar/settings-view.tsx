@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 import { Bell, CalendarClock, Download, Moon, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,18 @@ const OPENAI_CACHE_KIND_LABELS: Record<string, string> = {
   "opportunity-research": "Research szans"
 };
 
-type SettingsSectionKey = (typeof settingsSections)[number]["key"];
+export type SettingsSectionKey = (typeof settingsSections)[number]["key"];
+export type SettingsPanelTarget = "ai-jobs" | "scheduler" | "maintenance" | "observability";
+
+function settingsPanelElementId(target: SettingsPanelTarget) {
+  return `settings-panel-${target}`;
+}
 
 export function SettingsView({
+  activeSection: controlledActiveSection,
+  onSectionChange,
+  focusPanel,
+  onFocusPanelHandled,
   settingsSummary,
   notificationSummary,
   isLoading,
@@ -43,6 +52,10 @@ export function SettingsView({
   onPruneSnapshots,
   onRetryLoad
 }: {
+  activeSection?: SettingsSectionKey;
+  onSectionChange?: (section: SettingsSectionKey) => void;
+  focusPanel?: SettingsPanelTarget | null;
+  onFocusPanelHandled?: () => void;
   settingsSummary: SettingsSummary | null;
   notificationSummary: NotificationSummary | null;
   isLoading: boolean;
@@ -57,7 +70,32 @@ export function SettingsView({
   onPruneSnapshots: () => void;
   onRetryLoad: () => void;
 }) {
-  const [activeSection, setActiveSection] = useState<SettingsSectionKey>("configuration");
+  const [localActiveSection, setLocalActiveSection] = useState<SettingsSectionKey>("configuration");
+  const activeSection = controlledActiveSection ?? localActiveSection;
+
+  function handleSectionChange(section: SettingsSectionKey) {
+    if (controlledActiveSection === undefined) {
+      setLocalActiveSection(section);
+    }
+    onSectionChange?.(section);
+  }
+
+  useEffect(() => {
+    if (!focusPanel || !settingsSummary || !notificationSummary) {
+      return undefined;
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const element = document.getElementById(settingsPanelElementId(focusPanel));
+      if (element instanceof HTMLElement && !element.classList.contains("hidden")) {
+        element.scrollIntoView({ block: "start" });
+        element.focus({ preventScroll: true });
+        onFocusPanelHandled?.();
+      }
+    });
+
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [activeSection, focusPanel, notificationSummary, onFocusPanelHandled, settingsSummary]);
 
   if (!settingsSummary || !notificationSummary) {
     return (
@@ -101,7 +139,7 @@ export function SettingsView({
 
   return (
     <section className="space-y-4">
-      <SettingsSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
+      <SettingsSectionNav activeSection={activeSection} onSectionChange={handleSectionChange} />
 
       <SectionCard
         title="Ustawienia MVP"
@@ -155,7 +193,7 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
-        <SettingsPanel title="Scheduler Windows" className={activeSection === "configuration" ? "xl:col-span-2" : "hidden"}>
+        <SettingsPanel id={settingsPanelElementId("scheduler")} title="Scheduler Windows" className={activeSection === "configuration" ? "xl:col-span-2" : "hidden"}>
           <SchedulerDiagnostics scheduler={settingsSummary.scheduler} />
         </SettingsPanel>
 
@@ -174,7 +212,7 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
-        <SettingsPanel title="Centrum zadan AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
+        <SettingsPanel id={settingsPanelElementId("ai-jobs")} title="Centrum zadan AI" className={activeSection === "ai-costs" ? "xl:col-span-2" : "hidden"}>
           <AiJobsCenter
             queue={settingsSummary.aiJobQueue}
             jobs={settingsSummary.recentAiJobs}
@@ -227,7 +265,7 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
-      <SettingsPanel title="Observability" className={activeSection === "observability" ? undefined : "hidden"}>
+      <SettingsPanel id={settingsPanelElementId("observability")} title="Observability" className={activeSection === "observability" ? undefined : "hidden"}>
         <div className="grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
           <InfoItem label="Ostatni scan" value={formatLastScan(settingsSummary.observability)} />
           <InfoItem label="Czas ostatniego skanu" value={formatDuration(settingsSummary.observability.lastScan?.durationMs ?? null)} />
@@ -267,7 +305,7 @@ export function SettingsView({
         </p>
       </SettingsPanel>
 
-      <SettingsPanel title="Dane i maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
+      <SettingsPanel id={settingsPanelElementId("maintenance")} title="Dane i maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
         <MaintenancePreview preview={maintenancePreview} />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -365,11 +403,24 @@ function SettingToggle({
   );
 }
 
-function SettingsPanel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+function SettingsPanel({ id, title, children, className }: { id?: string; title: string; children: React.ReactNode; className?: string }) {
+  const titleId = id ? `${id}-title` : undefined;
+
   return (
-    <section className={cn("rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft", className)}>
+    <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      aria-labelledby={titleId}
+      className={cn(
+        "rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft",
+        id && "scroll-mt-24 focus:outline-none focus:ring-2 focus:ring-focus/50 focus:ring-offset-2 focus:ring-offset-background",
+        className
+      )}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">{title}</h3>
+        <h3 id={titleId} className="text-base font-semibold">
+          {title}
+        </h3>
         <Badge tone="neutral">{title === "Dane i maintenance" ? "local" : "status"}</Badge>
       </div>
       {children}

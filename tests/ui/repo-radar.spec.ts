@@ -181,6 +181,25 @@ test("keeps secondary global actions in the command palette", async ({ page }) =
   await expectNoHorizontalOverflow(page);
 });
 
+test("opens settings subsections from command palette quick commands", async ({ page }) => {
+  await page.getByRole("button", { name: "Komendy" }).click();
+  const commandInput = page.getByRole("combobox", { name: "Szukaj komend albo repozytoriow" });
+
+  await commandInput.fill("maintenance");
+  const maintenanceCommand = page.getByRole("option", { name: /Otworz Maintenance/ });
+  await expect(maintenanceCommand).toBeVisible();
+  await expect(maintenanceCommand).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByRole("heading", { name: "Paleta komend" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Maintenance" })).toHaveAttribute("aria-current", "page");
+  const maintenancePanel = page.locator("#settings-panel-maintenance");
+  await expect(maintenancePanel).toBeVisible();
+  await expect(maintenancePanel).toBeFocused();
+  await expect(page.getByText("Dane i maintenance")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("keeps the library view within a 1280px desktop viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole("navigation").getByRole("button", { name: "Biblioteka" }).click();

@@ -51,6 +51,7 @@ import { ActionItemCard as RepoActionItemCard } from "@/components/repo-radar/ac
 import { TasksView } from "@/components/repo-radar/tasks-view";
 import { IdeasView } from "@/components/repo-radar/ideas-view";
 import { SettingsView } from "@/components/repo-radar/settings-view";
+import type { SettingsPanelTarget, SettingsSectionKey } from "@/components/repo-radar/settings-view";
 import { WeeklyReportsView } from "@/components/repo-radar/weekly-reports-view";
 import { IdeaDetailDialog } from "@/components/repo-radar/idea-detail-dialog";
 import { EvidencePanel } from "@/components/repo-radar/evidence-panel";
@@ -110,6 +111,8 @@ function buildPruneSnapshotsConfirmation(snapshotPreview?: SettingsPanelData["se
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
   const [activeSection, setActiveSection] = useState<SectionKey>("repo");
   const [activeTab, setActiveTab] = useState<TabKey>("radar");
+  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionKey>("configuration");
+  const [activeSettingsPanelTarget, setActiveSettingsPanelTarget] = useState<SettingsPanelTarget | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteOpenKey, setCommandPaletteOpenKey] = useState(0);
   const [report, setReport] = useState<ReportState>(null);
@@ -135,6 +138,14 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     }
     setActiveTab(tabKey);
   }, []);
+  const openSettingsSection = useCallback(
+    (section: SettingsSectionKey, focusPanel: SettingsPanelTarget | null = null) => {
+      setActiveSettingsSection(section);
+      setActiveSettingsPanelTarget(focusPanel);
+      switchToTab("settings");
+    },
+    [switchToTab]
+  );
   const {
     query,
     setQuery,
@@ -636,6 +647,7 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           onClose={() => setIsCommandPaletteOpen(false)}
           onRunScan={runScan}
           onOpenTab={switchToTab}
+          onOpenSettingsSection={openSettingsSection}
           onOpenDailyBriefing={openDailyBriefing}
           onCreateWeeklyReport={createWeeklyReport}
           onCreatePortfolioBrief={openPortfolioBrief}
@@ -931,6 +943,10 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
       {activeTab === "settings" ? (
         <SettingsView
+          activeSection={activeSettingsSection}
+          onSectionChange={setActiveSettingsSection}
+          focusPanel={activeSettingsPanelTarget}
+          onFocusPanelHandled={() => setActiveSettingsPanelTarget(null)}
           settingsSummary={settingsPanelData?.settingsSummary ?? null}
           notificationSummary={settingsPanelData?.notificationSummary ?? null}
           isLoading={isSettingsViewLoading}

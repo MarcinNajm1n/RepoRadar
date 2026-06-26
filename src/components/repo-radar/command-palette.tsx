@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, Download, FileText, RefreshCw, Search } from "lucide-react";
+import { Activity, Bot, CalendarClock, Download, FileText, RefreshCw, Search, Wrench } from "lucide-react";
 import type React from "react";
 import type { RepositoryListItem } from "@/types/repository";
 import { cn } from "@/lib/utils";
 import type { TabKey } from "./navigation";
 import { tabs } from "./navigation";
+import type { SettingsPanelTarget, SettingsSectionKey } from "./settings-view";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { Button, DialogShell } from "./ui";
 import { formatOpenAiBudgetCommandDescription } from "@/lib/openai/token-budgets";
@@ -53,6 +54,7 @@ export function CommandPalette({
   onClose,
   onRunScan,
   onOpenTab,
+  onOpenSettingsSection,
   onOpenDailyBriefing,
   onCreateWeeklyReport,
   onCreatePortfolioBrief,
@@ -65,6 +67,7 @@ export function CommandPalette({
   onClose: () => void;
   onRunScan: () => void;
   onOpenTab: (tab: TabKey) => void;
+  onOpenSettingsSection: (section: SettingsSectionKey, focusPanel?: SettingsPanelTarget) => void;
   onOpenDailyBriefing: () => void;
   onCreateWeeklyReport: () => void;
   onCreatePortfolioBrief: () => void;
@@ -101,14 +104,14 @@ export function CommandPalette({
           {
             id: "daily-briefing",
             label: "Utworz briefing dzienny",
-            hint: "Wygeneruj lokalny briefing z najwazniejszymi sygnalami.",
+            hint: "Wygeneruj lokalny briefing bez OpenAI.",
             icon: CalendarClock,
             run: onOpenDailyBriefing
           },
           {
             id: "weekly",
             label: "Utworz raport tygodniowy",
-            hint: "Wygeneruj lokalny raport tygodniowy.",
+            hint: `Wygeneruj lokalny raport tygodniowy. ${formatOpenAiBudgetCommandDescription("weekly-report")}`,
             icon: FileText,
             run: onCreateWeeklyReport
           },
@@ -122,9 +125,43 @@ export function CommandPalette({
           {
             id: "portfolio-brief",
             label: "Utworz RepoRadar Brief",
-            hint: "Wygeneruj markdown portfolio i otworz widok do PDF.",
+            hint: "Wygeneruj lokalny markdown portfolio i otworz widok do PDF.",
             icon: FileText,
             run: onCreatePortfolioBrief
+          }
+        ]
+      },
+      {
+        id: "settings-ops",
+        label: "Ustawienia operacyjne",
+        commands: [
+          {
+            id: "settings-ai-costs",
+            label: "Otworz AI i koszty / Centrum zadan AI",
+            hint: "Koszty, cache OpenAI i kolejka zadan AI.",
+            icon: Bot,
+            run: () => onOpenSettingsSection("ai-costs", "ai-jobs")
+          },
+          {
+            id: "settings-scheduler",
+            label: "Otworz Scheduler Windows",
+            hint: "Konfiguracja i diagnostyka schedulera.",
+            icon: CalendarClock,
+            run: () => onOpenSettingsSection("configuration", "scheduler")
+          },
+          {
+            id: "settings-maintenance",
+            label: "Otworz Maintenance",
+            hint: "Czyszczenie cache, logow i starych snapshotow.",
+            icon: Wrench,
+            run: () => onOpenSettingsSection("maintenance", "maintenance")
+          },
+          {
+            id: "settings-observability",
+            label: "Otworz Observability",
+            hint: "Status skanow, cache i runtime GitHub.",
+            icon: Activity,
+            run: () => onOpenSettingsSection("observability", "observability")
           }
         ]
       },
@@ -141,7 +178,15 @@ export function CommandPalette({
         }))
       }
     ],
-    [onCreatePortfolioBrief, onCreateWeeklyReport, onDownloadIdeasCsv, onOpenDailyBriefing, onOpenTab, onRunScan]
+    [
+      onCreatePortfolioBrief,
+      onCreateWeeklyReport,
+      onDownloadIdeasCsv,
+      onOpenDailyBriefing,
+      onOpenSettingsSection,
+      onOpenTab,
+      onRunScan
+    ]
   );
 
   const normalizedQuery = query.trim().toLowerCase();

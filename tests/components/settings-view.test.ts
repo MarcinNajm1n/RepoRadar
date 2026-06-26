@@ -279,4 +279,29 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("schtasks /Query /TN");
     expect(html).toContain("schtasks /Run /TN");
   });
+
+  it("marks the controlled settings section as active", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        activeSection: "ai-costs",
+        settingsSummary: settingsSummary(),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain('aria-pressed="true" aria-current="page">AI i koszty</button>');
+    expect(html).toMatch(/<section id="settings-panel-ai-jobs"[\s\S]*?class="[^"]*xl:col-span-2[^"]*"[\s\S]*?<h3 id="settings-panel-ai-jobs-title" class="text-base font-semibold">Centrum zadan AI<\/h3>/);
+    expect(html).toMatch(/<section id="settings-panel-scheduler"[\s\S]*?class="[^"]*hidden[^"]*"[\s\S]*?<h3 id="settings-panel-scheduler-title" class="text-base font-semibold">Scheduler Windows<\/h3>/);
+  });
 });

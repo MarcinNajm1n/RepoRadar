@@ -99,6 +99,7 @@ describe("AI budget labels", () => {
         onClose: noop,
         onRunScan: noop,
         onOpenTab: noop,
+        onOpenSettingsSection: noop,
         onOpenDailyBriefing: noop,
         onCreateWeeklyReport: noop,
         onCreatePortfolioBrief: noop,
@@ -109,7 +110,37 @@ describe("AI budget labels", () => {
 
     expect(html).toContain("Uruchom scan");
     expect(html).toContain(formatOpenAiBudgetCommandDescription("summary"));
+    expect(html).toContain("Utworz briefing dzienny");
+    expect(html).toContain("Wygeneruj lokalny briefing bez OpenAI.");
     expect(html).toContain("Utworz raport tygodniowy");
-    expect(html).not.toContain(formatOpenAiBudgetCommandDescription("weekly-report"));
+    expect(html).toContain(formatOpenAiBudgetCommandDescription("weekly-report"));
+    expect(html).toContain("Utworz RepoRadar Brief");
+    expect(html).toContain("Wygeneruj lokalny markdown portfolio");
+    expect(html).not.toContain(formatOpenAiBudgetCommandDescription("repo-report"));
+  });
+
+  it("renders quick settings commands in the command palette", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CommandPalette, {
+        isOpen: true,
+        repositories: [],
+        isPending: false,
+        onClose: noop,
+        onRunScan: noop,
+        onOpenTab: noop,
+        onOpenSettingsSection: noop,
+        onOpenDailyBriefing: noop,
+        onCreateWeeklyReport: noop,
+        onCreatePortfolioBrief: noop,
+        onDownloadIdeasCsv: noop,
+        onSearchRepositories: noop
+      })
+    );
+
+    expect(html).toContain("Ustawienia operacyjne");
+    expect(html).toContain("Otworz AI i koszty / Centrum zadan AI");
+    expect(html).toContain("Otworz Scheduler Windows");
+    expect(html).toContain("Otworz Maintenance");
+    expect(html).toContain("Otworz Observability");
   });
 });
