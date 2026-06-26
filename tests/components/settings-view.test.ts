@@ -303,6 +303,8 @@ describe("SettingsView maintenance preview", () => {
 
     expect(html).toContain("Discord webhook");
     expect(html).toContain("niepoprawny URL");
+    expect(html).toContain("DISCORD_WEBHOOK_URL musi byc adresem HTTPS");
+    expect(html).toContain("https://discord.com/api/webhooks/ID/TOKEN");
   });
 
   it("marks the controlled settings section as active", () => {
