@@ -44,6 +44,36 @@ describe("getConfig", () => {
     expect(getConfig().marketResearchMode).toBe("light");
   });
 
+  it("ignores blank numeric env values instead of treating whitespace as zero", () => {
+    process.env.OPENAI_DAILY_ANALYSIS_LIMIT = "   ";
+    process.env.MARKET_RESEARCH_MAX_SOURCES = "\t";
+
+    const config = getConfig();
+
+    expect(config.openAiDailyAnalysisLimit).toBe(20);
+    expect(config.marketResearchMaxSources).toBe(8);
+  });
+
+  it("trims boolean env values before parsing", () => {
+    process.env.ENABLE_HN_SOURCE = " true ";
+    process.env.ENABLE_RSS_SOURCE = "\tfalse ";
+
+    const config = getConfig();
+
+    expect(config.enableHnSource).toBe(true);
+    expect(config.enableRssSource).toBe(false);
+  });
+
+  it("uses boolean defaults for blank env values", () => {
+    process.env.ENABLE_OPENAI_WEB_SEARCH_SOURCE = "   ";
+    process.env.ENABLE_REDDIT_SOURCE = "\t";
+
+    const config = getConfig();
+
+    expect(config.enableOpenAiWebSearchSource).toBe(true);
+    expect(config.enableRedditSource).toBe(false);
+  });
+
   it("clamps GitHub discovery profile ranges from env", () => {
     process.env.FRESH_REPO_MIN_STARS = "-10";
     process.env.FRESH_REPO_MAX_AGE_DAYS = "99999";

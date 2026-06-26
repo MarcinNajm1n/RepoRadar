@@ -73,7 +73,12 @@ function readNumber(name: string, fallback: number) {
     return fallback;
   }
 
-  const parsed = Number(raw);
+  const normalized = raw.trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -87,7 +92,12 @@ function readBoolean(name: string, fallback: boolean) {
     return fallback;
   }
 
-  return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(normalized);
 }
 
 function readString(name: string, fallback = "") {
