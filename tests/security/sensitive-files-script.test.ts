@@ -57,6 +57,19 @@ describe("check-sensitive-files.ps1", () => {
     });
   });
 
+  runOnWindows("blocks staged legacy npm auth credentials", () => {
+    withTempGitRepo((repoDir) => {
+      const fakeBasicAuth = "C".repeat(28);
+      const fakePassword = "D".repeat(28);
+      stageFile(repoDir, ".npmrc", `_auth=${fakeBasicAuth}\n//registry.npmjs.org/:_password=${fakePassword}\n`);
+
+      const result = runSensitiveCheck(repoDir);
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: .npmrc");
+    });
+  });
+
   runOnWindows("allows empty secret placeholders in env examples", () => {
     withTempGitRepo((repoDir) => {
       const keyName = ["GEMINI", "API", "KEY"].join("_");
