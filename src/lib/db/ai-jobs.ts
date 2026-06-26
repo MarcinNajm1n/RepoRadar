@@ -80,8 +80,21 @@ function cleanPriority(priority: number | undefined) {
   return Math.max(-100, Math.min(100, Math.round(priority)));
 }
 
+function isAiJobType(type: unknown): type is AiJobType {
+  return typeof type === "string" && Object.prototype.hasOwnProperty.call(AI_JOB_TYPES, type);
+}
+
+export function normalizeAiJobType(type: unknown): AiJobType {
+  if (!isAiJobType(type)) {
+    throw new Error("Unsupported AI job type.");
+  }
+
+  return type;
+}
+
 export function buildAiJobDedupeKey(input: RunAiJobInput) {
-  return input.dedupeKey ?? [input.type, input.repoId, input.ideaId, input.reportId].filter(Boolean).join(":");
+  const type = normalizeAiJobType(input.type);
+  return input.dedupeKey ?? [type, input.repoId, input.ideaId, input.reportId].filter(Boolean).join(":");
 }
 
 export async function runAiJob<T>(
@@ -89,7 +102,8 @@ export async function runAiJob<T>(
   handler: () => Promise<T>,
   result: (value: T) => Record<string, unknown> = () => ({})
 ) {
-  const dedupeKey = buildAiJobDedupeKey(input);
+  const type = normalizeAiJobType(input.type);
+  const dedupeKey = buildAiJobDedupeKey({ ...input, type });
 
   if (activeAiJobDedupeKeys.has(dedupeKey)) {
     throw new Error(AI_JOB_ALREADY_RUNNING_MESSAGE);
@@ -126,7 +140,7 @@ export async function runAiJob<T>(
 
       return tx.aiJob.create({
         data: {
-          type: input.type,
+          type,
           status: "RUNNING",
           repoId: input.repoId ?? null,
           ideaId: input.ideaId ?? null,

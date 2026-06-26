@@ -28,8 +28,10 @@ import {
   buildAiJobDedupeKey,
   getAiJobQueueSummary,
   getRecentAiJobs,
+  normalizeAiJobType,
   runAiJob
 } from "../../src/lib/db/ai-jobs";
+import type { AiJobType } from "../../src/types/ai-job";
 
 type TransactionCallback = (tx: typeof mocks.prisma) => Promise<unknown>;
 
@@ -47,9 +49,30 @@ describe("buildAiJobDedupeKey", () => {
   it("honors explicit dedupe keys", () => {
     expect(buildAiJobDedupeKey({ type: "IDEA", repoId: "repo_1", dedupeKey: "custom" })).toBe("custom");
   });
+
+  it("rejects unsupported runtime job types", () => {
+    expect(normalizeAiJobType("REPORT")).toBe("REPORT");
+    expect(() => buildAiJobDedupeKey({ type: "BAD" as unknown as AiJobType, repoId: "repo_1" })).toThrow(
+      "Unsupported AI job type"
+    );
+    expect(() => buildAiJobDedupeKey({ type: "BAD" as unknown as AiJobType, dedupeKey: "manual" })).toThrow(
+      "Unsupported AI job type"
+    );
+  });
 });
 
 describe("runAiJob", () => {
+  it("rejects unsupported job types before creating database work", async () => {
+    const handler = vi.fn();
+
+    await expect(runAiJob({ type: "BAD" as unknown as AiJobType, repoId: "repo_1" }, handler)).rejects.toThrow(
+      "Unsupported AI job type"
+    );
+
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("blocks a second active job with the same dedupe key", async () => {
     const handler = vi.fn();
     mocks.aiJob.findFirst.mockResolvedValue({ id: "job_running" });
