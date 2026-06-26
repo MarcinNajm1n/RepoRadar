@@ -38,7 +38,7 @@ import type {
   TasksPanelData,
   WeeklyReportsPanelData
 } from "@/types/repository";
-import { safeJsonParse } from "@/lib/utils";
+import { safeJsonParse, sanitizeExternalStringArray } from "@/lib/utils";
 import type { Prisma, Repository } from "@prisma/client";
 
 const DEFAULT_REPOSITORY_PAGE = 1;
@@ -70,6 +70,10 @@ const DEFAULT_SCORE_BREAKDOWN = {
   initialMomentumPoints: 0,
   usedInitialMomentumFallback: false
 };
+
+function parseStoredStringArray(value: string | null | undefined, maxItems = 30) {
+  return sanitizeExternalStringArray(safeJsonParse<unknown>(value, []), maxItems);
+}
 
 const ideaListInclude = {
   repository: { select: { fullName: true } },
@@ -159,7 +163,7 @@ export function mapRepository(repository: RepositoryRecord): RepositoryListItem 
     description: repository.description,
     readmeExcerpt: repository.readmeExcerpt,
     primaryLanguage: repository.primaryLanguage,
-    topics: safeJsonParse<string[]>(repository.topicsJson, []),
+    topics: parseStoredStringArray(repository.topicsJson),
     license: repository.license,
     createdAt: repository.createdAt.toISOString(),
     pushedAt: repository.pushedAt?.toISOString() ?? null,
@@ -181,7 +185,7 @@ export function mapRepository(repository: RepositoryRecord): RepositoryListItem 
     relevanceScore: repository.relevanceScore,
     initialMomentumScore: repository.initialMomentumScore,
     scoreBreakdown: safeJsonParse(repository.scoreBreakdownJson, DEFAULT_SCORE_BREAKDOWN),
-    discoveryProfiles: safeJsonParse<string[]>(repository.discoveryProfilesJson, []),
+    discoveryProfiles: parseStoredStringArray(repository.discoveryProfilesJson),
     source: repository.source,
     growth24h: repository.growth24h ?? latestSnapshot?.growth24h ?? null,
     growth7d: repository.growth7d ?? latestSnapshot?.growth7d ?? null,
@@ -1038,7 +1042,7 @@ async function getRepositoryFilterOptions(): Promise<RepositoryFilterOptions> {
   const discoveryProfiles = new Set<string>();
 
   for (const row of profileRows) {
-    for (const profile of safeJsonParse<string[]>(row.discoveryProfilesJson, [])) {
+    for (const profile of parseStoredStringArray(row.discoveryProfilesJson)) {
       discoveryProfiles.add(profile);
     }
   }

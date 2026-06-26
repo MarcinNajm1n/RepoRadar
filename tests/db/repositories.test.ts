@@ -87,6 +87,18 @@ describe("mapRepository", () => {
     expect(mapped.scoreBreakdown.usedInitialMomentumFallback).toBe(false);
   });
 
+  it("sanitizes stored topic and discovery profile arrays before display", () => {
+    const mapped = mapRepository(
+      repositoryRecord({
+        topicsJson: JSON.stringify([" ai-agents ", 42, { label: "bad" }, "mcp\u0000tools"]),
+        discoveryProfilesJson: JSON.stringify(["fresh_repos", null, ["bad"], "fast_momentum\u0001profile"])
+      })
+    );
+
+    expect(mapped.topics).toEqual(["ai-agents", "mcptools"]);
+    expect(mapped.discoveryProfiles).toEqual(["fresh_repos", "fast_momentum profile"]);
+  });
+
   it("prefers denormalized growth fields and falls back to the latest snapshot", () => {
     const denormalized = mapRepository(
       repositoryRecord({
