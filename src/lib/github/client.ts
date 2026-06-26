@@ -1,7 +1,14 @@
 import { getConfig } from "@/lib/config";
 import { stableHash } from "@/lib/hash";
 import { sanitizeExternalText, truncateText } from "@/lib/utils";
-import type { DiscoveredGitHubRepository, GitHubReadmeResult, GitHubSearchQuerySpec, GitHubSearchResponse, SearchOptions } from "./types";
+import type {
+  DiscoveredGitHubRepository,
+  GitHubReadmeResult,
+  GitHubRepositoryItem,
+  GitHubSearchQuerySpec,
+  GitHubSearchResponse,
+  SearchOptions
+} from "./types";
 import { mergeDiscoveredGitHubRepository } from "./dedupe";
 import { captureGitHubRateLimit } from "./rate-limit";
 import { sanitizeGitHubCount } from "./sanitize";
@@ -9,6 +16,8 @@ import { sanitizeGitHubCount } from "./sanitize";
 const GITHUB_API = "https://api.github.com";
 const MAX_GITHUB_RETRY_DELAY_MS = 30_000;
 const MAX_CONDITIONAL_CACHE_ENTRIES = 200;
+const GITHUB_OWNER_LOGIN_PATTERN = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i;
+const GITHUB_REPOSITORY_NAME_PATTERN = /^[a-z\d._-]{1,100}$/i;
 
 type RequestOptions = {
   accept?: string;
@@ -100,6 +109,49 @@ function formatRateLimitReset(response: Response) {
 
   const resetDate = new Date(Number(reset) * 1000);
   return Number.isNaN(resetDate.getTime()) ? null : resetDate.toISOString();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isGitHubOwnerLogin(value: unknown): value is string {
+  return typeof value === "string" && GITHUB_OWNER_LOGIN_PATTERN.test(value);
+}
+
+function isGitHubRepositoryName(value: unknown): value is string {
+  return typeof value === "string" && GITHUB_REPOSITORY_NAME_PATTERN.test(value) && value !== "." && value !== "..";
+}
+
+function isMatchingRepositoryFullName(value: unknown, owner: string, name: string) {
+  return value === `${owner}/${name}`;
+}
+
+function isUsableGitHubSearchItem(value: unknown): value is GitHubRepositoryItem {
+  if (!isRecord(value) || !isRecord(value.owner)) {
+    return false;
+  }
+
+  const ownerLogin = value.owner.login;
+  const repositoryName = value.name;
+
+  if (!isGitHubOwnerLogin(ownerLogin) || !isGitHubRepositoryName(repositoryName)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "number" &&
+    Number.isSafeInteger(value.id) &&
+    value.id > 0 &&
+    isMatchingRepositoryFullName(value.full_name, ownerLogin, repositoryName) &&
+    typeof value.archived === "boolean" &&
+    typeof value.fork === "boolean"
+  );
+}
+
+function getUsableGitHubSearchItems(response: GitHubSearchResponse) {
+  const items = (response as { items?: unknown }).items;
+  return Array.isArray(items) ? items.filter(isUsableGitHubSearchItem) : [];
 }
 
 export class GitHubClient {
@@ -231,7 +283,7 @@ export async function searchGitHubRepositories(queries: GitHubSearchQuerySpec[],
         page,
         perPage: 100
       });
-      for (const item of result.items) {
+      for (const item of getUsableGitHubSearchItems(result)) {
         if (sanitizeGitHubCount(item.stargazers_count) >= spec.minStars) {
           mergeDiscoveredGitHubRepository(discovered, item, spec);
         }

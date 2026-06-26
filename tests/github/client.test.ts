@@ -145,6 +145,47 @@ describe("GitHubClient", () => {
     expect(result[0].item.full_name).toBe("owner/strong");
     expect(result[0].matchedProfiles).toEqual(["fast_momentum"]);
   });
+
+  it("ignores malformed GitHub search items and non-array item payloads", async () => {
+    const strongRepo = repo(1, "owner/strong", 120);
+    const badOwnerRepo = { ...repo(2, "owner/bad-owner", 130), owner: null };
+    const badIdRepo = { ...repo(3, "owner/bad-id", 140), id: "3" };
+    const badNameRepo = { ...repo(4, "owner/bad-name", 150), name: "" };
+    const badPathRepo = { ...repo(5, "owner/bad-path", 160), name: "bad/path" };
+    const mismatchedFullNameRepo = { ...repo(6, "owner/mismatch", 170), full_name: "other/mismatch" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            total_count: 7,
+            incomplete_results: false,
+            items: [strongRepo, badOwnerRepo, badIdRepo, badNameRepo, badPathRepo, mismatchedFullNameRepo, null]
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            total_count: 1,
+            incomplete_results: false,
+            items: { full_name: "owner/not-an-array" }
+          }),
+          { status: 200 }
+        )
+      );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await searchGitHubRepositories(
+      [{ profile: "fast_momentum", query: "ai", sort: "stars", order: "desc", minStars: 100 }],
+      2
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].item.full_name).toBe("owner/strong");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 function repo(id: number, fullName: string, stars: number): GitHubRepositoryItem {
