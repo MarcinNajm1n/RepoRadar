@@ -3,26 +3,26 @@ import { sanitizeExternalText, sanitizeExternalUrl } from "@/lib/utils";
 import type { MarketResearchContext, MarketResearchProvider, MarketResearchSourceInput } from "../types";
 
 type RedditTokenResponse = {
-  access_token?: string;
-  error?: string;
+  access_token?: unknown;
+  error?: unknown;
 };
 
 type RedditSearchResponse = {
   data?: {
-    children?: Array<{
-      data?: {
-        title?: string;
-        permalink?: string;
-        url?: string;
-        subreddit_name_prefixed?: string;
-        selftext?: string;
-        id?: string;
-        created_utc?: number;
-        score?: number;
-        num_comments?: number;
-      };
-    }>;
+    children?: unknown;
   };
+};
+
+type RedditSearchItem = {
+  title?: unknown;
+  permalink?: unknown;
+  url?: unknown;
+  subreddit_name_prefixed?: unknown;
+  selftext?: unknown;
+  id?: unknown;
+  created_utc?: unknown;
+  score?: unknown;
+  num_comments?: unknown;
 };
 
 function redditConfigured() {
@@ -50,11 +50,12 @@ async function getRedditAccessToken() {
   }).finally(() => clearTimeout(timeout));
 
   const data = (await response.json()) as RedditTokenResponse;
-  if (!response.ok || !data.access_token) {
-    throw new Error(`Reddit OAuth failed: ${data.error ?? response.status}`);
+  const accessToken = sanitizeExternalText(data.access_token, 2000);
+  if (!response.ok || !accessToken) {
+    throw new Error(`Reddit OAuth failed: ${sanitizeExternalText(data.error, 120) ?? response.status}`);
   }
 
-  return data.access_token;
+  return accessToken;
 }
 
 function redditRateLimitError(response: Response) {
@@ -74,6 +75,70 @@ function redditRateLimitError(response: Response) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function redditCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function redditCountLabel(value: unknown, label: string) {
+  const count = redditCount(value);
+  return count > 0 ? `${label}: ${count}` : null;
+}
+
+function redditPublishedDate(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  const date = new Date(value * 1000);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+function redditSourceUrl(item: RedditSearchItem) {
+  const permalink = sanitizeExternalText(item.permalink, 500);
+  if (permalink?.startsWith("/")) {
+    const url = sanitizeExternalUrl(`https://www.reddit.com${permalink}`);
+    if (url) {
+      return url;
+    }
+  }
+
+  return sanitizeExternalUrl(item.url);
+}
+
+function redditSourceItem(value: unknown): RedditSearchItem | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const data = (value as { data?: unknown }).data;
+  return data && typeof data === "object" ? (data as RedditSearchItem) : null;
+}
+
+function marketResearchSourceFromRedditItem(item: RedditSearchItem): MarketResearchSourceInput | null {
+  const url = redditSourceUrl(item);
+  if (!url) {
+    return null;
+  }
+
+  const snippetParts = [
+    sanitizeExternalText(item.selftext, 500),
+    redditCountLabel(item.score, "score"),
+    redditCountLabel(item.num_comments, "comments")
+  ].filter(Boolean);
+
+  return {
+    sourceType: "reddit",
+    title: sanitizeExternalText(item.title, 240) ?? "Reddit discussion",
+    url,
+    providerItemId: sanitizeExternalText(item.id, 120) ?? sanitizeExternalText(item.permalink, 500),
+    publisher: sanitizeExternalText(item.subreddit_name_prefixed, 120) ?? "Reddit",
+    publishedAt: redditPublishedDate(item.created_utc),
+    snippet: snippetParts.join(" | ") || "Public Reddit search result.",
+    sentiment: "mixed",
+    relevanceScore: 60
+  };
 }
 
 export const redditProvider: MarketResearchProvider = {
@@ -107,29 +172,12 @@ export const redditProvider: MarketResearchProvider = {
     }
 
     const sources: MarketResearchSourceInput[] =
-      data.data?.children
-        ?.map((child) => child.data)
-        .filter(Boolean)
-        .map((item) => {
-          const snippetParts = [
-            sanitizeExternalText(item!.selftext, 500),
-            item!.score === undefined ? null : `score: ${item!.score}`,
-            item!.num_comments === undefined ? null : `comments: ${item!.num_comments}`
-          ].filter(Boolean);
-          const permalink = item!.permalink ? `https://www.reddit.com${item!.permalink}` : item!.url;
-          return {
-            sourceType: "reddit",
-            title: sanitizeExternalText(item!.title, 240) ?? "Reddit discussion",
-            url: sanitizeExternalUrl(permalink) ?? "https://www.reddit.com/",
-            providerItemId: item!.id ?? item!.permalink ?? null,
-            publisher: item!.subreddit_name_prefixed ?? "Reddit",
-            publishedAt: item!.created_utc ? new Date(item!.created_utc * 1000).toISOString().slice(0, 10) : null,
-            snippet: snippetParts.join(" | ") || "Public Reddit search result.",
-            sentiment: "mixed",
-            relevanceScore: 60
-          };
-        })
-        .slice(0, limit) ?? [];
+      (Array.isArray(data.data?.children) ? data.data.children : [])
+        .map(redditSourceItem)
+        .filter((item): item is RedditSearchItem => Boolean(item))
+        .map(marketResearchSourceFromRedditItem)
+        .filter((source): source is MarketResearchSourceInput => Boolean(source))
+        .slice(0, limit);
 
     return {
       provider: this.name,
