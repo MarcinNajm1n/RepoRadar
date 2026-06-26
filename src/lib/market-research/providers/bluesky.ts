@@ -44,6 +44,7 @@ export const blueskyProvider: MarketResearchProvider = {
     if (!baseUrl || !baseUrl.startsWith("https://")) {
       throw new Error("BLUESKY_PUBLIC_API_BASE must be an https URL");
     }
+    const baseHost = new URL(baseUrl).hostname;
 
     const limit = Math.min(config.marketResearchMaxSources, context.mode === "light" ? 4 : 8);
     const sources: MarketResearchSourceInput[] = [];
@@ -54,7 +55,11 @@ export const blueskyProvider: MarketResearchProvider = {
       url.searchParams.set("q", query);
       url.searchParams.set("sort", "top");
       url.searchParams.set("limit", String(Math.min(limit, 25)));
-      const data = await fetchJsonWithTimeout<BlueskySearchResponse>(url.toString(), { timeoutMs: 10000, maxBytes: 300_000 });
+      const data = await fetchJsonWithTimeout<BlueskySearchResponse>(url.toString(), {
+        timeoutMs: 10000,
+        maxBytes: 300_000,
+        allowedHosts: [baseHost]
+      });
 
       for (const post of data.posts ?? []) {
         const text = sanitizeExternalText(post.record?.text, 700);

@@ -1,10 +1,22 @@
-import { sanitizeExternalUrl } from "@/lib/utils";
+import { lookup } from "node:dns/promises";
+import type { LookupAddress } from "node:dns";
+import { isBlockedExternalHost, sanitizeExternalUrl } from "@/lib/utils";
 
-export async function fetchWithTimeout(url: string, options: { timeoutMs?: number; maxBytes?: number } = {}) {
+type ExternalFetchOptions = {
+  timeoutMs?: number;
+  maxBytes?: number;
+  allowedHosts: readonly string[];
+};
+
+export async function fetchWithTimeout(url: string, options: ExternalFetchOptions) {
   const safeUrl = sanitizeExternalUrl(url);
   if (!safeUrl) {
     throw new Error("Blocked or invalid external URL");
   }
+
+  const parsedUrl = new URL(safeUrl);
+  assertAllowedExternalFetchHost(parsedUrl.hostname, options.allowedHosts);
+  await assertResolvedHostIsPublic(parsedUrl);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 10000);
@@ -34,7 +46,37 @@ export async function fetchWithTimeout(url: string, options: { timeoutMs?: numbe
   }
 }
 
-export async function fetchJsonWithTimeout<T>(url: string, options: { timeoutMs?: number; maxBytes?: number } = {}) {
+export async function fetchJsonWithTimeout<T>(url: string, options: ExternalFetchOptions) {
   const text = await fetchWithTimeout(url, options);
   return JSON.parse(text) as T;
+}
+
+function assertAllowedExternalFetchHost(hostname: string, allowedHosts: readonly string[]) {
+  const normalized = normalizeHostname(hostname);
+  const allowed = allowedHosts.map(normalizeHostname).filter(Boolean);
+  if (!allowed.length || !allowed.includes(normalized)) {
+    throw new Error("Blocked external URL host allowlist");
+  }
+}
+
+async function assertResolvedHostIsPublic(parsedUrl: URL) {
+  const hostname = parsedUrl.hostname;
+  let addresses: LookupAddress[];
+
+  try {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new Error("Could not resolve external URL host");
+  }
+
+  if (!addresses.length || addresses.some((entry) => isBlockedExternalHost(entry.address))) {
+    throw new Error("Blocked external URL host resolution");
+  }
+}
+
+function normalizeHostname(hostname: string) {
+  return hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.+$/g, "");
 }

@@ -92,9 +92,10 @@ export const rssProvider: MarketResearchProvider = {
       if (!safeFeed) {
         continue;
       }
+      const feedHost = new URL(safeFeed).hostname;
 
       try {
-        const xml = await fetchWithTimeout(safeFeed, { timeoutMs: 10000, maxBytes: 500_000 });
+        const xml = await fetchWithTimeout(safeFeed, { timeoutMs: 10000, maxBytes: 500_000, allowedHosts: [feedHost] });
         const entries = parseFeedEntries(xml, safeFeed);
         for (const entry of entries) {
           if (terms.length && !matchesResearchTerms(entry, terms)) {

@@ -72,7 +72,7 @@ export function sanitizeExternalUrl(value: unknown, maxLength = 700) {
     if (parsed.username || parsed.password) {
       return null;
     }
-    if (isBlockedHost(parsed.hostname)) {
+    if (isBlockedExternalHost(parsed.hostname)) {
       return null;
     }
 
@@ -82,7 +82,7 @@ export function sanitizeExternalUrl(value: unknown, maxLength = 700) {
   }
 }
 
-function isBlockedHost(hostname: string) {
+export function isBlockedExternalHost(hostname: string) {
   const normalized = hostname
     .toLowerCase()
     .replace(/^\[|\]$/g, "")

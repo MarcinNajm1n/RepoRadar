@@ -50,7 +50,11 @@ export const hackerNewsProvider: MarketResearchProvider = {
 
     for (const query of buildResearchQueries(context).slice(0, context.mode === "light" ? 2 : 4)) {
       const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=${perQueryLimit}`;
-      const data = await fetchJsonWithTimeout<HnAlgoliaResponse>(url, { timeoutMs: 10000, maxBytes: 250_000 });
+      const data = await fetchJsonWithTimeout<HnAlgoliaResponse>(url, {
+        timeoutMs: 10000,
+        maxBytes: 250_000,
+        allowedHosts: ["hn.algolia.com"]
+      });
       for (const hit of data.hits ?? []) {
         const title = sanitizeExternalText(hit.title ?? hit.story_title, 240);
         const url = hitUrl(hit);
