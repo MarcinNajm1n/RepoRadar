@@ -4,6 +4,7 @@ import { sanitizeExternalText, truncateText } from "@/lib/utils";
 import type { DiscoveredGitHubRepository, GitHubReadmeResult, GitHubSearchQuerySpec, GitHubSearchResponse, SearchOptions } from "./types";
 import { mergeDiscoveredGitHubRepository } from "./dedupe";
 import { captureGitHubRateLimit } from "./rate-limit";
+import { sanitizeGitHubCount } from "./sanitize";
 
 const GITHUB_API = "https://api.github.com";
 const MAX_GITHUB_RETRY_DELAY_MS = 30_000;
@@ -231,7 +232,7 @@ export async function searchGitHubRepositories(queries: GitHubSearchQuerySpec[],
         perPage: 100
       });
       for (const item of result.items) {
-        if (item.stargazers_count >= spec.minStars) {
+        if (sanitizeGitHubCount(item.stargazers_count) >= spec.minStars) {
           mergeDiscoveredGitHubRepository(discovered, item, spec);
         }
       }

@@ -1,4 +1,6 @@
 import type { DiscoveredGitHubRepository } from "./types";
+import { sanitizeGitHubCount, sanitizeOptionalGitHubDate } from "./sanitize";
+import { sanitizeExternalText } from "@/lib/utils";
 
 export type ExistingGitHubRepositoryState = {
   githubId: number;
@@ -8,14 +10,22 @@ export type ExistingGitHubRepositoryState = {
 };
 
 function itemPushedAtMs(discovered: DiscoveredGitHubRepository) {
-  return discovered.item.pushed_at ? new Date(discovered.item.pushed_at).getTime() : null;
+  return sanitizeOptionalGitHubDate(discovered.item.pushed_at)?.getTime() ?? null;
+}
+
+function itemStars(discovered: DiscoveredGitHubRepository) {
+  return sanitizeGitHubCount(discovered.item.stargazers_count);
+}
+
+function itemFullNameKey(discovered: DiscoveredGitHubRepository) {
+  return sanitizeExternalText(discovered.item.full_name, 300)?.toLowerCase() ?? "";
 }
 
 function isChanged(discovered: DiscoveredGitHubRepository, existing: ExistingGitHubRepositoryState) {
   const pushedAtMs = itemPushedAtMs(discovered);
   const existingPushedAtMs = existing.pushedAt?.getTime() ?? null;
 
-  return discovered.item.stargazers_count !== existing.starsCurrent || pushedAtMs !== existingPushedAtMs;
+  return itemStars(discovered) !== existing.starsCurrent || pushedAtMs !== existingPushedAtMs;
 }
 
 function priority(discovered: DiscoveredGitHubRepository, existing: ExistingGitHubRepositoryState | undefined) {
@@ -35,9 +45,9 @@ export function prioritizeIncrementalScanItems(
 
   return discovered
     .map((item, index) => {
-      const existing = byGitHubId.get(item.item.id) ?? byFullName.get(item.item.full_name.toLowerCase());
+      const existing = byGitHubId.get(item.item.id) ?? byFullName.get(itemFullNameKey(item));
       return { item, index, priority: priority(item, existing) };
     })
-    .sort((a, b) => a.priority - b.priority || b.item.item.stargazers_count - a.item.item.stargazers_count || a.index - b.index)
+    .sort((a, b) => a.priority - b.priority || itemStars(b.item) - itemStars(a.item) || a.index - b.index)
     .map(({ item }) => item);
 }

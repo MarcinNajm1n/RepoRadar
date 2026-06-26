@@ -124,12 +124,13 @@ describe("GitHubClient", () => {
   it("keeps only results that meet the matched profile minStars", async () => {
     const strongRepo = repo(1, "owner/strong", 120);
     const weakRepo = repo(2, "owner/weak", 80);
+    const malformedRepo = { ...repo(3, "owner/malformed", 0), stargazers_count: "Infinity" as unknown as number };
     global.fetch = vi.fn(async () =>
       new Response(
         JSON.stringify({
-          total_count: 2,
+          total_count: 3,
           incomplete_results: false,
-          items: [strongRepo, weakRepo]
+          items: [strongRepo, weakRepo, malformedRepo]
         }),
         { status: 200 }
       )

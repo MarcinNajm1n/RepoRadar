@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { dedupeGitHubRepositories, mergeDiscoveredGitHubRepository } from "../../src/lib/github/dedupe";
 import type { DiscoveredGitHubRepository, GitHubRepositoryItem, GitHubSearchQuerySpec } from "../../src/lib/github/types";
 
-function repo(id: number, fullName: string): GitHubRepositoryItem {
+function repo(id: number, fullName: unknown): GitHubRepositoryItem {
+  const safeFullName = typeof fullName === "string" ? fullName : "runtime/malformed";
+
   return {
     id,
-    full_name: fullName,
-    name: fullName.split("/")[1],
-    owner: { login: fullName.split("/")[0] },
-    html_url: `https://github.com/${fullName}`,
+    full_name: fullName as string,
+    name: safeFullName.split("/")[1],
+    owner: { login: safeFullName.split("/")[0] },
+    html_url: `https://github.com/${safeFullName}`,
     description: null,
     language: null,
     topics: [],
@@ -60,5 +62,21 @@ describe("dedupeGitHubRepositories", () => {
     expect(discovered).toHaveLength(1);
     expect(discovered[0].matchedProfiles).toEqual(["fresh_repos", "fast_momentum"]);
     expect(discovered[0].minStarsMatched).toBe(50);
+  });
+
+  it("does not throw when runtime payloads have non-string full_name values", () => {
+    const malformed = repo(1, { full_name: "owner/tool" });
+    const discovered: DiscoveredGitHubRepository[] = [];
+    const spec: GitHubSearchQuerySpec = {
+      profile: "fresh_repos",
+      query: "fresh",
+      sort: "updated",
+      order: "desc",
+      minStars: 50
+    };
+
+    expect(() => dedupeGitHubRepositories([malformed])).not.toThrow();
+    expect(() => mergeDiscoveredGitHubRepository(discovered, malformed, spec)).not.toThrow();
+    expect(discovered).toHaveLength(1);
   });
 });
