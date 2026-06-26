@@ -279,7 +279,7 @@ Run the same check manually:
 npm run security:check
 ```
 
-The check blocks common private files and secrets, including `.env`, private key files, local SQLite databases, credential JSON files, GitHub/OpenAI/Gemini/Hugging Face provider keys, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, database URLs with credentials, and private key blocks.
+The check blocks common private files and secrets, including `.env`, private key files, local SQLite databases, credential JSON files, GitHub/OpenAI/Gemini/Hugging Face provider keys, npm registry tokens, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, database URLs with credentials, and private key blocks.
 
 Commit `.env.example` with empty placeholders. Keep real values only in `.env` or another ignored local file. `package-lock.json` is safe and should be committed.
 

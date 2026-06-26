@@ -45,6 +45,18 @@ describe("check-sensitive-files.ps1", () => {
     });
   });
 
+  runOnWindows("blocks staged npm registry auth tokens", () => {
+    withTempGitRepo((repoDir) => {
+      const fakeNpmToken = ["npm", "_", "B".repeat(36)].join("");
+      stageFile(repoDir, ".npmrc", `//registry.npmjs.org/:_authToken=${fakeNpmToken}\n`);
+
+      const result = runSensitiveCheck(repoDir);
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: .npmrc");
+    });
+  });
+
   runOnWindows("allows empty secret placeholders in env examples", () => {
     withTempGitRepo((repoDir) => {
       const keyName = ["GEMINI", "API", "KEY"].join("_");

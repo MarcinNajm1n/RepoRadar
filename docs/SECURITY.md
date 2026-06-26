@@ -17,7 +17,7 @@ Run before commits:
 npm run security:check
 ```
 
-The check blocks common private files and secret patterns, including `.env`, local SQLite databases, private keys, credential JSON files, OpenAI/GitHub/Gemini/Hugging Face provider keys, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, and database URLs with credentials.
+The check blocks common private files and secret patterns, including `.env`, local SQLite databases, private keys, credential JSON files, OpenAI/GitHub/Gemini/Hugging Face provider keys, npm registry tokens, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, and database URLs with credentials.
 
 ## External Data
 
