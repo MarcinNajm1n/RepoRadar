@@ -2,6 +2,9 @@ import { getConfig } from "@/lib/config";
 import { sanitizeExternalText, truncateText } from "@/lib/utils";
 import type { NotificationPayload, NotificationResult } from "../types";
 
+const DISCORD_WEBHOOK_HOSTS = new Set(["discord.com", "discordapp.com"]);
+const DISCORD_WEBHOOK_ERROR = "DISCORD_WEBHOOK_URL must be an HTTPS Discord webhook URL";
+
 export function maskDiscordWebhookUrl(url: string | undefined) {
   if (!url) {
     return undefined;
@@ -12,6 +15,33 @@ export function maskDiscordWebhookUrl(url: string | undefined) {
     return `${parsed.hostname}/configured`;
   } catch {
     return "discord-webhook:configured";
+  }
+}
+
+function parseDiscordWebhookUrl(url: string | undefined) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase().replace(/\.+$/g, "");
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || !DISCORD_WEBHOOK_HOSTS.has(hostname)) {
+      return null;
+    }
+
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const webhookIndex = parts[1] === "webhooks" ? 1 : /^v\d+$/.test(parts[1] ?? "") && parts[2] === "webhooks" ? 2 : -1;
+    const webhookId = parts[webhookIndex + 1];
+    const webhookToken = parts[webhookIndex + 2];
+    if (parts[0] !== "api" || webhookIndex < 0 || parts.length !== webhookIndex + 3 || !/^\d+$/.test(webhookId ?? "") || !webhookToken) {
+      return null;
+    }
+
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return null;
   }
 }
 
@@ -56,12 +86,24 @@ export async function sendDiscordNotification(payload: NotificationPayload): Pro
     };
   }
 
+  const webhookUrl = parseDiscordWebhookUrl(config.discordWebhookUrl);
+  if (!webhookUrl) {
+    return {
+      channel: "discord",
+      eventType: payload.eventType,
+      status: "FAILED",
+      maskedTarget,
+      payloadJson: JSON.stringify({ title: payload.title, repoCount: payload.repositories?.length ?? 0, opportunityCandidateId: payload.opportunityCandidateId }),
+      error: DISCORD_WEBHOOK_ERROR
+    };
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   const body = buildDiscordBody(payload);
 
   try {
-    const response = await fetch(config.discordWebhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
