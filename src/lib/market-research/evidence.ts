@@ -77,8 +77,12 @@ function sourceText(source: MarketResearchSourceInput) {
   return `${source.title} ${source.snippet}`.toLowerCase();
 }
 
-function providerKey(providerName: string) {
-  const normalized = providerName.toLowerCase();
+function normalizedProviderName(providerName: unknown) {
+  return sanitizeExternalText(providerName, 80) ?? "web";
+}
+
+function providerKey(providerName: unknown) {
+  const normalized = normalizedProviderName(providerName).toLowerCase();
   if (normalized.includes("hacker") || normalized === "hn") {
     return "hn";
   }
@@ -95,7 +99,7 @@ function snippetFingerprint(snippet: string | null | undefined) {
   return stableHash(normalizedText(snippet, 500)).slice(0, 16);
 }
 
-export function buildSourceKey(source: MarketResearchSourceInput, providerName = source.sourceType) {
+export function buildSourceKey(source: MarketResearchSourceInput, providerName: unknown = source.sourceType) {
   const provider = providerKey(providerName);
   const itemId = sanitizeExternalText(source.providerItemId ?? source.sourceKey ?? "", 240);
   if (itemId) {
@@ -110,7 +114,7 @@ export function buildSourceKey(source: MarketResearchSourceInput, providerName =
     }
   }
 
-  const canonicalUrl = source.canonicalUrl ?? canonicalizeUrl(source.url);
+  const canonicalUrl = canonicalizeUrl(source.canonicalUrl) ?? canonicalizeUrl(source.url);
   if (canonicalUrl) {
     return `url:${canonicalUrl}`;
   }
@@ -158,8 +162,8 @@ export function classifyEvidenceKind(source: MarketResearchSourceInput, _context
   return "other";
 }
 
-function sourceTypeWeight(sourceType: string) {
-  const normalized = sourceType.toLowerCase();
+function sourceTypeWeight(sourceType: unknown) {
+  const normalized = normalizedProviderName(sourceType).toLowerCase();
   if (normalized === "hn") {
     return 18;
   }
@@ -273,14 +277,15 @@ export function normalizeSource(source: MarketResearchSourceInput, providerName:
     return null;
   }
 
+  const sourceType = sanitizeExternalText(source.sourceType, 80) ?? normalizedProviderName(providerName);
   const evidenceKind = (source.evidenceKind as EvidenceKind | undefined) ?? classifyEvidenceKind(source, context);
   const normalized: MarketResearchSourceInput = {
     ...source,
-    sourceType: sanitizeExternalText(source.sourceType || providerName, 80) ?? providerName,
+    sourceType,
     title,
     url: canonicalUrl,
     canonicalUrl,
-    sourceKey: buildSourceKey({ ...source, title, snippet, canonicalUrl }, providerName),
+    sourceKey: buildSourceKey({ ...source, sourceType, title, snippet, canonicalUrl }, sourceType),
     publisher: sanitizeExternalText(source.publisher, 180),
     publishedAt: sanitizeExternalText(source.publishedAt, 80),
     snippet,

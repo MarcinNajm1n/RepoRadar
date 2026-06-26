@@ -131,6 +131,15 @@ describe("evidence engine", () => {
     expect(normalized?.relevanceScore).toBe(100);
   });
 
+  it("defaults missing runtime source types and revalidates canonical URL keys", () => {
+    const normalized = normalizeSource(source({ sourceType: undefined as unknown as string }), undefined as unknown as string, context);
+
+    expect(normalized?.sourceType).toBe("web");
+    expect(normalized?.sourceRank).toEqual(expect.any(Number));
+    expect(Number.isFinite(normalized?.sourceRank)).toBe(true);
+    expect(buildSourceKey(source({ providerItemId: null, canonicalUrl: "javascript:alert(1)" }))).toBe("url:https://example.com/post");
+  });
+
   it("keeps invalid runtime confidence scores out of direct ranking", () => {
     const rank = rankEvidenceSource(
       source({
