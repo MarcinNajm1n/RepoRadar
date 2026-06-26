@@ -26,7 +26,13 @@ import {
 } from "./cache-keys";
 import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets";
 import { formatOpenAiBudgetWarning, getRequiredOpenAiCallsForAction } from "./budget-status";
-import { sanitizeAiRating, sanitizeOptionalAiRating, sanitizeOptionalAiScore } from "./parsed-idea";
+import {
+  sanitizeAiRating,
+  sanitizeAiText,
+  sanitizeOptionalAiRating,
+  sanitizeOptionalAiScore,
+  sanitizeOptionalAiText
+} from "./parsed-idea";
 import {
   attachResearchRunsToIdea,
   attachResearchRunsToReport,
@@ -309,27 +315,32 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
         research
       })
     : null;
+  const fallbackTitle = `Pomysł na bazie ${repository.fullName}`;
+  const fallbackProblem = "Do uzupełnienia po ręcznej analizie.";
+  const fallbackTargetUser = "Programiści i builderzy AI.";
+  const fallbackMvpScope = "Małe narzędzie lokalne lub webowe do zbudowania w 1-2 tygodnie.";
+  const fallbackMonetization = "Niski do średniego; wymaga walidacji.";
 
   const idea = await prisma.idea.create({
     data: {
       sourceRepoId: repoId,
-      title: parsed.title ?? `Pomysł na bazie ${repository.fullName}`,
-      problem: parsed.problem ?? "Do uzupełnienia po ręcznej analizie.",
-      proposedSolution: parsed.proposedSolution ?? content,
-      targetUser: parsed.targetUser ?? "Programiści i builderzy AI.",
-      mvpScope: parsed.mvpScope ?? "Małe narzędzie lokalne lub webowe do zbudowania w 1-2 tygodnie.",
-      monetizationPotential: parsed.monetizationPotential ?? "Niski do średniego; wymaga walidacji.",
+      title: sanitizeAiText(parsed.title, fallbackTitle, 180),
+      problem: sanitizeAiText(parsed.problem, fallbackProblem, 1200),
+      proposedSolution: sanitizeAiText(parsed.proposedSolution, content, 4000),
+      targetUser: sanitizeAiText(parsed.targetUser, fallbackTargetUser, 700),
+      mvpScope: sanitizeAiText(parsed.mvpScope, fallbackMvpScope, 1200),
+      monetizationPotential: sanitizeAiText(parsed.monetizationPotential, fallbackMonetization, 700),
       difficulty: sanitizeAiRating(parsed.difficulty, 3),
       usefulnessScore: sanitizeAiRating(parsed.usefulnessScore, 3),
       riskScore: sanitizeAiRating(parsed.riskScore, 3),
-      suggestedStack: parsed.suggestedStack ?? "Next.js, SQLite, OpenAI API",
-      marketSummary: (parsed.marketSummary ?? research?.summary) || null,
+      suggestedStack: sanitizeAiText(parsed.suggestedStack, "Next.js, SQLite, OpenAI API", 700),
+      marketSummary: sanitizeOptionalAiText(parsed.marketSummary, research?.summary ?? null, 2000),
       evidenceIdsJson: stringifyStoredStringArray(research?.sourceIds ?? []),
       confidenceScore: sanitizeOptionalAiRating(parsed.confidenceScore, research?.confidenceScore ?? null),
       opportunityScore: opportunity?.score ?? sanitizeOptionalAiScore(parsed.opportunityScore),
       opportunityBreakdownJson: stringifyStoredNumberRecord(opportunity?.breakdown ?? {}, { min: 0, max: 100 }),
-      applicationSummary: parsed.applicationSummary ?? null,
-      businessRationale: parsed.businessRationale ?? null,
+      applicationSummary: sanitizeOptionalAiText(parsed.applicationSummary, null, 1000),
+      businessRationale: sanitizeOptionalAiText(parsed.businessRationale, null, 1200),
       researchMode: "full",
       status: IDEA_STATUS.FULL,
       lastResearchAt: research ? new Date() : null,
@@ -574,18 +585,18 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
   const idea = await prisma.idea.update({
     where: { id: candidate.id },
     data: {
-      title: parsed.title ?? candidate.title,
-      problem: parsed.problem ?? candidate.problem,
-      proposedSolution: parsed.proposedSolution ?? candidate.proposedSolution,
-      targetUser: parsed.targetUser ?? candidate.targetUser,
-      mvpScope: parsed.mvpScope ?? candidate.mvpScope,
-      monetizationPotential: parsed.monetizationPotential ?? candidate.monetizationPotential,
+      title: sanitizeAiText(parsed.title, candidate.title, 180),
+      problem: sanitizeAiText(parsed.problem, candidate.problem, 1200),
+      proposedSolution: sanitizeAiText(parsed.proposedSolution, candidate.proposedSolution, 4000),
+      targetUser: sanitizeAiText(parsed.targetUser, candidate.targetUser, 700),
+      mvpScope: sanitizeAiText(parsed.mvpScope, candidate.mvpScope, 1200),
+      monetizationPotential: sanitizeAiText(parsed.monetizationPotential, candidate.monetizationPotential, 700),
       difficulty: sanitizeAiRating(parsed.difficulty, candidate.difficulty),
       usefulnessScore: sanitizeAiRating(parsed.usefulnessScore, candidate.usefulnessScore),
       riskScore: sanitizeAiRating(parsed.riskScore, candidate.riskScore),
-      suggestedStack: parsed.suggestedStack ?? candidate.suggestedStack,
+      suggestedStack: sanitizeAiText(parsed.suggestedStack, candidate.suggestedStack, 700),
       firstStepsJson: stringifyStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson)),
-      marketSummary: (parsed.marketSummary ?? research?.summary ?? candidate.marketSummary) || null,
+      marketSummary: sanitizeOptionalAiText(parsed.marketSummary, research?.summary ?? candidate.marketSummary, 2000),
       evidenceIdsJson: stringifyStoredStringArray(evidenceIds),
       confidenceScore: sanitizeOptionalAiRating(parsed.confidenceScore, research?.confidenceScore ?? candidate.confidenceScore),
       opportunityScore:
@@ -595,8 +606,8 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
         opportunity?.breakdown ?? parseStoredNumberRecord(candidate.opportunityBreakdownJson, { min: 0, max: 100 }),
         { min: 0, max: 100 }
       ),
-      applicationSummary: parsed.applicationSummary ?? candidate.applicationSummary,
-      businessRationale: parsed.businessRationale ?? candidate.businessRationale,
+      applicationSummary: sanitizeOptionalAiText(parsed.applicationSummary, candidate.applicationSummary, 1000),
+      businessRationale: sanitizeOptionalAiText(parsed.businessRationale, candidate.businessRationale, 1200),
       researchMode: "full",
       status: IDEA_STATUS.FULL,
       lastResearchAt: research ? new Date() : candidate.lastResearchAt

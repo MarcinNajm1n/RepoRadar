@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeAiRating, sanitizeOptionalAiRating, sanitizeOptionalAiScore } from "../../src/lib/openai/parsed-idea";
+import {
+  sanitizeAiRating,
+  sanitizeAiText,
+  sanitizeOptionalAiRating,
+  sanitizeOptionalAiScore,
+  sanitizeOptionalAiText
+} from "../../src/lib/openai/parsed-idea";
 
 describe("OpenAI idea numeric fields", () => {
   it("normalizes 1-5 rating values from JSON responses", () => {
@@ -20,5 +26,17 @@ describe("OpenAI idea numeric fields", () => {
     expect(sanitizeOptionalAiScore(-10, null)).toBe(0);
     expect(sanitizeOptionalAiScore("Infinity", 101)).toBe(100);
     expect(sanitizeOptionalAiScore({ score: 90 }, null)).toBeNull();
+  });
+
+  it("sanitizes required text fields with bounded fallbacks", () => {
+    expect(sanitizeAiText("  Build\u0000 workflow  ", "Fallback", 50)).toBe("Build workflow");
+    expect(sanitizeAiText({ text: "bad" }, "Fallback", 50)).toBe("Fallback");
+    expect(sanitizeAiText("abcdef", "Fallback", 4)).toBe("abc…");
+  });
+
+  it("sanitizes optional text fields without forcing empty strings", () => {
+    expect(sanitizeOptionalAiText(null, null)).toBeNull();
+    expect(sanitizeOptionalAiText(42, "  fallback\u0001text  ", 50)).toBe("fallback text");
+    expect(sanitizeOptionalAiText("  summary  ", null, 50)).toBe("summary");
   });
 });

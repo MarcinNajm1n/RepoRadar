@@ -1,4 +1,4 @@
-import { clamp } from "@/lib/utils";
+import { clamp, sanitizeExternalText } from "@/lib/utils";
 
 function coerceFiniteNumber(value: unknown) {
   if (typeof value === "number") {
@@ -33,4 +33,12 @@ export function sanitizeOptionalAiRating(value: unknown, fallback: number | null
 
 export function sanitizeOptionalAiScore(value: unknown, fallback: number | null = null) {
   return sanitizeOptionalIntegerInRange(value, fallback, 0, 100);
+}
+
+export function sanitizeAiText(value: unknown, fallback: string, maxLength = 1200) {
+  return sanitizeExternalText(value, maxLength) ?? sanitizeExternalText(fallback, maxLength) ?? "";
+}
+
+export function sanitizeOptionalAiText(value: unknown, fallback: string | null = null, maxLength = 1200) {
+  return sanitizeExternalText(value, maxLength) ?? sanitizeExternalText(fallback, maxLength);
 }
