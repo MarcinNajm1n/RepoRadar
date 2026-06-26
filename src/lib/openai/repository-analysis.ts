@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { getRepositoryForReport } from "@/lib/db/repositories";
 import { countOpenAiAnalysesToday, getCachedOpenAiOutputByHashes, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
-import { clamp, safeJsonParse } from "@/lib/utils";
+import { safeJsonParse } from "@/lib/utils";
 import {
   parseStoredNumberRecord,
   parseStoredStringArray,
@@ -26,6 +26,7 @@ import {
 } from "./cache-keys";
 import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets";
 import { formatOpenAiBudgetWarning, getRequiredOpenAiCallsForAction } from "./budget-status";
+import { sanitizeAiRating, sanitizeOptionalAiRating, sanitizeOptionalAiScore } from "./parsed-idea";
 import {
   attachResearchRunsToIdea,
   attachResearchRunsToReport,
@@ -318,16 +319,14 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
       targetUser: parsed.targetUser ?? "Programiści i builderzy AI.",
       mvpScope: parsed.mvpScope ?? "Małe narzędzie lokalne lub webowe do zbudowania w 1-2 tygodnie.",
       monetizationPotential: parsed.monetizationPotential ?? "Niski do średniego; wymaga walidacji.",
-      difficulty: parsed.difficulty ?? 3,
-      usefulnessScore: parsed.usefulnessScore ?? 3,
-      riskScore: parsed.riskScore ?? 3,
+      difficulty: sanitizeAiRating(parsed.difficulty, 3),
+      usefulnessScore: sanitizeAiRating(parsed.usefulnessScore, 3),
+      riskScore: sanitizeAiRating(parsed.riskScore, 3),
       suggestedStack: parsed.suggestedStack ?? "Next.js, SQLite, OpenAI API",
       marketSummary: (parsed.marketSummary ?? research?.summary) || null,
       evidenceIdsJson: stringifyStoredStringArray(research?.sourceIds ?? []),
-      confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
-      opportunityScore:
-        opportunity?.score ??
-        (parsed.opportunityScore === undefined ? null : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
+      confidenceScore: sanitizeOptionalAiRating(parsed.confidenceScore, research?.confidenceScore ?? null),
+      opportunityScore: opportunity?.score ?? sanitizeOptionalAiScore(parsed.opportunityScore),
       opportunityBreakdownJson: stringifyStoredNumberRecord(opportunity?.breakdown ?? {}, { min: 0, max: 100 }),
       applicationSummary: parsed.applicationSummary ?? null,
       businessRationale: parsed.businessRationale ?? null,
@@ -581,19 +580,17 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
       targetUser: parsed.targetUser ?? candidate.targetUser,
       mvpScope: parsed.mvpScope ?? candidate.mvpScope,
       monetizationPotential: parsed.monetizationPotential ?? candidate.monetizationPotential,
-      difficulty: parsed.difficulty ?? candidate.difficulty,
-      usefulnessScore: parsed.usefulnessScore ?? candidate.usefulnessScore,
-      riskScore: parsed.riskScore ?? candidate.riskScore,
+      difficulty: sanitizeAiRating(parsed.difficulty, candidate.difficulty),
+      usefulnessScore: sanitizeAiRating(parsed.usefulnessScore, candidate.usefulnessScore),
+      riskScore: sanitizeAiRating(parsed.riskScore, candidate.riskScore),
       suggestedStack: parsed.suggestedStack ?? candidate.suggestedStack,
       firstStepsJson: stringifyStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson)),
       marketSummary: (parsed.marketSummary ?? research?.summary ?? candidate.marketSummary) || null,
       evidenceIdsJson: stringifyStoredStringArray(evidenceIds),
-      confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? candidate.confidenceScore,
+      confidenceScore: sanitizeOptionalAiRating(parsed.confidenceScore, research?.confidenceScore ?? candidate.confidenceScore),
       opportunityScore:
         opportunity?.score ??
-        (parsed.opportunityScore === undefined
-          ? candidate.opportunityScore
-          : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
+        sanitizeOptionalAiScore(parsed.opportunityScore, candidate.opportunityScore),
       opportunityBreakdownJson: stringifyStoredNumberRecord(
         opportunity?.breakdown ?? parseStoredNumberRecord(candidate.opportunityBreakdownJson, { min: 0, max: 100 }),
         { min: 0, max: 100 }
