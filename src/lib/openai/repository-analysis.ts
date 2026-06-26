@@ -3,7 +3,13 @@ import { getRepositoryForReport } from "@/lib/db/repositories";
 import { countOpenAiAnalysesToday, getCachedOpenAiOutputByHashes, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
 import { clamp, safeJsonParse } from "@/lib/utils";
-import { parseStoredStringArray, sanitizeStoredStringArray } from "@/lib/stored-json";
+import {
+  parseStoredNumberRecord,
+  parseStoredStringArray,
+  sanitizeStoredStringArray,
+  stringifyStoredNumberRecord,
+  stringifyStoredStringArray
+} from "@/lib/stored-json";
 import { repoReportPath } from "@/lib/reports/paths";
 import {
   buildIdeaPrompt,
@@ -317,18 +323,20 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
       riskScore: parsed.riskScore ?? 3,
       suggestedStack: parsed.suggestedStack ?? "Next.js, SQLite, OpenAI API",
       marketSummary: (parsed.marketSummary ?? research?.summary) || null,
-      evidenceIdsJson: JSON.stringify(sanitizeStoredStringArray(research?.sourceIds ?? [])),
+      evidenceIdsJson: stringifyStoredStringArray(research?.sourceIds ?? []),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
       opportunityScore:
         opportunity?.score ??
         (parsed.opportunityScore === undefined ? null : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
-      opportunityBreakdownJson: JSON.stringify(opportunity?.breakdown ?? {}),
+      opportunityBreakdownJson: stringifyStoredNumberRecord(opportunity?.breakdown ?? {}, { min: 0, max: 100 }),
       applicationSummary: parsed.applicationSummary ?? null,
       businessRationale: parsed.businessRationale ?? null,
       researchMode: "full",
       status: IDEA_STATUS.FULL,
       lastResearchAt: research ? new Date() : null,
-      firstStepsJson: JSON.stringify(parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"])
+      firstStepsJson: stringifyStoredStringArray(
+        parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"]
+      )
     }
   });
   await attachResearchRunsToIdea(research?.runIds ?? (research?.runId ? [research.runId] : []), idea.id);
@@ -426,12 +434,12 @@ export async function generateOpportunityCandidateForRepository(repoId: string, 
     usefulnessScore: scoreToFive(opportunityScore),
     riskScore: research.confidenceScore && research.confidenceScore >= 4 ? 2 : 3,
     suggestedStack: "Next.js, SQLite/PostgreSQL, GitHub API, OpenAI web search",
-    firstStepsJson: JSON.stringify(firstSteps),
+    firstStepsJson: stringifyStoredStringArray(firstSteps),
     marketSummary: research.summary || null,
-    evidenceIdsJson: JSON.stringify(research.sourceIds),
+    evidenceIdsJson: stringifyStoredStringArray(research.sourceIds),
     confidenceScore: research.confidenceScore,
     opportunityScore,
-    opportunityBreakdownJson: JSON.stringify(opportunity.breakdown),
+    opportunityBreakdownJson: stringifyStoredNumberRecord(opportunity.breakdown, { min: 0, max: 100 }),
     applicationSummary: fallback.applicationSummary,
     businessRationale: fallback.businessRationale,
     researchMode: "light",
@@ -577,17 +585,18 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
       usefulnessScore: parsed.usefulnessScore ?? candidate.usefulnessScore,
       riskScore: parsed.riskScore ?? candidate.riskScore,
       suggestedStack: parsed.suggestedStack ?? candidate.suggestedStack,
-      firstStepsJson: JSON.stringify(sanitizeStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson))),
+      firstStepsJson: stringifyStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson)),
       marketSummary: (parsed.marketSummary ?? research?.summary ?? candidate.marketSummary) || null,
-      evidenceIdsJson: JSON.stringify(evidenceIds),
+      evidenceIdsJson: stringifyStoredStringArray(evidenceIds),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? candidate.confidenceScore,
       opportunityScore:
         opportunity?.score ??
         (parsed.opportunityScore === undefined
           ? candidate.opportunityScore
           : Math.round(clamp(Number(parsed.opportunityScore), 0, 100))),
-      opportunityBreakdownJson: JSON.stringify(
-        opportunity?.breakdown ?? safeJsonParse(candidate.opportunityBreakdownJson, {})
+      opportunityBreakdownJson: stringifyStoredNumberRecord(
+        opportunity?.breakdown ?? parseStoredNumberRecord(candidate.opportunityBreakdownJson, { min: 0, max: 100 }),
+        { min: 0, max: 100 }
       ),
       applicationSummary: parsed.applicationSummary ?? candidate.applicationSummary,
       businessRationale: parsed.businessRationale ?? candidate.businessRationale,

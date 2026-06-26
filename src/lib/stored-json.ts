@@ -14,6 +14,10 @@ export function parseStoredStringArray(value: string | null | undefined, maxItem
   return sanitizeStoredStringArray(safeJsonParse<unknown>(value, []), maxItems);
 }
 
+export function stringifyStoredStringArray(values: unknown, maxItems = 30) {
+  return JSON.stringify(sanitizeStoredStringArray(values, maxItems));
+}
+
 export function sanitizeStoredNumberRecord(values: unknown, options: StoredNumberRecordOptions = {}): Record<string, number> {
   if (!values || typeof values !== "object" || Array.isArray(values)) {
     return {};
@@ -40,4 +44,8 @@ export function sanitizeStoredNumberRecord(values: unknown, options: StoredNumbe
 
 export function parseStoredNumberRecord(value: string | null | undefined, options: StoredNumberRecordOptions = {}): Record<string, number> {
   return sanitizeStoredNumberRecord(safeJsonParse<unknown>(value, {}), options);
+}
+
+export function stringifyStoredNumberRecord(values: unknown, options: StoredNumberRecordOptions = {}) {
+  return JSON.stringify(sanitizeStoredNumberRecord(values, options));
 }

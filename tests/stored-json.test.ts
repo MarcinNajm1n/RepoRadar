@@ -3,7 +3,9 @@ import {
   parseStoredNumberRecord,
   parseStoredStringArray,
   sanitizeStoredNumberRecord,
-  sanitizeStoredStringArray
+  sanitizeStoredStringArray,
+  stringifyStoredNumberRecord,
+  stringifyStoredStringArray
 } from "../src/lib/stored-json";
 
 describe("stored JSON string arrays", () => {
@@ -20,6 +22,12 @@ describe("stored JSON string arrays", () => {
 
   it("sanitizes runtime arrays before storing them again", () => {
     expect(sanitizeStoredStringArray(["source_1", null, ["bad"], "source\u0001two"])).toEqual(["source_1", "source two"]);
+  });
+
+  it("stringifies sanitized string arrays for JSON columns", () => {
+    expect(stringifyStoredStringArray([" source_1 ", null, ["bad"], "source\u0001two"])).toBe(
+      JSON.stringify(["source_1", "source two"])
+    );
   });
 
   it("sanitizes numeric records from local JSON columns", () => {
@@ -46,5 +54,11 @@ describe("stored JSON string arrays", () => {
   it("ignores non-record numeric payloads", () => {
     expect(parseStoredNumberRecord("[1,2,3]")).toEqual({});
     expect(sanitizeStoredNumberRecord(null)).toEqual({});
+  });
+
+  it("stringifies sanitized numeric records for JSON columns", () => {
+    expect(stringifyStoredNumberRecord({ demand: 82, ignored: "90", above: 150 }, { min: 0, max: 100 })).toBe(
+      JSON.stringify({ demand: 82, above: 100 })
+    );
   });
 });
