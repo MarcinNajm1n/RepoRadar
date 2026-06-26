@@ -388,6 +388,31 @@ describe("buildRadarToday", () => {
     expect(candidates[3].signals).toContain("Wzrost 7d: +42 gwiazdek.");
   });
 
+  it("points invalid Discord webhook alerts directly to settings", () => {
+    const [candidate] = rankRadarNextActionCandidates({
+      alerts: [
+        {
+          id: "discord-webhook-invalid",
+          level: "warning",
+          title: "Discord webhook ma bledny URL",
+          message: "Popraw DISCORD_WEBHOOK_URL w .env."
+        }
+      ],
+      actionItems: [],
+      businessCandidates: [],
+      topRepositories: [],
+      latestRepositories: [],
+      lastScan: null
+    });
+
+    expect(candidate).toMatchObject({
+      kind: "alert",
+      id: "alert:discord-webhook-invalid",
+      actionLabel: "Otworz ustawienia"
+    });
+    expect(candidate.signals).toContain("Zmienna .env do poprawy: DISCORD_WEBHOOK_URL.");
+  });
+
   it("builds limited repository sections without ignored repositories", () => {
     const radar = buildRadarToday(
       {

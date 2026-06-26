@@ -372,6 +372,18 @@ function formatSignalDelta(value: number | null | undefined) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function alertActionLabel(alert: RadarTodayData["alerts"][number]) {
+  return alert.id === "discord-webhook-invalid" ? "Otworz ustawienia" : "Sprawdz alert";
+}
+
+function alertRepairSignals(alert: RadarTodayData["alerts"][number]) {
+  if (alert.id === "discord-webhook-invalid") {
+    return ["Zmienna .env do poprawy: DISCORD_WEBHOOK_URL."];
+  }
+
+  return [];
+}
+
 function buildAlertNextAction(alert: RadarTodayData["alerts"][number]): RadarNextAction {
   return {
     id: `alert:${alert.id}`,
@@ -381,9 +393,10 @@ function buildAlertNextAction(alert: RadarTodayData["alerts"][number]): RadarNex
     reason: "Najpierw usun blokery operacyjne, bo moga falszowac jakosc radaru.",
     signals: [
       `Alert ma poziom: ${formatAlertLevel(alert.level)}.`,
-      "Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo."
+      "Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo.",
+      ...alertRepairSignals(alert)
     ],
-    actionLabel: "Sprawdz alert",
+    actionLabel: alertActionLabel(alert),
     repoId: null,
     ideaId: null,
     taskId: null
