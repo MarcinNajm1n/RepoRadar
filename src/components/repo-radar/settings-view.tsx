@@ -190,7 +190,7 @@ export function SettingsView({
           ) : null}
           {settingsSummary.discordWebhookStatus === "invalid" ? (
             <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground" role="alert">
-              DISCORD_WEBHOOK_URL musi byc adresem HTTPS w formacie https://discord.com/api/webhooks/ID/TOKEN.
+              DISCORD_WEBHOOK_URL musi byc adresem HTTPS w formacie https://discord.com/api/webhooks/ID/TOKEN. Po zmianie zrestartuj `npm run dev`.
             </p>
           ) : null}
         </SettingsPanel>

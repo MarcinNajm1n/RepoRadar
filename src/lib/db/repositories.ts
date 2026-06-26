@@ -692,7 +692,7 @@ export function buildRadarToday(
       id: "discord-webhook-invalid",
       level: "warning",
       title: "Discord webhook ma bledny URL",
-      message: "Popraw DISCORD_WEBHOOK_URL w .env, zeby testowe i automatyczne powiadomienia mogly dotrzec do Discorda."
+      message: "Popraw DISCORD_WEBHOOK_URL w .env, zeby testowe i automatyczne powiadomienia mogly dotrzec do Discorda. Po zmianie zrestartuj npm run dev."
     });
   }
   if (input.settingsStatus.autoOpportunityResearchEnabled) {

@@ -500,7 +500,8 @@ describe("buildRadarToday", () => {
     ]);
     expect(radar.alerts.find((alert) => alert.id === "discord-webhook-invalid")).toMatchObject({
       level: "warning",
-      title: "Discord webhook ma bledny URL"
+      title: "Discord webhook ma bledny URL",
+      message: expect.stringContaining("Po zmianie zrestartuj npm run dev")
     });
     expect(radar.nextAction).toMatchObject({ kind: "alert", id: "alert:last-scan-failed" });
   });

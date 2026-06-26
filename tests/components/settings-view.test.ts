@@ -305,6 +305,7 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("niepoprawny URL");
     expect(html).toContain("DISCORD_WEBHOOK_URL musi byc adresem HTTPS");
     expect(html).toContain("https://discord.com/api/webhooks/ID/TOKEN");
+    expect(html).toContain("Po zmianie zrestartuj `npm run dev`");
   });
 
   it("renders a safe setup hint when GitHub token is missing", () => {
