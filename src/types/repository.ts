@@ -408,6 +408,7 @@ export type NotificationSummary = {
 export type DashboardSettingsStatus = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
+  discordWebhookStatus: "missing" | "valid" | "invalid";
   autoOpportunityResearchEnabled: boolean;
 };
 

@@ -670,6 +670,14 @@ export function buildRadarToday(
       message: "Raporty AI i pelne pomysly beda niedostepne do czasu ustawienia OPENAI_API_KEY."
     });
   }
+  if (input.settingsStatus.discordWebhookStatus === "invalid") {
+    alerts.push({
+      id: "discord-webhook-invalid",
+      level: "warning",
+      title: "Discord webhook ma bledny URL",
+      message: "Popraw DISCORD_WEBHOOK_URL w .env, zeby testowe i automatyczne powiadomienia mogly dotrzec do Discorda."
+    });
+  }
   if (input.settingsStatus.autoOpportunityResearchEnabled) {
     alerts.push({
       id: "auto-research-enabled",
@@ -779,6 +787,7 @@ function getDashboardSettingsStatus(): DashboardSettingsStatus {
   return {
     githubTokenConfigured: Boolean(config.githubToken),
     openAiConfigured: Boolean(config.openAiApiKey),
+    discordWebhookStatus: getDiscordWebhookStatus(config.discordWebhookUrl),
     autoOpportunityResearchEnabled: config.enableAutoOpportunityResearch
   };
 }

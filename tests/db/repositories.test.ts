@@ -274,6 +274,7 @@ function settingsStatus(overrides: Partial<DashboardSettingsStatus> = {}): Dashb
   return {
     githubTokenConfigured: true,
     openAiConfigured: true,
+    discordWebhookStatus: "missing",
     autoOpportunityResearchEnabled: false,
     ...overrides
   };
@@ -455,11 +456,12 @@ describe("buildRadarToday", () => {
         settingsStatus: settingsStatus({
           githubTokenConfigured: false,
           openAiConfigured: false,
+          discordWebhookStatus: "invalid",
           autoOpportunityResearchEnabled: true
         }),
         notificationStatus: notificationStatus({ failed24h: 2 })
       },
-      5,
+      6,
       now
     );
 
@@ -467,9 +469,14 @@ describe("buildRadarToday", () => {
       "last-scan-failed",
       "github-token-missing",
       "openai-missing",
+      "discord-webhook-invalid",
       "auto-research-enabled",
       "notification-failures"
     ]);
+    expect(radar.alerts.find((alert) => alert.id === "discord-webhook-invalid")).toMatchObject({
+      level: "warning",
+      title: "Discord webhook ma bledny URL"
+    });
     expect(radar.nextAction).toMatchObject({ kind: "alert", id: "alert:last-scan-failed" });
   });
 
