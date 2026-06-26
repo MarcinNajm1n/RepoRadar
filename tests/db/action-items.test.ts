@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     actionItem: {
       create: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn()
     }
   },
@@ -18,7 +19,13 @@ vi.mock("@/lib/db/repository-audit", () => ({
   recordActionItemDecision: mocks.recordActionItemDecision
 }));
 
-import { createActionItem, normalizeActionItemStatus, normalizeActionItemType } from "../../src/lib/db/action-items";
+import {
+  createActionItem,
+  getActionItems,
+  getActiveActionItems,
+  normalizeActionItemStatus,
+  normalizeActionItemType
+} from "../../src/lib/db/action-items";
 
 function actionItemRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -113,6 +120,58 @@ describe("action item input normalization", () => {
         data: expect.objectContaining({ priority: -100 })
       })
     );
+  });
+});
+
+describe("action item list limits", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.prisma.actionItem.findMany.mockResolvedValue([actionItemRecord()]);
+  });
+
+  it("clamps finite list limits before passing them to Prisma", async () => {
+    await getActionItems(250);
+    await getActiveActionItems(0);
+
+    expect(mocks.prisma.actionItem.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        take: 100
+      })
+    );
+    expect(mocks.prisma.actionItem.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        take: 1
+      })
+    );
+  });
+
+  it("falls back for non-finite list limits while preserving explicit unlimited reads", async () => {
+    await getActionItems(Number.NaN);
+    await getActiveActionItems(Number.POSITIVE_INFINITY);
+    await getActiveActionItems("many" as unknown as number);
+    await getActionItems(null);
+
+    expect(mocks.prisma.actionItem.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        take: 50
+      })
+    );
+    expect(mocks.prisma.actionItem.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        take: 20
+      })
+    );
+    expect(mocks.prisma.actionItem.findMany).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        take: 20
+      })
+    );
+    expect(mocks.prisma.actionItem.findMany.mock.calls[3]?.[0]).not.toHaveProperty("take");
   });
 });
 

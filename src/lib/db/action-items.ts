@@ -15,6 +15,9 @@ export const ACTIVE_ACTION_ITEM_STATUSES: ActionItemStatus[] = [
   "IN_PROGRESS",
   "SNOOZED"
 ];
+const DEFAULT_ACTION_ITEM_LIMIT = 50;
+const DEFAULT_ACTIVE_ACTION_ITEM_LIMIT = 20;
+const MAX_ACTION_ITEM_LIMIT = 100;
 
 type ActionItemRecord = Awaited<ReturnType<typeof prisma.actionItem.findMany>>[number] & {
   repository?: { fullName: string; url: string } | null;
@@ -106,6 +109,14 @@ function cleanPriority(priority: unknown) {
   return Math.round(clamp(priority, -100, 100));
 }
 
+function cleanLimit(limit: unknown, fallback: number) {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) {
+    return fallback;
+  }
+
+  return Math.floor(clamp(limit, 1, MAX_ACTION_ITEM_LIMIT));
+}
+
 function buildCreateData(input: CreateActionItemInput) {
   return {
     type: normalizeActionItemType(input.type),
@@ -140,7 +151,8 @@ function buildUpdateData(input: UpdateActionItemInput) {
   };
 }
 
-export async function getActionItems(limit: number | null = 50) {
+export async function getActionItems(limit: number | null = DEFAULT_ACTION_ITEM_LIMIT) {
+  const take = limit === null ? null : cleanLimit(limit, DEFAULT_ACTION_ITEM_LIMIT);
   const rows = await prisma.actionItem.findMany({
     where: {
       status: {
@@ -148,7 +160,7 @@ export async function getActionItems(limit: number | null = 50) {
       }
     },
     orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
-    ...(limit === null ? {} : { take: limit }),
+    ...(take === null ? {} : { take }),
     include: {
       repository: { select: { fullName: true, url: true } },
       idea: { select: { title: true } },
@@ -158,8 +170,9 @@ export async function getActionItems(limit: number | null = 50) {
 
   return rows.map(mapActionItem);
 }
-export async function getActiveActionItems(limit = 20) {
+export async function getActiveActionItems(limit = DEFAULT_ACTIVE_ACTION_ITEM_LIMIT) {
   const now = new Date();
+  const take = cleanLimit(limit, DEFAULT_ACTIVE_ACTION_ITEM_LIMIT);
   const rows = await prisma.actionItem.findMany({
     where: {
       OR: [
@@ -171,7 +184,7 @@ export async function getActiveActionItems(limit = 20) {
       ]
     },
     orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
-    take: limit,
+    take,
     include: {
       repository: { select: { fullName: true, url: true } },
       idea: { select: { title: true } },
