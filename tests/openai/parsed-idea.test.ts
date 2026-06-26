@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   sanitizeAiRating,
   sanitizeAiStringArray,
+  sanitizeAiSummary,
   sanitizeAiText,
   sanitizeOptionalAiRating,
   sanitizeOptionalAiScore,
@@ -39,6 +40,12 @@ describe("OpenAI idea numeric fields", () => {
     expect(sanitizeOptionalAiText(null, null)).toBeNull();
     expect(sanitizeOptionalAiText(42, "  fallback\u0001text  ", 50)).toBe("fallback text");
     expect(sanitizeOptionalAiText("  summary  ", null, 50)).toBe("summary");
+  });
+
+  it("sanitizes short repository summaries before persistence", () => {
+    expect(sanitizeAiSummary("  Agent\u0000 workflow  ")).toBe("Agent workflow");
+    expect(sanitizeAiSummary({ text: "bad" })).toBe("Brak streszczenia.");
+    expect(sanitizeAiSummary("a".repeat(1400))).toHaveLength(1200);
   });
 
   it("falls back for non-array string list fields", () => {

@@ -39,6 +39,10 @@ export function sanitizeAiText(value: unknown, fallback: string, maxLength = 120
   return sanitizeExternalText(value, maxLength) ?? sanitizeExternalText(fallback, maxLength) ?? "";
 }
 
+export function sanitizeAiSummary(value: unknown) {
+  return sanitizeAiText(value, "Brak streszczenia.", 1200);
+}
+
 export function sanitizeOptionalAiText(value: unknown, fallback: string | null = null, maxLength = 1200) {
   return sanitizeExternalText(value, maxLength) ?? sanitizeExternalText(fallback, maxLength);
 }

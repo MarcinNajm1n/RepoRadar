@@ -29,6 +29,7 @@ import { formatOpenAiBudgetWarning, getRequiredOpenAiCallsForAction } from "./bu
 import {
   sanitizeAiRating,
   sanitizeAiStringArray,
+  sanitizeAiSummary,
   sanitizeAiText,
   sanitizeOptionalAiRating,
   sanitizeOptionalAiScore,
@@ -120,11 +121,12 @@ export async function generateShortSummaryForRepository(repoId: string, force = 
   if (!force) {
     const cached = await getCachedOpenAiOutputByHashes("summary", repoId, hashes.lookup, config.openAiModel);
     if (cached) {
+      const summary = sanitizeAiSummary(cached.content);
       await prisma.repository.update({
         where: { id: repoId },
-        data: { shortSummaryPl: cached.content, lastAnalyzedAt: new Date() }
+        data: { shortSummaryPl: summary, lastAnalyzedAt: new Date() }
       });
-      return cached.content;
+      return summary;
     }
   }
 
@@ -134,16 +136,17 @@ export async function generateShortSummaryForRepository(repoId: string, force = 
     applyOpenAiActionBudget(context, "summary"),
     getOpenAiActionOptions("summary")
   );
-  await saveOpenAiOutput("summary", repoId, hashes.current, config.openAiModel, content);
+  const summary = sanitizeAiSummary(content);
+  await saveOpenAiOutput("summary", repoId, hashes.current, config.openAiModel, summary);
   await prisma.repository.update({
     where: { id: repoId },
     data: {
-      shortSummaryPl: content,
+      shortSummaryPl: summary,
       lastAnalyzedAt: new Date()
     }
   });
 
-  return content;
+  return summary;
 }
 
 export async function generateFullReportForRepository(repoId: string, force = false) {
