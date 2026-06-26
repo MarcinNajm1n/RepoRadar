@@ -94,6 +94,8 @@ Open `http://localhost:3000`.
 - market research: `MARKET_RESEARCH_ENABLED`, `MARKET_RESEARCH_PROVIDER`, `MARKET_RESEARCH_DAILY_LIMIT`, `MARKET_RESEARCH_MAX_SOURCES`, `MCP_WEB_RESEARCH_SERVER_URL`.
 - optional Reddit source: `ENABLE_REDDIT_SOURCE`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`.
 
+After changing secret values such as `GITHUB_TOKEN`, `OPENAI_API_KEY`, or `DISCORD_WEBHOOK_URL`, restart `npm run dev` so the local Next.js process reloads `.env`.
+
 ### GitHub Token
 
 Create a fine-grained personal access token in GitHub Settings -> Developer settings -> Personal access tokens. RepoRadar only needs read-only access to public repository metadata and content. Do not grant write, workflow, secrets, admin, or organization permissions.
@@ -277,7 +279,7 @@ Run the same check manually:
 npm run security:check
 ```
 
-The check blocks common private files and secrets, including `.env`, private key files, local SQLite databases, credential JSON files, GitHub tokens, OpenAI keys, Discord webhooks, SMTP passwords, and private key blocks.
+The check blocks common private files and secrets, including `.env`, private key files, local SQLite databases, credential JSON files, GitHub/OpenAI/Gemini/Hugging Face provider keys, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, database URLs with credentials, and private key blocks.
 
 Commit `.env.example` with empty placeholders. Keep real values only in `.env` or another ignored local file. `package-lock.json` is safe and should be committed.
 

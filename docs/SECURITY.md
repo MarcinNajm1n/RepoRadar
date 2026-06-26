@@ -6,6 +6,7 @@
 - Commit only `.env.example` with empty placeholders.
 - Do not store API keys, tokens, webhooks, passwords, client secrets, or database credentials in SQLite settings.
 - The UI shows only configured/missing status for secrets.
+- Restart `npm run dev` after editing `.env`, otherwise the running Next.js process may still use the old secret state.
 - Rotate any key that was pasted into chat, screenshots, logs, or committed files.
 
 ## Git Safety
@@ -16,7 +17,7 @@ Run before commits:
 npm run security:check
 ```
 
-The check blocks common private files and secret patterns, including `.env`, local SQLite databases, private keys, credential JSON files, OpenAI keys, GitHub tokens, Discord webhooks, SMTP passwords, and database URLs with credentials.
+The check blocks common private files and secret patterns, including `.env`, local SQLite databases, private keys, credential JSON files, OpenAI/GitHub/Gemini/Hugging Face provider keys, Discord webhooks, Slack tokens, generic access/auth tokens, SMTP passwords, and database URLs with credentials.
 
 ## External Data
 
