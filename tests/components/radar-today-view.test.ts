@@ -132,4 +132,43 @@ describe("RadarTodayView", () => {
     expect(html).toContain("Opcjonalnie pozniej");
     expect(html).toContain("npm run screenshots:portfolio");
   });
+
+  it("renders scan failure diagnostics with timing and partial counts", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RadarTodayView, {
+        radarToday: radarToday({
+          scanChanges: {
+            lastScan: {
+              startedAt: "2026-06-16T09:00:00.000Z",
+              finishedAt: "2026-06-16T09:03:30.000Z",
+              status: "FAILED",
+              reposFound: 30,
+              reposUpdated: 12,
+              errorMessage: "GitHub API rate limit exhausted until 2026-06-16T10:00:00.000Z."
+            },
+            latestRepositories: []
+          }
+        }),
+        isPending: false,
+        onOpenLibrary: noop,
+        onOpenReport: noop,
+        onOpenQuickBrief: noop,
+        onCreateReadmeTask: noop,
+        onCreateManualTask: noop,
+        onOpenCandidate: noop,
+        onPromoteCandidate: noop,
+        onOpenTasks: noop,
+        onOpenSettings: noop,
+        onRunScan: noop,
+        renderActionItem: () => React.createElement("div")
+      })
+    );
+
+    expect(html).toContain("Ostatni scan nie powiodl sie");
+    expect(html).toContain("GitHub API rate limit exhausted");
+    expect(html).toContain("Start");
+    expect(html).toContain("Koniec");
+    expect(html).toContain("Repo");
+    expect(html).toContain("12/30 zaktualizowane");
+  });
 });

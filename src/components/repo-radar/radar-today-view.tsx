@@ -607,6 +607,7 @@ function ScanFailurePanel({
     maxLength: 320,
     fallback: "Brak szczegolow bledu. Sprawdz token GitHub, rate limit i logi skanu."
   });
+  const finishedAt = latestScan.finishedAt ? formatDisplayDate(latestScan.finishedAt) : "brak zapisanego czasu zakonczenia";
 
   return (
     <section className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 shadow-soft" role="alert">
@@ -621,6 +622,22 @@ function ScanFailurePanel({
           <p className="mt-2 text-xs text-muted-foreground">
             Najczestsze przyczyny: wygasl token GitHub, rate limit, brak internetu albo blad jednego z zapytan GitHub API.
           </p>
+          <dl className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+            <div className="min-w-0 rounded-md border border-destructive/20 bg-surface-panel/70 p-2">
+              <dt className="font-semibold text-foreground">Start</dt>
+              <dd className="mt-1 break-words">{formatDisplayDate(latestScan.startedAt)}</dd>
+            </div>
+            <div className="min-w-0 rounded-md border border-destructive/20 bg-surface-panel/70 p-2">
+              <dt className="font-semibold text-foreground">Koniec</dt>
+              <dd className="mt-1 break-words">{finishedAt}</dd>
+            </div>
+            <div className="min-w-0 rounded-md border border-destructive/20 bg-surface-panel/70 p-2">
+              <dt className="font-semibold text-foreground">Repo</dt>
+              <dd className="mt-1 break-words">
+                {latestScan.reposUpdated}/{latestScan.reposFound} zaktualizowane
+              </dd>
+            </div>
+          </dl>
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
           <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
