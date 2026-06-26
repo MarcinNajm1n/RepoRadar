@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   clearExpiredExternalCache: vi.fn(),
   clearOldNotificationLogs: vi.fn(),
   pruneOldSnapshots: vi.fn(),
+  setSetting: vi.fn(),
   revalidatePath: vi.fn(),
   runAiJob: vi.fn()
 }));
@@ -102,7 +103,7 @@ vi.mock("@/lib/reports/weekly", () => ({
 }));
 
 vi.mock("@/lib/db/settings", () => ({
-  setSetting: vi.fn()
+  setSetting: mocks.setSetting
 }));
 
 import {
@@ -113,7 +114,8 @@ import {
   generateReportAction,
   generateShortSummaryAction,
   pruneOldSnapshotsAction,
-  promoteCandidateToFullIdeaAction
+  promoteCandidateToFullIdeaAction,
+  updateSettingAction
 } from "../../src/app/actions";
 
 const baseConfig = {
@@ -152,6 +154,7 @@ beforeEach(() => {
   mocks.clearExpiredExternalCache.mockResolvedValue({ deletedCount: 3 });
   mocks.clearOldNotificationLogs.mockResolvedValue({ deletedCount: 4, cutoff: "2026-05-12T00:00:00.000Z" });
   mocks.pruneOldSnapshots.mockResolvedValue({ deletedCount: 5, cutoff: "2025-06-25T00:00:00.000Z" });
+  mocks.setSetting.mockResolvedValue({ key: "enable_local_notifications", value: "true" });
   mocks.runAiJob.mockImplementation(
     async (_input: unknown, handler: () => Promise<unknown>) => handler()
   );
@@ -223,6 +226,34 @@ describe("maintenance action confirmations", () => {
 
     expect(mocks.pruneOldSnapshots).toHaveBeenCalledWith({ daysToKeep: 365, confirmed: true });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
+  });
+});
+
+describe("settings action validation", () => {
+  it("persists only supported boolean UI settings", async () => {
+    await expect(updateSettingAction("enable_local_notifications", "true")).resolves.toEqual({ ok: true });
+    await expect(updateSettingAction("auto_generate_weekly_ideas", false as unknown as string)).resolves.toEqual({ ok: true });
+
+    expect(mocks.setSetting).toHaveBeenNthCalledWith(1, "enable_local_notifications", "true");
+    expect(mocks.setSetting).toHaveBeenNthCalledWith(2, "auto_generate_weekly_ideas", "false");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("rejects unsupported UI setting keys before persistence", async () => {
+    await expect(updateSettingAction("OPENAI_API_KEY", "true")).rejects.toThrow("Unsupported UI setting key");
+    await expect(updateSettingAction("github_rate_limit_snapshot", "true")).rejects.toThrow("Unsupported UI setting key");
+    await expect(updateSettingAction(123 as unknown as string, "true")).rejects.toThrow("Unsupported UI setting key");
+
+    expect(mocks.setSetting).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported UI setting values before persistence", async () => {
+    await expect(updateSettingAction("enable_local_notifications", "yes")).rejects.toThrow("Unsupported UI setting value");
+    await expect(updateSettingAction("auto_generate_weekly_ideas", 1 as unknown as string)).rejects.toThrow("Unsupported UI setting value");
+
+    expect(mocks.setSetting).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
 

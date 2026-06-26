@@ -45,6 +45,23 @@ function isExplicitForce(force: unknown) {
   return force === true;
 }
 
+const USER_EDITABLE_BOOLEAN_SETTINGS = new Set(["auto_generate_weekly_ideas", "enable_local_notifications"]);
+
+function normalizeUserEditableSetting(key: unknown, value: unknown) {
+  if (typeof key !== "string" || !USER_EDITABLE_BOOLEAN_SETTINGS.has(key)) {
+    throw new Error("Unsupported UI setting key.");
+  }
+
+  if (value === true || value === "true") {
+    return { key, value: "true" };
+  }
+  if (value === false || value === "false") {
+    return { key, value: "false" };
+  }
+
+  throw new Error("Unsupported UI setting value.");
+}
+
 export async function runScanAction() {
   const result = await runDailyScan();
   revalidatePath("/");
@@ -284,7 +301,8 @@ export async function testNotificationAction() {
 }
 
 export async function updateSettingAction(key: string, value: string) {
-  await setSetting(key, value);
+  const normalized = normalizeUserEditableSetting(key, value);
+  await setSetting(normalized.key, normalized.value);
   revalidatePath("/");
   return { ok: true };
 }
