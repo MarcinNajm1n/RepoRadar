@@ -5,6 +5,8 @@ import type { NotificationPayload, NotificationResult } from "../types";
 const DISCORD_WEBHOOK_HOSTS = new Set(["discord.com", "discordapp.com"]);
 const DISCORD_WEBHOOK_ERROR = "DISCORD_WEBHOOK_URL must be an HTTPS Discord webhook URL";
 
+export type DiscordWebhookStatus = "missing" | "valid" | "invalid";
+
 export function maskDiscordWebhookUrl(url: string | undefined) {
   if (!url) {
     return undefined;
@@ -43,6 +45,14 @@ function parseDiscordWebhookUrl(url: string | undefined) {
   } catch {
     return null;
   }
+}
+
+export function getDiscordWebhookStatus(url: string | undefined): DiscordWebhookStatus {
+  if (!url) {
+    return "missing";
+  }
+
+  return parseDiscordWebhookUrl(url) ? "valid" : "invalid";
 }
 
 function buildDiscordBody(payload: NotificationPayload) {

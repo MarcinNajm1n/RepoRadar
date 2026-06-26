@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isExcellentOpportunity } from "../../src/lib/market-research/opportunity";
-import { sendDiscordNotification, maskDiscordWebhookUrl } from "../../src/lib/notifications/channels/discord";
+import { getDiscordWebhookStatus, sendDiscordNotification, maskDiscordWebhookUrl } from "../../src/lib/notifications/channels/discord";
 import { isHighValueRepository } from "../../src/lib/notifications/thresholds";
 
 const originalEnv = { ...process.env };
@@ -18,6 +18,12 @@ describe("notification safety", () => {
 
     expect(masked).toBe("discord.com/configured");
     expect(masked).not.toContain("super-secret-token");
+  });
+
+  it("classifies Discord webhook configuration without exposing the token", () => {
+    expect(getDiscordWebhookStatus(undefined)).toBe("missing");
+    expect(getDiscordWebhookStatus("https://discord.com/api/webhooks/1234567890/test-token")).toBe("valid");
+    expect(getDiscordWebhookStatus("https://example.com/api/webhooks/1234567890/test-token")).toBe("invalid");
   });
 
   it("skips Discord when webhook is not configured", async () => {

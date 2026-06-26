@@ -14,6 +14,7 @@ import { getOpenAiCacheSummary } from "./openai-cache";
 import { recordRepositoryStatusAudit } from "./repository-audit";
 import { getAllSettings, parseBooleanSetting } from "./settings";
 import { getMaintenancePreview } from "@/lib/maintenance";
+import { getDiscordWebhookStatus } from "@/lib/notifications/channels/discord";
 import { getWindowsSchedulerStatus } from "@/lib/scheduler/windows-task";
 import type { ActionItemListItem } from "@/types/action-item";
 import type {
@@ -715,6 +716,7 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
+  const discordWebhookStatus = getDiscordWebhookStatus(config.discordWebhookUrl);
   const { getGraphifyMaintenanceSummary } = await import("@/lib/graphify/status");
   const [
     persistedSettings,
@@ -745,7 +747,8 @@ async function getSettingsSummary(): Promise<SettingsSummary> {
   return {
     githubTokenConfigured: Boolean(config.githubToken),
     openAiConfigured: Boolean(config.openAiApiKey),
-    discordWebhookConfigured: Boolean(config.discordWebhookUrl),
+    discordWebhookConfigured: discordWebhookStatus === "valid",
+    discordWebhookStatus,
     autoGenerateWeeklyIdeas: parseBooleanSetting(persistedSettings.auto_generate_weekly_ideas, false),
     notificationsEnabled: parseBooleanSetting(persistedSettings.enable_local_notifications, config.enableNotifications),
     windowsNotificationsEnabled: config.enableWindowsNotifications,

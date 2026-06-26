@@ -18,6 +18,7 @@ function settingsSummary(overrides: Partial<SettingsSummary> = {}): SettingsSumm
     githubTokenConfigured: true,
     openAiConfigured: true,
     discordWebhookConfigured: false,
+    discordWebhookStatus: "missing",
     autoGenerateWeeklyIdeas: false,
     notificationsEnabled: true,
     windowsNotificationsEnabled: false,
@@ -279,6 +280,29 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("Uruchom recznie");
     expect(html).toContain("schtasks /Query /TN");
     expect(html).toContain("schtasks /Run /TN");
+  });
+
+  it("renders invalid Discord webhook status distinctly from missing config", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        settingsSummary: settingsSummary({ discordWebhookConfigured: false, discordWebhookStatus: "invalid" }),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain("Discord webhook");
+    expect(html).toContain("niepoprawny URL");
   });
 
   it("marks the controlled settings section as active", () => {

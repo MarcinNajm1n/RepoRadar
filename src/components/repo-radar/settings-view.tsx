@@ -172,7 +172,7 @@ export function SettingsView({
             <InfoItem label="GitHub token" value={settingsSummary.githubTokenConfigured ? "skonfigurowany" : "brak"} />
             <InfoItem label="GitHub API limit" value={formatGitHubRateLimit(settingsSummary.githubRateLimit)} />
             <InfoItem label="OpenAI key" value={settingsSummary.openAiConfigured ? "skonfigurowany" : "brak"} />
-            <InfoItem label="Discord webhook" value={settingsSummary.discordWebhookConfigured ? "skonfigurowany" : "brak"} />
+            <InfoItem label="Discord webhook" value={formatDiscordWebhookStatus(settingsSummary.discordWebhookStatus)} />
             <InfoItem label="DB settings" value={String(settingsSummary.persistedSettingCount)} />
           </div>
           <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
@@ -233,7 +233,7 @@ export function SettingsView({
             <InfoItem label="Failed 24h" value={String(notificationSummary.failed24h)} />
             <InfoItem label="Skipped 24h" value={String(notificationSummary.skipped24h)} />
             <InfoItem label="Windows" value={String(settingsSummary.windowsNotificationsEnabled)} />
-            <InfoItem label="Discord" value={settingsSummary.discordWebhookConfigured ? "skonfigurowany" : "brak"} />
+            <InfoItem label="Discord" value={formatDiscordWebhookStatus(settingsSummary.discordWebhookStatus)} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={onTestNotification} disabled={isPending}>
@@ -807,6 +807,18 @@ function formatSchedulerShortStatus(scheduler: SettingsSummary["scheduler"]) {
     default:
       return scheduler.status;
   }
+}
+
+function formatDiscordWebhookStatus(status: SettingsSummary["discordWebhookStatus"]) {
+  if (status === "valid") {
+    return "skonfigurowany";
+  }
+
+  if (status === "invalid") {
+    return "niepoprawny URL";
+  }
+
+  return "brak";
 }
 
 function getSchedulerBadgeTone(status: SettingsSummary["scheduler"]["status"]): BadgeTone {

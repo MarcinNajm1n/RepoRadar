@@ -356,6 +356,7 @@ export type SettingsSummary = {
   githubTokenConfigured: boolean;
   openAiConfigured: boolean;
   discordWebhookConfigured: boolean;
+  discordWebhookStatus: "missing" | "valid" | "invalid";
   autoGenerateWeeklyIdeas: boolean;
   notificationsEnabled: boolean;
   windowsNotificationsEnabled: boolean;
