@@ -307,6 +307,9 @@ export function SettingsView({
 
       <SettingsPanel id={settingsPanelElementId("maintenance")} title="Dane i maintenance" className={activeSection === "maintenance" ? undefined : "hidden"}>
         <MaintenancePreview preview={maintenancePreview} />
+        <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
+          Akcje czyszczenia pokazuja potwierdzenie z aktualnym dry-run, zanim usuna lokalne dane.
+        </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onClearExpiredExternalCache} disabled={isPending || expiredCacheCount === 0}>

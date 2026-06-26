@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   generateOpportunityCandidateForRepository: vi.fn(),
   generateShortSummaryForRepository: vi.fn(),
   promoteCandidateToFullIdea: vi.fn(),
+  clearExpiredExternalCache: vi.fn(),
+  clearOldNotificationLogs: vi.fn(),
   revalidatePath: vi.fn(),
   runAiJob: vi.fn()
 }));
@@ -73,8 +75,8 @@ vi.mock("@/lib/exports/ideas-csv", () => ({
 }));
 
 vi.mock("@/lib/maintenance", () => ({
-  clearExpiredExternalCache: vi.fn(),
-  clearOldNotificationLogs: vi.fn(),
+  clearExpiredExternalCache: mocks.clearExpiredExternalCache,
+  clearOldNotificationLogs: mocks.clearOldNotificationLogs,
   pruneOldSnapshots: vi.fn()
 }));
 
@@ -103,6 +105,8 @@ vi.mock("@/lib/db/settings", () => ({
 }));
 
 import {
+  clearExpiredExternalCacheAction,
+  clearOldNotificationLogsAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
   generateReportAction,
@@ -143,9 +147,46 @@ beforeEach(() => {
     id: "idea_1",
     title: "Pelny pomysl"
   });
+  mocks.clearExpiredExternalCache.mockResolvedValue({ deletedCount: 3 });
+  mocks.clearOldNotificationLogs.mockResolvedValue({ deletedCount: 4, cutoff: "2026-05-12T00:00:00.000Z" });
   mocks.runAiJob.mockImplementation(
     async (_input: unknown, handler: () => Promise<unknown>) => handler()
   );
+});
+
+describe("maintenance action confirmations", () => {
+  it("requires explicit confirmation before clearing expired external research cache", async () => {
+    await expect(clearExpiredExternalCacheAction()).rejects.toThrow("External research cache cleanup requires explicit confirmation");
+
+    expect(mocks.clearExpiredExternalCache).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("clears expired external research cache when confirmed", async () => {
+    await expect(clearExpiredExternalCacheAction({ confirmed: true })).resolves.toEqual({ deletedCount: 3 });
+
+    expect(mocks.clearExpiredExternalCache).toHaveBeenCalledTimes(1);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("requires explicit confirmation before clearing old notification logs", async () => {
+    await expect(clearOldNotificationLogsAction({ daysToKeep: 45 })).rejects.toThrow(
+      "Notification log cleanup requires explicit confirmation"
+    );
+
+    expect(mocks.clearOldNotificationLogs).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("passes the confirmed retention window to notification log cleanup", async () => {
+    await expect(clearOldNotificationLogsAction({ daysToKeep: 45, confirmed: true })).resolves.toEqual({
+      deletedCount: 4,
+      cutoff: "2026-05-12T00:00:00.000Z"
+    });
+
+    expect(mocks.clearOldNotificationLogs).toHaveBeenCalledWith(45);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
+  });
 });
 
 describe("AI action OpenAI budget preflight", () => {

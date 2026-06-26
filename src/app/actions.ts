@@ -233,13 +233,22 @@ export async function generateDailyBriefingAction() {
   };
 }
 
-export async function clearExpiredExternalCacheAction() {
+export async function clearExpiredExternalCacheAction(options: { confirmed?: boolean } = {}) {
+  if (!options.confirmed) {
+    throw new Error("External research cache cleanup requires explicit confirmation.");
+  }
+
   const result = await clearExpiredExternalCache();
   revalidatePath("/");
   return result;
 }
 
-export async function clearOldNotificationLogsAction(daysToKeep = 30) {
+export async function clearOldNotificationLogsAction(options: { daysToKeep?: number; confirmed?: boolean } = {}) {
+  if (!options.confirmed) {
+    throw new Error("Notification log cleanup requires explicit confirmation.");
+  }
+
+  const daysToKeep = options.daysToKeep ?? 30;
   const result = await clearOldNotificationLogs(daysToKeep);
   revalidatePath("/");
   return result;

@@ -217,6 +217,7 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("Preview jest dry-run");
     expect(html).toContain("Wygasly research cache");
     expect(html).toContain("Repo bez historii");
+    expect(html).toContain("Akcje czyszczenia pokazuja potwierdzenie z aktualnym dry-run");
     expect(html).toContain("Wyczysc cache (3)");
     expect(html).toContain("Wyczysc logi 30d+ (4)");
     expect(html).toContain("Przytnij snapshoty 180d+ (12)");

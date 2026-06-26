@@ -41,6 +41,12 @@ import {
 } from "@/app/actions";
 import { IDEA_STATUS, isFullIdeaStatus } from "@/types/idea-status";
 import { cn, formatDate } from "@/lib/utils";
+import {
+  buildClearExpiredExternalCacheConfirmation,
+  buildClearOldNotificationLogsConfirmation,
+  buildPruneSnapshotsConfirmation,
+  getNotificationLogDaysToKeep
+} from "@/lib/maintenance-confirmations";
 import { AppShell } from "@/components/repo-radar/app-shell";
 import { TopBar } from "@/components/repo-radar/top-bar";
 import { RadarTodayView } from "@/components/repo-radar/radar-today-view";
@@ -88,24 +94,6 @@ function isEditableTarget(target: EventTarget | null) {
 
 function isIdeasPanelTab(tab: TabKey) {
   return tab === "candidates" || tab === "ideas" || tab === "savedIdeas" || tab === "dismissedIdeas";
-}
-
-function buildPruneSnapshotsConfirmation(snapshotPreview?: SettingsPanelData["settingsSummary"]["maintenancePreview"]["snapshots"]) {
-  if (!snapshotPreview) {
-    return "Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.";
-  }
-
-  const losingHistory =
-    snapshotPreview.repositoriesLosingAllSnapshots > 0
-      ? `${snapshotPreview.repositoriesLosingAllSnapshots} repo straci wszystkie snapshoty.`
-      : "Zadne repo nie powinno stracic calej historii snapshotow.";
-
-  return [
-    `Usunac snapshoty starsze niz ${snapshotPreview.daysToKeep} dni? Te dane sa lokalne i nie beda odzyskane z historii.`,
-    "",
-    `Dry-run: ${snapshotPreview.oldEntries} snapshotow z ${snapshotPreview.affectedRepositories} repo.`,
-    losingHistory
-  ].join("\n");
 }
 
 export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
@@ -527,6 +515,30 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
         setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Eksport CSV nie powiodl sie." });
       }
     });
+  }
+
+  function clearExpiredExternalCacheWithConfirmation() {
+    const cachePreview = settingsPanelData?.settingsSummary.maintenancePreview.externalResearchCache;
+    if (!window.confirm(buildClearExpiredExternalCacheConfirmation(cachePreview))) {
+      return;
+    }
+
+    runAction(() => clearExpiredExternalCacheAction({ confirmed: true }), "Wygasly cache wyczyszczony.", "Czyszcze cache...", refreshSettingsPanelDataIfOpen);
+  }
+
+  function clearOldNotificationLogsWithConfirmation() {
+    const logsPreview = settingsPanelData?.settingsSummary.maintenancePreview.notificationLogs;
+    const daysToKeep = getNotificationLogDaysToKeep(logsPreview);
+    if (!window.confirm(buildClearOldNotificationLogsConfirmation(logsPreview))) {
+      return;
+    }
+
+    runAction(
+      () => clearOldNotificationLogsAction({ daysToKeep, confirmed: true }),
+      "Stare logi powiadomien wyczyszczone.",
+      "Czyszcze logi...",
+      refreshSettingsPanelDataIfOpen
+    );
   }
 
   function pruneSnapshotsWithConfirmation() {
@@ -954,12 +966,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
           onSaveSetting={(key, value) =>
             runAction(() => updateSettingAction(key, String(value)), "Ustawienie zapisane.", "Zapisuje ustawienie...", refreshSettingsPanelDataIfOpen)
           }
-          onClearExpiredExternalCache={() =>
-            runAction(() => clearExpiredExternalCacheAction(), "Wygasly cache wyczyszczony.", "Czyszcze cache...", refreshSettingsPanelDataIfOpen)
-          }
-          onClearOldNotificationLogs={() =>
-            runAction(() => clearOldNotificationLogsAction(30), "Stare logi powiadomien wyczyszczone.", "Czyszcze logi...", refreshSettingsPanelDataIfOpen)
-          }
+          onClearExpiredExternalCache={clearExpiredExternalCacheWithConfirmation}
+          onClearOldNotificationLogs={clearOldNotificationLogsWithConfirmation}
           onTestNotification={() =>
             runAction(() => testNotificationAction(), "Test notification wykonany.", "Wysylam test notification...", refreshSettingsPanelDataIfOpen)
           }
