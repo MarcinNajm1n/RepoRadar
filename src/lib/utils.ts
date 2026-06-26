@@ -83,7 +83,10 @@ export function sanitizeExternalUrl(value: unknown, maxLength = 700) {
 }
 
 function isBlockedHost(hostname: string) {
-  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const normalized = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.+$/g, "");
   if (!normalized || normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
     return true;
   }

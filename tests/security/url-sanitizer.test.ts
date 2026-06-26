@@ -12,6 +12,9 @@ describe("sanitizeExternalUrl", () => {
     expect(sanitizeExternalUrl("http://[fc00::1]/internal")).toBeNull();
     expect(sanitizeExternalUrl("http://[::ffff:127.0.0.1]/admin")).toBeNull();
     expect(sanitizeExternalUrl("http://[::ffff:10.0.0.5]/metadata")).toBeNull();
+    expect(sanitizeExternalUrl("http://localhost./admin")).toBeNull();
+    expect(sanitizeExternalUrl("http://sub.localhost./admin")).toBeNull();
+    expect(sanitizeExternalUrl("http://example.local./metadata")).toBeNull();
     expect(sanitizeExternalUrl("javascript:alert(1)")).toBeNull();
   });
 
