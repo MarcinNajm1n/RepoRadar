@@ -1,6 +1,5 @@
 import { prisma } from "./client";
 import { getConfig } from "@/lib/config";
-import { getGraphifyMaintenanceSummary } from "@/lib/graphify/status";
 import { isRepositoryStatus } from "@/types/status";
 import type { RepositoryStatus } from "@/types/status";
 import { FULL_IDEA_STATUSES, IDEA_STATUS, isIdeaStatus } from "@/types/idea-status";
@@ -681,6 +680,7 @@ export function buildRadarToday(
 
 async function getSettingsSummary(): Promise<SettingsSummary> {
   const config = getConfig();
+  const { getGraphifyMaintenanceSummary } = await import("@/lib/graphify/status");
   const [
     persistedSettings,
     githubRateLimit,

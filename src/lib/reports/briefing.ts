@@ -4,7 +4,6 @@ import { REPORT_TYPES } from "@/types/status";
 import type { ActionItemListItem } from "@/types/action-item";
 import type { DashboardData, IdeaListItem, RepositoryListItem } from "@/types/repository";
 import { toIsoDate } from "@/lib/utils";
-import { writeMarkdownReport } from "./writer";
 
 function repoLine(repo: RepositoryListItem, index: number) {
   const growth = repo.growth7d === null ? "baseline" : `+${repo.growth7d} stars / 7d`;
@@ -72,6 +71,7 @@ export async function createDailyBriefing(now = new Date()) {
   const data = await getDashboardData();
   const markdown = buildDailyBriefingMarkdown(data, now);
   const date = toIsoDate(now);
+  const { writeMarkdownReport } = await import("./writer");
   const markdownPath = await writeMarkdownReport(`daily/${date}-briefing.md`, markdown);
   const topRepoIds = data.radarToday.topRepositories.slice(0, 3).map((repo) => repo.id);
 

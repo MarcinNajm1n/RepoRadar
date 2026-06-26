@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db/client";
 import { formatDate, getIsoWeek, toIsoDate } from "@/lib/utils";
-import { writeMarkdownReport } from "./writer";
 
 type PortfolioRepo = {
   id: string;
@@ -209,6 +208,7 @@ export async function createPortfolioBrief(now = new Date()) {
     lastScan,
     latestWeeklyReport: weeklyReports[0] ?? null
   });
+  const { writeMarkdownReport } = await import("./writer");
   const markdownPath = await writeMarkdownReport(`portfolio/reporadar-brief-${toIsoDate(now)}.md`, markdown);
   const topRepoIds = topRepositories.map((repo) => repo.id);
 

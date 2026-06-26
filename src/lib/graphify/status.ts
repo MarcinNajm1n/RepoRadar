@@ -56,8 +56,11 @@ async function readLocalSkillVersion(workspaceRoot: string) {
   return { path: null, version: null };
 }
 
-export async function getGraphifyMaintenanceSummary(workspaceRoot = process.cwd()): Promise<GraphifyMaintenanceSummary> {
-  const graphifyRoot = path.join(workspaceRoot, "graphify-out");
+export async function getGraphifyMaintenanceSummary(workspaceRoot?: string): Promise<GraphifyMaintenanceSummary> {
+  const graphifyRoot = workspaceRoot
+    ? path.join(path.resolve(workspaceRoot), "graphify-out")
+    : path.join(/*turbopackIgnore: true*/ process.cwd(), "graphify-out");
+  const resolvedWorkspaceRoot = workspaceRoot ? path.resolve(workspaceRoot) : path.dirname(graphifyRoot);
   const graphPath = path.join(graphifyRoot, "graph.json");
   const reportPath = path.join(graphifyRoot, "GRAPH_REPORT.md");
   const manifestPath = path.join(graphifyRoot, "manifest.json");
@@ -68,7 +71,7 @@ export async function getGraphifyMaintenanceSummary(workspaceRoot = process.cwd(
     readJson<GraphJson>(graphPath),
     readJson<Record<string, unknown>>(manifestPath),
     inferAstCacheVersion(graphifyRoot),
-    readLocalSkillVersion(workspaceRoot)
+    readLocalSkillVersion(resolvedWorkspaceRoot)
   ]);
 
   if (!graphStats && !reportStats && !manifestStats) {

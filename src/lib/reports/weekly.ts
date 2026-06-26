@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db/client";
 import { getIsoWeek } from "@/lib/utils";
-import { writeMarkdownReport } from "./writer";
 
 function repoLine(repo: {
   fullName: string;
@@ -107,6 +106,7 @@ export async function createWeeklyReport(now = new Date()) {
     "RepoRadar bazuje na lokalnych snapshotach, więc potwierdzony growth pojawia się dopiero po kilku skanach. Wysokie początkowe stars są traktowane jako initial traction, nie jako udawany weekly growth."
   ].join("\n");
 
+  const { writeMarkdownReport } = await import("./writer");
   const markdownPath = await writeMarkdownReport(`weekly/${week}.md`, markdown);
   const topRepoIds = [...new Set([...rising, ...newlyDiscovered, ...revived].map((repo) => repo.id))];
 

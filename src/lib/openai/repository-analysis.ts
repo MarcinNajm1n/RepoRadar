@@ -3,7 +3,7 @@ import { getRepositoryForReport } from "@/lib/db/repositories";
 import { countOpenAiAnalysesToday, getCachedOpenAiOutputByHashes, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
 import { clamp, safeJsonParse } from "@/lib/utils";
-import { repoReportPath, writeMarkdownReport } from "@/lib/reports/writer";
+import { repoReportPath } from "@/lib/reports/paths";
 import {
   buildIdeaPrompt,
   buildRepoReportPrompt,
@@ -142,6 +142,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
   if (!force) {
     const cached = await getCachedOpenAiOutputByHashes("repo-report", repoId, hashes.lookup, config.openAiModel);
     if (cached) {
+      const { writeMarkdownReport } = await import("@/lib/reports/writer");
       const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), cached.content);
       const report = await prisma.report.create({
         data: {
@@ -174,6 +175,7 @@ export async function generateFullReportForRepository(repoId: string, force = fa
 
   const content = await generateOpenAiText(buildRepoReportPrompt(), reportContext, getOpenAiActionOptions("repo-report"));
   await saveOpenAiOutput("repo-report", repoId, hashes.current, config.openAiModel, content);
+  const { writeMarkdownReport } = await import("@/lib/reports/writer");
   const markdownPath = await writeMarkdownReport(repoReportPath(repository.owner, repository.name), content);
 
   const report = await prisma.report.create({

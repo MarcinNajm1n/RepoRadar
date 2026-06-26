@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { toIsoDate } from "@/lib/utils";
 import { isHighValueRepository } from "@/lib/notifications/thresholds";
-import { writeMarkdownReport } from "./writer";
 
 export async function createDailyReport(scanRunId: string) {
   const scanRun = await prisma.scanRun.findUniqueOrThrow({ where: { id: scanRunId } });
@@ -55,6 +54,7 @@ export async function createDailyReport(scanRunId: string) {
   ];
 
   const markdown = lines.join("\n");
+  const { writeMarkdownReport } = await import("./writer");
   const markdownPath = await writeMarkdownReport(`daily/${date}.md`, markdown);
 
   return prisma.report.create({

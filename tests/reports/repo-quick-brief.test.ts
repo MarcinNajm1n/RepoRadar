@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRepoQuickBriefMarkdown } from "../../src/lib/reports/repo-quick-brief";
-import { repoQuickBriefPath } from "../../src/lib/reports/writer";
+import { repoQuickBriefPath } from "../../src/lib/reports/paths";
 
 const repo = {
   id: "repo_1",

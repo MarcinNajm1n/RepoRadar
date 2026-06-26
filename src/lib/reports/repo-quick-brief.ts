@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { getRepositoryForReport } from "@/lib/db/repositories";
 import { safeJsonParse } from "@/lib/utils";
 import { REPORT_TYPES } from "@/types/status";
-import { repoQuickBriefPath, writeMarkdownReport } from "./writer";
+import { repoQuickBriefPath } from "./paths";
 
 function formatGrowth(value: number | null | undefined) {
   return value === null || value === undefined ? "brak historii" : `+${value}`;
@@ -63,6 +63,7 @@ export function buildRepoQuickBriefMarkdown(repo: Awaited<ReturnType<typeof getR
 export async function createRepoQuickBrief(repoId: string, now = new Date()) {
   const repo = await getRepositoryForReport(repoId);
   const markdown = buildRepoQuickBriefMarkdown(repo, now);
+  const { writeMarkdownReport } = await import("./writer");
   const markdownPath = await writeMarkdownReport(repoQuickBriefPath(repo.owner, repo.name), markdown);
 
   return prisma.report.create({
