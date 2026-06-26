@@ -6,7 +6,7 @@ import { fetchJsonWithTimeout } from "./http";
 
 type BlueskySearchResponse = {
   posts?: Array<{
-    uri?: string;
+    uri?: unknown;
     cid?: string;
     author?: {
       handle?: string;
@@ -16,20 +16,35 @@ type BlueskySearchResponse = {
       text?: string;
       createdAt?: string;
     };
-    replyCount?: number;
-    repostCount?: number;
-    likeCount?: number;
-    quoteCount?: number;
+    replyCount?: unknown;
+    repostCount?: unknown;
+    likeCount?: unknown;
+    quoteCount?: unknown;
   }>;
 };
 
-function blueskyPostUrl(uri: string | undefined, handle: string | undefined) {
-  const match = uri?.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/([^/]+)$/);
+function blueskyPostUrl(uri: unknown, handle: string | undefined) {
+  const cleanUri = sanitizeExternalText(uri, 300);
+  const match = cleanUri?.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/([^/]+)$/);
   if (!match) {
     return null;
   }
 
   return sanitizeExternalUrl(`https://bsky.app/profile/${encodeURIComponent(handle || match[1])}/post/${match[2]}`);
+}
+
+function engagementCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function publishedDate(value: unknown) {
+  const cleanValue = sanitizeExternalText(value, 80);
+  if (!cleanValue) {
+    return null;
+  }
+
+  const date = new Date(cleanValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
 export const blueskyProvider: MarketResearchProvider = {
@@ -69,14 +84,18 @@ export const blueskyProvider: MarketResearchProvider = {
           continue;
         }
 
-        const engagement = (post.replyCount ?? 0) + (post.repostCount ?? 0) + (post.likeCount ?? 0) + (post.quoteCount ?? 0);
+        const engagement =
+          engagementCount(post.replyCount) +
+          engagementCount(post.repostCount) +
+          engagementCount(post.likeCount) +
+          engagementCount(post.quoteCount);
         sources.push({
           sourceType: "bluesky",
           title: sanitizeExternalText(`Bluesky: ${handle ?? "public post"}`, 240) ?? "Bluesky public post",
           url: postUrl,
-          providerItemId: post.uri ?? null,
+          providerItemId: sanitizeExternalText(post.uri, 300),
           publisher: handle ? `@${handle}` : "Bluesky",
-          publishedAt: post.record?.createdAt ? new Date(post.record.createdAt).toISOString().slice(0, 10) : null,
+          publishedAt: publishedDate(post.record?.createdAt),
           snippet: text,
           sentiment: estimateBasicSentiment(text),
           relevanceScore: Math.round(Math.min(92, 45 + Math.min(engagement, 180) / 4))

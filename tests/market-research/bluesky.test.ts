@@ -67,4 +67,40 @@ describe("bluesky market research provider", () => {
     });
     expect(result.sources[0].snippet).toContain("automate manual workflow");
   });
+
+  it("ignores invalid dates and non-numeric engagement counts from public posts", async () => {
+    process.env.ENABLE_BLUESKY_SOURCE = "true";
+    process.env.BLUESKY_PUBLIC_API_BASE = "https://public.api.bsky.app";
+    process.env.MARKET_RESEARCH_MAX_SOURCES = "1";
+    global.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          posts: [
+            {
+              uri: "at://did:plc:test/app.bsky.feed.post/badmeta",
+              author: { handle: "builder.bsky.social" },
+              record: {
+                text: "Teams ask for better workflow automation and less manual release work.",
+                createdAt: "not-a-date"
+              },
+              replyCount: "20",
+              repostCount: Number.POSITIVE_INFINITY,
+              likeCount: -10,
+              quoteCount: { count: 1 }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    ) as typeof fetch;
+
+    const result = await blueskyProvider.research(context);
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0]).toMatchObject({
+      publishedAt: null,
+      providerItemId: "at://did:plc:test/app.bsky.feed.post/badmeta",
+      relevanceScore: 45
+    });
+  });
 });
