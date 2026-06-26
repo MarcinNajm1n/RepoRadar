@@ -40,11 +40,13 @@ $allowedExactPaths = @(
 $secretContentPatterns = @(
   '-----BEGIN (RSA |OPENSSH |EC |DSA |PGP )?PRIVATE KEY-----',
   '(?i)\bsk-[A-Za-z0-9_-]{20,}\b',
+  '(?i)\bAIza[0-9A-Za-z_-]{35}\b',
+  '(?i)\bhf_[A-Za-z0-9]{20,}\b',
   '(?i)\bgithub_pat_[A-Za-z0-9_]{20,}\b',
   '(?i)\bgh[pousr]_[A-Za-z0-9_]{20,}\b',
   '(?i)\bxox[baprs]-[A-Za-z0-9-]{20,}\b',
   '\bAKIA[0-9A-Z]{16}\b',
-  '(?im)^[ \t]*(OPENAI_API_KEY|GITHUB_TOKEN|SMTP_PASSWORD|DISCORD_WEBHOOK_URL|REDDIT_CLIENT_SECRET)[ \t]*=[ \t]*["'']?[^#\s"'']{8,}',
+  '(?im)^[ \t]*((OPENAI_API_KEY|GITHUB_TOKEN|SMTP_PASSWORD|DISCORD_WEBHOOK_URL|ANTHROPIC_API_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|HUGGINGFACE_API_TOKEN|HF_TOKEN|SLACK_BOT_TOKEN|X_BEARER_TOKEN|PRODUCT_HUNT_TOKEN)|[A-Z0-9_]*(API_KEY|ACCESS_TOKEN|AUTH_TOKEN|CLIENT_SECRET|APP_PASSWORD))[ \t]*=[ \t]*["'']?[^#\s"'']{8,}',
   '(?im)^[ \t]*DATABASE_URL[ \t]*=[ \t]*["'']?(postgres|postgresql|mysql|mongodb)[^#\s"'']*:[^#\s"'']+@'
 )
 
