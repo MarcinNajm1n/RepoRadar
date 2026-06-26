@@ -92,6 +92,14 @@ describe("external research cache", () => {
     expect(mocks.prisma.externalResearchCache.upsert).not.toHaveBeenCalled();
   });
 
+  it("skips uncacheable and oversized payloads without failing research", async () => {
+    await expect(setExternalResearchCache("hn", "bigint", { bad: BigInt(1) }, { ttlHours: 2 })).resolves.toBeNull();
+    expect(mocks.prisma.externalResearchCache.upsert).not.toHaveBeenCalled();
+
+    await expect(setExternalResearchCache("hn", "oversized", { text: "x".repeat(1_000_001) }, { ttlHours: 2 })).resolves.toBeNull();
+    expect(mocks.prisma.externalResearchCache.upsert).not.toHaveBeenCalled();
+  });
+
   it("deletes expired cache rows", async () => {
     mocks.prisma.externalResearchCache.deleteMany.mockResolvedValue({ count: 1 });
 

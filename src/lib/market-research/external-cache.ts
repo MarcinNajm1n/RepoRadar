@@ -4,6 +4,8 @@ import { stableHash } from "@/lib/hash";
 import { safeJsonParse, sanitizeExternalText } from "@/lib/utils";
 import type { MarketResearchContext } from "./types";
 
+const MAX_EXTERNAL_RESEARCH_CACHE_BYTES = 1_000_000;
+
 export function buildExternalResearchCacheKey(provider: string, context: MarketResearchContext, query: string) {
   return stableHash(
     [
@@ -33,14 +35,27 @@ export async function getExternalResearchCache<T = unknown>(provider: string, ca
   return safeJsonParse<T | null>(row.contentJson, null);
 }
 
+function serializeCacheContent(content: unknown) {
+  try {
+    const contentJson = JSON.stringify(content);
+    if (!contentJson || contentJson === "null" || contentJson === "[]" || contentJson === "{}") {
+      return null;
+    }
+
+    return new TextEncoder().encode(contentJson).byteLength <= MAX_EXTERNAL_RESEARCH_CACHE_BYTES ? contentJson : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function setExternalResearchCache(
   provider: string,
   cacheKey: string,
   content: unknown,
   options: { mode?: string; query?: string; ttlHours?: number } = {}
 ) {
-  const contentJson = JSON.stringify(content);
-  if (!contentJson || contentJson === "null" || contentJson === "[]" || contentJson === "{}") {
+  const contentJson = serializeCacheContent(content);
+  if (!contentJson) {
     return null;
   }
 
