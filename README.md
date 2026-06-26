@@ -223,6 +223,16 @@ Then:
 
 ## Tests
 
+Run the full local verification gate before larger changes or before handing off a branch:
+
+```bash
+npm run verify
+```
+
+It runs lint, typecheck, Vitest, production build, and the sensitive-file check.
+
+For narrower checks during development:
+
 ```bash
 npm run typecheck
 npm run test
