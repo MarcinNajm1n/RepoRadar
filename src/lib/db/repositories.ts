@@ -38,7 +38,8 @@ import type {
   TasksPanelData,
   WeeklyReportsPanelData
 } from "@/types/repository";
-import { safeJsonParse, sanitizeExternalStringArray } from "@/lib/utils";
+import { safeJsonParse } from "@/lib/utils";
+import { parseStoredStringArray } from "@/lib/stored-json";
 import type { Prisma, Repository } from "@prisma/client";
 
 const DEFAULT_REPOSITORY_PAGE = 1;
@@ -70,10 +71,6 @@ const DEFAULT_SCORE_BREAKDOWN = {
   initialMomentumPoints: 0,
   usedInitialMomentumFallback: false
 };
-
-function parseStoredStringArray(value: string | null | undefined, maxItems = 30) {
-  return sanitizeExternalStringArray(safeJsonParse<unknown>(value, []), maxItems);
-}
 
 const ideaListInclude = {
   repository: { select: { fullName: true } },

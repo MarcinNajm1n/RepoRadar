@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { getConfig } from "@/lib/config";
 import { runAiJob } from "@/lib/db/ai-jobs";
-import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
+import { monthsBetween, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
 import {
   sanitizeGitHubCount,
   sanitizeGitHubDate,
@@ -21,6 +21,7 @@ import { getAdaptiveGitHubConcurrency, runWithAdaptiveConcurrency } from "./conc
 import { prioritizeIncrementalScanItems } from "./incremental-scan";
 import { getLastGitHubRateLimitSnapshot } from "./rate-limit";
 import { saveGitHubRateLimitSnapshot } from "@/lib/db/github-rate-limit";
+import { parseStoredStringArray } from "@/lib/stored-json";
 import type { GitHubReadmeResult, GitHubRepositoryItem, GitHubSearchProfile } from "./types";
 
 type ScanOptions = {
@@ -165,7 +166,7 @@ async function snapshotAndScoreRepository(repoId: string, readmeText: string | n
     forksCurrent: repository.forksCurrent,
     createdAt: repository.createdAt,
     pushedAt: repository.pushedAt,
-    topics: safeJsonParse<string[]>(repository.topicsJson, []),
+    topics: parseStoredStringArray(repository.topicsJson),
     description: repository.description,
     readmeText: readmeText ?? repository.readmeExcerpt,
     readmeExcerpt: repository.readmeExcerpt,

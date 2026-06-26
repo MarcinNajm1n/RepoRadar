@@ -51,4 +51,17 @@ describe("repo quick brief", () => {
     expect(repoQuickBriefPath("owner", "tool")).toBe("repos/owner__tool__quick-brief.md");
     expect(repoQuickBriefPath("../owner", "tool\\name")).toBe("repos/..-owner__tool-name__quick-brief.md");
   });
+
+  it("sanitizes stored topics before writing markdown", () => {
+    const markdown = buildRepoQuickBriefMarkdown(
+      {
+        ...repo,
+        topicsJson: JSON.stringify([" ai ", 42, { label: "bad" }, "mcp\u0000tools"])
+      } as never,
+      new Date("2026-06-21T12:00:00Z")
+    );
+
+    expect(markdown).toContain("- Topics: ai, mcptools");
+    expect(markdown).not.toContain("[object Object]");
+  });
 });

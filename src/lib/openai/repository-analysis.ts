@@ -3,6 +3,7 @@ import { getRepositoryForReport } from "@/lib/db/repositories";
 import { countOpenAiAnalysesToday, getCachedOpenAiOutputByHashes, saveOpenAiOutput } from "@/lib/db/openai-cache";
 import { getConfig } from "@/lib/config";
 import { clamp, safeJsonParse } from "@/lib/utils";
+import { parseStoredStringArray, sanitizeStoredStringArray } from "@/lib/stored-json";
 import { repoReportPath } from "@/lib/reports/paths";
 import {
   buildIdeaPrompt,
@@ -29,7 +30,7 @@ import type { MarketResearchMode } from "@/lib/market-research/types";
 import { ACTIVE_IDEA_STATUSES, IDEA_STATUS, isActiveIdeaStatus } from "@/types/idea-status";
 
 function topicsFromJson(value: string) {
-  return safeJsonParse<string[]>(value, []);
+  return parseStoredStringArray(value);
 }
 
 async function ensureOpenAiBudget(requiredCalls = 1) {
@@ -220,8 +221,9 @@ function extractJsonObject(value: string) {
 }
 
 function mergeEvidenceIds(existingJson: string | null | undefined, nextIds: string[] | undefined) {
-  const existing = safeJsonParse<string[]>(existingJson, []);
-  return [...new Set([...existing, ...(nextIds ?? [])])];
+  const existing = parseStoredStringArray(existingJson);
+  const next = sanitizeStoredStringArray(nextIds ?? []);
+  return [...new Set([...existing, ...next])];
 }
 
 async function findActiveIdeaForRepository(repoId: string) {
@@ -315,7 +317,7 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
       riskScore: parsed.riskScore ?? 3,
       suggestedStack: parsed.suggestedStack ?? "Next.js, SQLite, OpenAI API",
       marketSummary: (parsed.marketSummary ?? research?.summary) || null,
-      evidenceIdsJson: JSON.stringify(research?.sourceIds ?? []),
+      evidenceIdsJson: JSON.stringify(sanitizeStoredStringArray(research?.sourceIds ?? [])),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? null,
       opportunityScore:
         opportunity?.score ??
@@ -353,7 +355,7 @@ export async function generateOpportunityCandidateForRepository(repoId: string, 
       ideaId: activeExisting.id,
       opportunityScore: activeExisting.opportunityScore,
       confidenceScore: activeExisting.confidenceScore,
-      sourceCount: safeJsonParse<string[]>(activeExisting.evidenceIdsJson, []).length,
+      sourceCount: parseStoredStringArray(activeExisting.evidenceIdsJson).length,
       reason: "Aktywny kandydat albo pomysl juz istnieje dla tego repo."
     };
   }
@@ -371,7 +373,7 @@ export async function generateOpportunityCandidateForRepository(repoId: string, 
       ideaId: latestExisting.id,
       opportunityScore: latestExisting.opportunityScore,
       confidenceScore: latestExisting.confidenceScore,
-      sourceCount: safeJsonParse<string[]>(latestExisting.evidenceIdsJson, []).length,
+      sourceCount: parseStoredStringArray(latestExisting.evidenceIdsJson).length,
       reason: "Kandydat zostal odrzucony. Uzyj force=true, zeby odswiezyc research."
     };
   }
@@ -575,7 +577,7 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
       usefulnessScore: parsed.usefulnessScore ?? candidate.usefulnessScore,
       riskScore: parsed.riskScore ?? candidate.riskScore,
       suggestedStack: parsed.suggestedStack ?? candidate.suggestedStack,
-      firstStepsJson: JSON.stringify(parsed.firstSteps ?? safeJsonParse<string[]>(candidate.firstStepsJson, [])),
+      firstStepsJson: JSON.stringify(sanitizeStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson))),
       marketSummary: (parsed.marketSummary ?? research?.summary ?? candidate.marketSummary) || null,
       evidenceIdsJson: JSON.stringify(evidenceIds),
       confidenceScore: parsed.confidenceScore ?? research?.confidenceScore ?? candidate.confidenceScore,

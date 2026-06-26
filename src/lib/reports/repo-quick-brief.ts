@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { getRepositoryForReport } from "@/lib/db/repositories";
-import { safeJsonParse } from "@/lib/utils";
+import { parseStoredStringArray } from "@/lib/stored-json";
 import { REPORT_TYPES } from "@/types/status";
 import { repoQuickBriefPath } from "./paths";
 
@@ -26,7 +26,7 @@ function quickVerdict(repo: Awaited<ReturnType<typeof getRepositoryForReport>>) 
 
 export function buildRepoQuickBriefMarkdown(repo: Awaited<ReturnType<typeof getRepositoryForReport>>, now = new Date()) {
   const latest = repo.snapshots[0];
-  const topics = safeJsonParse<string[]>(repo.topicsJson, []);
+  const topics = parseStoredStringArray(repo.topicsJson);
 
   return [
     `# RepoRadar quick brief - ${repo.fullName}`,
