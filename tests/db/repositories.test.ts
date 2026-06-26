@@ -378,11 +378,11 @@ describe("buildRadarToday", () => {
     expect(candidates[0]).toMatchObject({
       kind: "alert",
       id: "alert:github-token-missing",
-      signals: [
-        "Alert ma poziom: ostrzezenie.",
-        "Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo."
-      ]
+      actionLabel: "Otworz ustawienia"
     });
+    expect(candidates[0].signals).toContain("Alert ma poziom: ostrzezenie.");
+    expect(candidates[0].signals).toContain("Alerty operacyjne maja pierwszenstwo przed zadaniami, pomyslami i repo.");
+    expect(candidates[0].signals).toContain("Zmienna .env do ustawienia: GITHUB_TOKEN.");
     expect(candidates[1].signals).toContain("Ma najblizszy termin w aktywnej kolejce.");
     expect(candidates[2].signals).toContain("Ocena okazji: 94.");
     expect(candidates[3].signals).toContain("Wzrost 7d: +42 gwiazdek.");

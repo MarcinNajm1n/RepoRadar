@@ -373,10 +373,14 @@ function formatSignalDelta(value: number | null | undefined) {
 }
 
 function alertActionLabel(alert: RadarTodayData["alerts"][number]) {
-  return alert.id === "discord-webhook-invalid" ? "Otworz ustawienia" : "Sprawdz alert";
+  return ["github-token-missing", "discord-webhook-invalid"].includes(alert.id) ? "Otworz ustawienia" : "Sprawdz alert";
 }
 
 function alertRepairSignals(alert: RadarTodayData["alerts"][number]) {
+  if (alert.id === "github-token-missing") {
+    return ["Zmienna .env do ustawienia: GITHUB_TOKEN."];
+  }
+
   if (alert.id === "discord-webhook-invalid") {
     return ["Zmienna .env do poprawy: DISCORD_WEBHOOK_URL."];
   }
