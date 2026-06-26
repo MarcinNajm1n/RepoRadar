@@ -498,6 +498,11 @@ describe("buildRadarToday", () => {
       "auto-research-enabled",
       "notification-failures"
     ]);
+    expect(radar.alerts.find((alert) => alert.id === "github-token-missing")).toMatchObject({
+      level: "warning",
+      title: "Brak GitHub token",
+      message: expect.stringContaining("Dodaj GITHUB_TOKEN w .env i zrestartuj npm run dev")
+    });
     expect(radar.alerts.find((alert) => alert.id === "discord-webhook-invalid")).toMatchObject({
       level: "warning",
       title: "Discord webhook ma bledny URL",

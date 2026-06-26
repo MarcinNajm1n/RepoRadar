@@ -676,7 +676,7 @@ export function buildRadarToday(
       id: "github-token-missing",
       level: "warning",
       title: "Brak GitHub token",
-      message: "Skan moze szybciej trafic w rate limit bez lokalnego GITHUB_TOKEN."
+      message: "Skan moze szybciej trafic w rate limit bez lokalnego GITHUB_TOKEN. Dodaj GITHUB_TOKEN w .env i zrestartuj npm run dev."
     });
   }
   if (!input.settingsStatus.openAiConfigured) {
