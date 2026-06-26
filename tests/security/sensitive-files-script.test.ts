@@ -12,6 +12,7 @@ function withTempGitRepo(run: (repoDir: string) => void) {
   const repoDir = mkdtempSync(path.join(tmpdir(), "reporadar-sensitive-"));
   try {
     execFileSync("git", ["init", "-q"], { cwd: repoDir });
+    execFileSync("git", ["config", "core.autocrlf", "false"], { cwd: repoDir });
     run(repoDir);
   } finally {
     rmSync(repoDir, { recursive: true, force: true });
