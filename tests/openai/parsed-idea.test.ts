@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   sanitizeAiRating,
+  sanitizeAiStringArray,
   sanitizeAiText,
   sanitizeOptionalAiRating,
   sanitizeOptionalAiScore,
@@ -38,5 +39,10 @@ describe("OpenAI idea numeric fields", () => {
     expect(sanitizeOptionalAiText(null, null)).toBeNull();
     expect(sanitizeOptionalAiText(42, "  fallback\u0001text  ", 50)).toBe("fallback text");
     expect(sanitizeOptionalAiText("  summary  ", null, 50)).toBe("summary");
+  });
+
+  it("falls back for non-array string list fields", () => {
+    expect(sanitizeAiStringArray("single step", [" fallback step "])).toEqual(["fallback step"]);
+    expect(sanitizeAiStringArray([" step one ", 42, "step\u0000two"], ["fallback"])).toEqual(["step one", "steptwo"]);
   });
 });

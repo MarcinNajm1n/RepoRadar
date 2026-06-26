@@ -28,6 +28,7 @@ import { applyOpenAiActionBudget, getOpenAiActionOptions } from "./token-budgets
 import { formatOpenAiBudgetWarning, getRequiredOpenAiCallsForAction } from "./budget-status";
 import {
   sanitizeAiRating,
+  sanitizeAiStringArray,
   sanitizeAiText,
   sanitizeOptionalAiRating,
   sanitizeOptionalAiScore,
@@ -41,6 +42,14 @@ import {
 import { buildOpportunityFallback, calculateOpportunityScoreWithBreakdown } from "@/lib/market-research/opportunity";
 import type { MarketResearchMode } from "@/lib/market-research/types";
 import { ACTIVE_IDEA_STATUSES, IDEA_STATUS, isActiveIdeaStatus } from "@/types/idea-status";
+
+const DEFAULT_FULL_IDEA_FIRST_STEPS = [
+  "Zdefiniuj użytkownika",
+  "Opisz problem",
+  "Zrób landing/demo",
+  "Zbuduj MVP",
+  "Zbierz feedback"
+];
 
 function topicsFromJson(value: string) {
   return parseStoredStringArray(value);
@@ -344,9 +353,7 @@ export async function generateIdeaForRepository(repoId: string, force = false) {
       researchMode: "full",
       status: IDEA_STATUS.FULL,
       lastResearchAt: research ? new Date() : null,
-      firstStepsJson: stringifyStoredStringArray(
-        parsed.firstSteps ?? ["Zdefiniuj użytkownika", "Opisz problem", "Zrób landing/demo", "Zbuduj MVP", "Zbierz feedback"]
-      )
+      firstStepsJson: stringifyStoredStringArray(sanitizeAiStringArray(parsed.firstSteps, DEFAULT_FULL_IDEA_FIRST_STEPS))
     }
   });
   await attachResearchRunsToIdea(research?.runIds ?? (research?.runId ? [research.runId] : []), idea.id);
@@ -595,7 +602,9 @@ export async function promoteCandidateToFullIdea(ideaId: string, force = false) 
       usefulnessScore: sanitizeAiRating(parsed.usefulnessScore, candidate.usefulnessScore),
       riskScore: sanitizeAiRating(parsed.riskScore, candidate.riskScore),
       suggestedStack: sanitizeAiText(parsed.suggestedStack, candidate.suggestedStack, 700),
-      firstStepsJson: stringifyStoredStringArray(parsed.firstSteps ?? parseStoredStringArray(candidate.firstStepsJson)),
+      firstStepsJson: stringifyStoredStringArray(
+        sanitizeAiStringArray(parsed.firstSteps, parseStoredStringArray(candidate.firstStepsJson))
+      ),
       marketSummary: sanitizeOptionalAiText(parsed.marketSummary, research?.summary ?? candidate.marketSummary, 2000),
       evidenceIdsJson: stringifyStoredStringArray(evidenceIds),
       confidenceScore: sanitizeOptionalAiRating(parsed.confidenceScore, research?.confidenceScore ?? candidate.confidenceScore),

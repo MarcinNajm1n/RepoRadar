@@ -1,4 +1,4 @@
-import { clamp, sanitizeExternalText } from "@/lib/utils";
+import { clamp, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
 
 function coerceFiniteNumber(value: unknown) {
   if (typeof value === "number") {
@@ -41,4 +41,9 @@ export function sanitizeAiText(value: unknown, fallback: string, maxLength = 120
 
 export function sanitizeOptionalAiText(value: unknown, fallback: string | null = null, maxLength = 1200) {
   return sanitizeExternalText(value, maxLength) ?? sanitizeExternalText(fallback, maxLength);
+}
+
+export function sanitizeAiStringArray(value: unknown, fallback: unknown, maxItems = 30) {
+  const sanitized = sanitizeExternalStringArray(value, maxItems);
+  return sanitized.length > 0 ? sanitized : sanitizeExternalStringArray(fallback, maxItems);
 }
