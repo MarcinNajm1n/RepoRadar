@@ -3,9 +3,14 @@ import type { SettingsPanelData } from "@/types/repository";
 type MaintenancePreview = SettingsPanelData["settingsSummary"]["maintenancePreview"];
 
 const DEFAULT_NOTIFICATION_LOG_DAYS_TO_KEEP = 30;
+const DEFAULT_SNAPSHOT_DAYS_TO_KEEP = 180;
 
 export function getNotificationLogDaysToKeep(preview?: MaintenancePreview["notificationLogs"]) {
   return preview?.daysToKeep ?? DEFAULT_NOTIFICATION_LOG_DAYS_TO_KEEP;
+}
+
+export function getSnapshotDaysToKeep(preview?: MaintenancePreview["snapshots"]) {
+  return preview?.daysToKeep ?? DEFAULT_SNAPSHOT_DAYS_TO_KEEP;
 }
 
 export function buildClearExpiredExternalCacheConfirmation(preview?: MaintenancePreview["externalResearchCache"]) {
@@ -37,8 +42,10 @@ export function buildClearOldNotificationLogsConfirmation(preview?: MaintenanceP
 }
 
 export function buildPruneSnapshotsConfirmation(preview?: MaintenancePreview["snapshots"]) {
+  const daysToKeep = getSnapshotDaysToKeep(preview);
+
   if (!preview) {
-    return "Usunac snapshoty starsze niz 180 dni? Te dane sa lokalne i nie beda odzyskane z historii.";
+    return `Usunac snapshoty starsze niz ${daysToKeep} dni? Te dane sa lokalne i nie beda odzyskane z historii.`;
   }
 
   const losingHistory =
@@ -47,7 +54,7 @@ export function buildPruneSnapshotsConfirmation(preview?: MaintenancePreview["sn
       : "Zadne repo nie powinno stracic calej historii snapshotow.";
 
   return [
-    `Usunac snapshoty starsze niz ${preview.daysToKeep} dni? Te dane sa lokalne i nie beda odzyskane z historii.`,
+    `Usunac snapshoty starsze niz ${daysToKeep} dni? Te dane sa lokalne i nie beda odzyskane z historii.`,
     "",
     `Dry-run: ${preview.oldEntries} snapshotow z ${preview.affectedRepositories} repo.`,
     losingHistory

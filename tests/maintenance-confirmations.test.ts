@@ -3,7 +3,8 @@ import {
   buildClearExpiredExternalCacheConfirmation,
   buildClearOldNotificationLogsConfirmation,
   buildPruneSnapshotsConfirmation,
-  getNotificationLogDaysToKeep
+  getNotificationLogDaysToKeep,
+  getSnapshotDaysToKeep
 } from "../src/lib/maintenance-confirmations";
 
 describe("maintenance confirmation copy", () => {
@@ -33,15 +34,23 @@ describe("maintenance confirmation copy", () => {
   });
 
   it("keeps snapshot prune warnings explicit", () => {
-    const message = buildPruneSnapshotsConfirmation({
-      daysToKeep: 180,
+    const preview = {
+      daysToKeep: 365,
       cutoff: "2025-12-27T12:00:00.000Z",
       oldEntries: 12,
       affectedRepositories: 5,
       repositoriesLosingAllSnapshots: 2
-    });
+    };
+    const message = buildPruneSnapshotsConfirmation(preview);
 
+    expect(getSnapshotDaysToKeep(preview)).toBe(365);
+    expect(message).toContain("starsze niz 365 dni");
     expect(message).toContain("12 snapshotow z 5 repo");
     expect(message).toContain("2 repo straci wszystkie snapshoty");
+  });
+
+  it("falls back to 180 days for snapshot pruning when preview is unavailable", () => {
+    expect(getSnapshotDaysToKeep()).toBe(180);
+    expect(buildPruneSnapshotsConfirmation()).toContain("starsze niz 180 dni");
   });
 });

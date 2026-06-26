@@ -22,7 +22,7 @@ vi.mock("@/lib/db/client", () => ({
   prisma: mocks.prisma
 }));
 
-import { getMaintenancePreview } from "../src/lib/maintenance";
+import { getMaintenancePreview, pruneOldSnapshots } from "../src/lib/maintenance";
 
 describe("maintenance preview", () => {
   beforeEach(() => {
@@ -81,5 +81,25 @@ describe("maintenance preview", () => {
     expect(preview.snapshots.repositoriesLosingAllSnapshots).toBe(0);
     expect(mocks.prisma.repoSnapshot.findMany).toHaveBeenCalledTimes(2);
     expect(mocks.prisma.repoSnapshot.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("requires strict boolean confirmation before pruning snapshots", async () => {
+    await expect(
+      pruneOldSnapshots({ daysToKeep: 180, confirmed: "true" } as unknown as { daysToKeep?: number; confirmed?: boolean })
+    ).rejects.toThrow("Snapshot pruning requires explicit confirmation");
+
+    expect(mocks.prisma.repoSnapshot.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("prunes snapshots only after explicit confirmation", async () => {
+    mocks.prisma.repoSnapshot.deleteMany.mockResolvedValue({ count: 6 });
+
+    await expect(pruneOldSnapshots({ daysToKeep: 365, confirmed: true })).resolves.toMatchObject({ deletedCount: 6 });
+
+    expect(mocks.prisma.repoSnapshot.deleteMany).toHaveBeenCalledWith({
+      where: {
+        capturedAt: { lt: expect.any(Date) }
+      }
+    });
   });
 });

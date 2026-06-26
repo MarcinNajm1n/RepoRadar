@@ -99,7 +99,7 @@ export async function clearOldNotificationLogs(daysToKeep = 30) {
 }
 
 export async function pruneOldSnapshots(options: { daysToKeep?: number; confirmed?: boolean } = {}) {
-  if (!options.confirmed) {
+  if (options.confirmed !== true) {
     throw new Error("Snapshot pruning requires explicit confirmation.");
   }
 

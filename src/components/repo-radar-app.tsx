@@ -45,7 +45,8 @@ import {
   buildClearExpiredExternalCacheConfirmation,
   buildClearOldNotificationLogsConfirmation,
   buildPruneSnapshotsConfirmation,
-  getNotificationLogDaysToKeep
+  getNotificationLogDaysToKeep,
+  getSnapshotDaysToKeep
 } from "@/lib/maintenance-confirmations";
 import { AppShell } from "@/components/repo-radar/app-shell";
 import { TopBar } from "@/components/repo-radar/top-bar";
@@ -543,11 +544,12 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
 
   function pruneSnapshotsWithConfirmation() {
     const snapshotPreview = settingsPanelData?.settingsSummary.maintenancePreview.snapshots;
+    const daysToKeep = getSnapshotDaysToKeep(snapshotPreview);
     if (!window.confirm(buildPruneSnapshotsConfirmation(snapshotPreview))) {
       return;
     }
     runAction(
-      () => pruneOldSnapshotsAction({ daysToKeep: 180, confirmed: true }),
+      () => pruneOldSnapshotsAction({ daysToKeep, confirmed: true }),
       "Stare snapshoty wyczyszczone.",
       "Czyszcze stare snapshoty...",
       refreshSettingsPanelDataIfOpen

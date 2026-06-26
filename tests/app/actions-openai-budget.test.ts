@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   promoteCandidateToFullIdea: vi.fn(),
   clearExpiredExternalCache: vi.fn(),
   clearOldNotificationLogs: vi.fn(),
+  pruneOldSnapshots: vi.fn(),
   revalidatePath: vi.fn(),
   runAiJob: vi.fn()
 }));
@@ -77,7 +78,7 @@ vi.mock("@/lib/exports/ideas-csv", () => ({
 vi.mock("@/lib/maintenance", () => ({
   clearExpiredExternalCache: mocks.clearExpiredExternalCache,
   clearOldNotificationLogs: mocks.clearOldNotificationLogs,
-  pruneOldSnapshots: vi.fn()
+  pruneOldSnapshots: mocks.pruneOldSnapshots
 }));
 
 vi.mock("@/lib/notifications/dispatcher", () => ({
@@ -111,6 +112,7 @@ import {
   generateOpportunityCandidateAction,
   generateReportAction,
   generateShortSummaryAction,
+  pruneOldSnapshotsAction,
   promoteCandidateToFullIdeaAction
 } from "../../src/app/actions";
 
@@ -149,6 +151,7 @@ beforeEach(() => {
   });
   mocks.clearExpiredExternalCache.mockResolvedValue({ deletedCount: 3 });
   mocks.clearOldNotificationLogs.mockResolvedValue({ deletedCount: 4, cutoff: "2026-05-12T00:00:00.000Z" });
+  mocks.pruneOldSnapshots.mockResolvedValue({ deletedCount: 5, cutoff: "2025-06-25T00:00:00.000Z" });
   mocks.runAiJob.mockImplementation(
     async (_input: unknown, handler: () => Promise<unknown>) => handler()
   );
@@ -159,6 +162,23 @@ describe("maintenance action confirmations", () => {
     await expect(clearExpiredExternalCacheAction()).rejects.toThrow("External research cache cleanup requires explicit confirmation");
 
     expect(mocks.clearExpiredExternalCache).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects truthy non-boolean confirmation payloads", async () => {
+    await expect(clearExpiredExternalCacheAction({ confirmed: "true" } as unknown as { confirmed?: boolean })).rejects.toThrow(
+      "External research cache cleanup requires explicit confirmation"
+    );
+    await expect(
+      clearOldNotificationLogsAction({ daysToKeep: 45, confirmed: 1 } as unknown as { daysToKeep?: number; confirmed?: boolean })
+    ).rejects.toThrow("Notification log cleanup requires explicit confirmation");
+    await expect(
+      pruneOldSnapshotsAction({ daysToKeep: 365, confirmed: "false" } as unknown as { daysToKeep?: number; confirmed?: boolean })
+    ).rejects.toThrow("Snapshot pruning requires explicit confirmation");
+
+    expect(mocks.clearExpiredExternalCache).not.toHaveBeenCalled();
+    expect(mocks.clearOldNotificationLogs).not.toHaveBeenCalled();
+    expect(mocks.pruneOldSnapshots).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -185,6 +205,23 @@ describe("maintenance action confirmations", () => {
     });
 
     expect(mocks.clearOldNotificationLogs).toHaveBeenCalledWith(45);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("requires explicit confirmation before pruning old snapshots", async () => {
+    await expect(pruneOldSnapshotsAction({ daysToKeep: 365 })).rejects.toThrow("Snapshot pruning requires explicit confirmation");
+
+    expect(mocks.pruneOldSnapshots).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("passes the confirmed snapshot retention window to snapshot pruning", async () => {
+    await expect(pruneOldSnapshotsAction({ daysToKeep: 365, confirmed: true })).resolves.toEqual({
+      deletedCount: 5,
+      cutoff: "2025-06-25T00:00:00.000Z"
+    });
+
+    expect(mocks.pruneOldSnapshots).toHaveBeenCalledWith({ daysToKeep: 365, confirmed: true });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
   });
 });

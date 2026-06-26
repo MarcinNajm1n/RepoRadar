@@ -234,7 +234,7 @@ export async function generateDailyBriefingAction() {
 }
 
 export async function clearExpiredExternalCacheAction(options: { confirmed?: boolean } = {}) {
-  if (!options.confirmed) {
+  if (options.confirmed !== true) {
     throw new Error("External research cache cleanup requires explicit confirmation.");
   }
 
@@ -244,7 +244,7 @@ export async function clearExpiredExternalCacheAction(options: { confirmed?: boo
 }
 
 export async function clearOldNotificationLogsAction(options: { daysToKeep?: number; confirmed?: boolean } = {}) {
-  if (!options.confirmed) {
+  if (options.confirmed !== true) {
     throw new Error("Notification log cleanup requires explicit confirmation.");
   }
 
@@ -254,7 +254,11 @@ export async function clearOldNotificationLogsAction(options: { daysToKeep?: num
   return result;
 }
 
-export async function pruneOldSnapshotsAction(options: { daysToKeep?: number; confirmed?: boolean }) {
+export async function pruneOldSnapshotsAction(options: { daysToKeep?: number; confirmed?: boolean } = {}) {
+  if (options.confirmed !== true) {
+    throw new Error("Snapshot pruning requires explicit confirmation.");
+  }
+
   const result = await pruneOldSnapshots(options);
   revalidatePath("/");
   return result;
