@@ -10,6 +10,9 @@ export async function writeMarkdownReport(relativePath: string, content: string)
   if (!target.startsWith(`${reportsRoot}${path.sep}`) && target !== reportsRoot) {
     throw new Error("Report path must stay inside REPORTS_DIR");
   }
+  if (path.extname(target).toLowerCase() !== ".md") {
+    throw new Error("Report path must use a .md extension");
+  }
 
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, "utf8");

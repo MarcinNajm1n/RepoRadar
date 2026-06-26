@@ -46,6 +46,24 @@ describe("repoReportPath", () => {
     }
   });
 
+  it("rejects non-markdown report paths", async () => {
+    const previousReportsDir = process.env.REPORTS_DIR;
+    const reportsDir = await fs.mkdtemp(path.join(os.tmpdir(), "reporadar-reports-"));
+    process.env.REPORTS_DIR = reportsDir;
+
+    try {
+      await expect(writeMarkdownReport("daily/report.html", "<h1>Daily</h1>")).rejects.toThrow(
+        "Report path must use a .md extension"
+      );
+    } finally {
+      if (previousReportsDir === undefined) {
+        delete process.env.REPORTS_DIR;
+      } else {
+        process.env.REPORTS_DIR = previousReportsDir;
+      }
+    }
+  });
+
   it("rejects helper-generated repository paths that would escape the reports directory", async () => {
     const previousReportsDir = process.env.REPORTS_DIR;
     const reportsDir = await fs.mkdtemp(path.join(os.tmpdir(), "reporadar-reports-"));
