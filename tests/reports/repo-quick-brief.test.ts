@@ -49,5 +49,6 @@ describe("repo quick brief", () => {
 
   it("uses a separate quick brief path", () => {
     expect(repoQuickBriefPath("owner", "tool")).toBe("repos/owner__tool__quick-brief.md");
+    expect(repoQuickBriefPath("../owner", "tool\\name")).toBe("repos/..-owner__tool-name__quick-brief.md");
   });
 });

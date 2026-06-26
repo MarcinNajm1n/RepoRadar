@@ -10,6 +10,11 @@ describe("repoReportPath", () => {
     expect(repoReportPath("openai", "agents")).toBe("repos/openai__agents.md");
   });
 
+  it("keeps repository path segments distinct while normalizing unsafe characters", () => {
+    expect(repoReportPath(" open   ai ", "")).toBe("repos/open ai__unknown.md");
+    expect(repoReportPath("owner", ".github")).toBe("repos/owner__.github.md");
+  });
+
   it("writes reports inside the configured reports directory", async () => {
     const previousReportsDir = process.env.REPORTS_DIR;
     const reportsDir = await fs.mkdtemp(path.join(os.tmpdir(), "reporadar-reports-"));
@@ -64,15 +69,18 @@ describe("repoReportPath", () => {
     }
   });
 
-  it("rejects helper-generated repository paths that would escape the reports directory", async () => {
+  it("sanitizes helper-generated repository paths before writing", async () => {
     const previousReportsDir = process.env.REPORTS_DIR;
     const reportsDir = await fs.mkdtemp(path.join(os.tmpdir(), "reporadar-reports-"));
     process.env.REPORTS_DIR = reportsDir;
 
     try {
-      await expect(writeMarkdownReport(repoReportPath("../../outside", "repo"), "# Escape")).rejects.toThrow(
-        "Report path must stay inside REPORTS_DIR"
-      );
+      const relativePath = repoReportPath("../../outside", "repo/name");
+      const returnedPath = await writeMarkdownReport(relativePath, "# Safe");
+      const targetPath = path.join(reportsDir, "repos", "..-..-outside__repo-name.md");
+
+      await expect(fs.readFile(targetPath, "utf8")).resolves.toBe("# Safe");
+      expect(returnedPath).toBe(path.relative(process.cwd(), targetPath).replace(/\\/g, "/"));
     } finally {
       if (previousReportsDir === undefined) {
         delete process.env.REPORTS_DIR;
