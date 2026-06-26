@@ -555,7 +555,7 @@ function buildFirstRunOnboarding(input: {
       title: "GitHub token",
       description: input.settingsStatus.githubTokenConfigured
         ? "Token jest skonfigurowany, wiec scan ma wiekszy limit zapytan."
-        : "Dodaj GITHUB_TOKEN w .env, zeby uniknac szybkiego rate limitu.",
+        : "Dodaj GITHUB_TOKEN w .env, zeby uniknac szybkiego rate limitu. Po zmianie zrestartuj npm run dev.",
       status: input.settingsStatus.githubTokenConfigured ? "done" : "todo",
       priority: "required",
       action: "open_settings",

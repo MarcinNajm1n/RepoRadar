@@ -327,6 +327,7 @@ describe("SettingsView maintenance preview", () => {
     );
 
     expect(html).toContain("GITHUB_TOKEN ustaw w `.env`");
+    expect(html).toContain("Po zmianie zrestartuj `npm run dev`");
     expect(html).toContain("UI nie pokazuje ani nie zapisuje wartosci tokena");
   });
 

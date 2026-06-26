@@ -180,7 +180,7 @@ export function SettingsView({
           </p>
           {!settingsSummary.githubTokenConfigured ? (
             <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground" role="alert">
-              GITHUB_TOKEN ustaw w `.env`, zeby zwiekszyc limit skanow GitHub. UI nie pokazuje ani nie zapisuje wartosci tokena.
+              GITHUB_TOKEN ustaw w `.env`, zeby zwiekszyc limit skanow GitHub. Po zmianie zrestartuj `npm run dev`. UI nie pokazuje ani nie zapisuje wartosci tokena.
             </p>
           ) : null}
           {settingsSummary.discordWebhookStatus === "invalid" ? (

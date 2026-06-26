@@ -535,6 +535,9 @@ describe("buildRadarToday", () => {
       priority: "required",
       command: "npm run db:seed"
     });
+    expect(radar.firstRun.steps.find((step) => step.id === "github_token")?.description).toContain(
+      "Po zmianie zrestartuj npm run dev"
+    );
     expect(radar.firstRun.steps.find((step) => step.id === "openai")).toMatchObject({
       status: "optional",
       priority: "optional",
