@@ -148,6 +148,26 @@ describe("mapRepository", () => {
     expect(mapped.discoveryProfiles).toEqual(["fresh_repos", "fast_momentum profile"]);
   });
 
+  it("normalizes malformed score breakdown values before display", () => {
+    const mapped = mapRepository(
+      repositoryRecord({
+        scoreBreakdownJson: JSON.stringify({
+          absoluteGrowthPoints: "10",
+          percentageGrowthPoints: -5,
+          agePoints: 125,
+          totalStarsPoints: 4,
+          usedInitialMomentumFallback: "true"
+        })
+      })
+    );
+
+    expect(mapped.scoreBreakdown.absoluteGrowthPoints).toBe(0);
+    expect(mapped.scoreBreakdown.percentageGrowthPoints).toBe(0);
+    expect(mapped.scoreBreakdown.agePoints).toBe(100);
+    expect(mapped.scoreBreakdown.totalStarsPoints).toBe(4);
+    expect(mapped.scoreBreakdown.usedInitialMomentumFallback).toBe(false);
+  });
+
   it("prefers denormalized growth fields and falls back to the latest snapshot", () => {
     const denormalized = mapRepository(
       repositoryRecord({
@@ -226,6 +246,27 @@ describe("stored string array mapping", () => {
     );
 
     expect(mapped.topRepoIds).toEqual(["repo_1", "repo two"]);
+  });
+
+  it("sanitizes idea opportunity breakdown numeric values", () => {
+    const mapped = mapIdea(
+      rawIdeaRecord({
+        opportunityBreakdownJson: JSON.stringify({
+          demand: 82,
+          "risk\u0001score": 33,
+          ignoredString: "90",
+          below: -5,
+          above: 125
+        })
+      })
+    );
+
+    expect(mapped.opportunityBreakdown).toEqual({
+      demand: 82,
+      "risk score": 33,
+      below: 0,
+      above: 100
+    });
   });
 });
 

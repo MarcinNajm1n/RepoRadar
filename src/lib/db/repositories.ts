@@ -33,13 +33,14 @@ import type {
   RepositoryPage,
   RepositoryPageInput,
   RepositoryListItem,
+  ScoreBreakdown,
   SettingsPanelData,
   SettingsSummary,
   TasksPanelData,
   WeeklyReportsPanelData
 } from "@/types/repository";
 import { safeJsonParse } from "@/lib/utils";
-import { parseStoredStringArray } from "@/lib/stored-json";
+import { parseStoredNumberRecord, parseStoredStringArray, sanitizeStoredNumberRecord } from "@/lib/stored-json";
 import type { Prisma, Repository } from "@prisma/client";
 
 const DEFAULT_REPOSITORY_PAGE = 1;
@@ -58,7 +59,7 @@ const latestSnapshotInclude = {
   }
 };
 
-const DEFAULT_SCORE_BREAKDOWN = {
+const DEFAULT_SCORE_BREAKDOWN: ScoreBreakdown = {
   absoluteGrowthPoints: 0,
   percentageGrowthPoints: 0,
   agePoints: 0,
@@ -71,6 +72,39 @@ const DEFAULT_SCORE_BREAKDOWN = {
   initialMomentumPoints: 0,
   usedInitialMomentumFallback: false
 };
+
+type ScoreBreakdownNumberKey = Exclude<keyof ScoreBreakdown, "usedInitialMomentumFallback">;
+
+const SCORE_BREAKDOWN_NUMBER_KEYS: ScoreBreakdownNumberKey[] = [
+  "absoluteGrowthPoints",
+  "percentageGrowthPoints",
+  "agePoints",
+  "totalStarsPoints",
+  "forksPoints",
+  "pushFreshnessPoints",
+  "topicRelevancePoints",
+  "readmeQualityPoints",
+  "keywordRelevancePoints",
+  "initialMomentumPoints"
+];
+
+function parseScoreBreakdown(value: string | null | undefined): ScoreBreakdown {
+  const raw = safeJsonParse<unknown>(value, {});
+  const numbers = sanitizeStoredNumberRecord(raw, { min: 0, max: 100 });
+  const parsed = { ...DEFAULT_SCORE_BREAKDOWN };
+
+  for (const key of SCORE_BREAKDOWN_NUMBER_KEYS) {
+    parsed[key] = numbers[key] ?? DEFAULT_SCORE_BREAKDOWN[key];
+  }
+
+  parsed.usedInitialMomentumFallback =
+    Boolean(raw) &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    (raw as { usedInitialMomentumFallback?: unknown }).usedInitialMomentumFallback === true;
+
+  return parsed;
+}
 
 const ideaListInclude = {
   repository: { select: { fullName: true } },
@@ -181,7 +215,7 @@ export function mapRepository(repository: RepositoryRecord): RepositoryListItem 
     trendScore: repository.trendScore,
     relevanceScore: repository.relevanceScore,
     initialMomentumScore: repository.initialMomentumScore,
-    scoreBreakdown: safeJsonParse(repository.scoreBreakdownJson, DEFAULT_SCORE_BREAKDOWN),
+    scoreBreakdown: parseScoreBreakdown(repository.scoreBreakdownJson),
     discoveryProfiles: parseStoredStringArray(repository.discoveryProfilesJson),
     source: repository.source,
     growth24h: repository.growth24h ?? latestSnapshot?.growth24h ?? null,
@@ -211,7 +245,7 @@ export function mapIdea(
     riskScore: idea.riskScore,
     confidenceScore: idea.confidenceScore,
     opportunityScore: idea.opportunityScore,
-    opportunityBreakdown: safeJsonParse<Record<string, number>>(idea.opportunityBreakdownJson, {}),
+    opportunityBreakdown: parseStoredNumberRecord(idea.opportunityBreakdownJson, { min: 0, max: 100 }),
     applicationSummary: idea.applicationSummary,
     businessRationale: idea.businessRationale,
     researchMode: idea.researchMode,
