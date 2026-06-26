@@ -28,9 +28,7 @@ afterEach(() => {
 
 describe("generateOpenAiText", () => {
   it("posts a non-stored Responses API request and returns trimmed output text", async () => {
-    const fetchMock = vi.fn(
-      async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ output_text: "  gotowe  " }), { status: 200 })
-    );
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ output_text: "  gotowe  " }), { status: 200 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(generateOpenAiText("instructions", "input", { maxOutputTokens: 128 })).resolves.toBe("gotowe");
@@ -60,8 +58,8 @@ describe("generateOpenAiText", () => {
   });
 
   it("rejects oversized successful responses before parsing them", async () => {
-    const fetchMock = vi.fn(
-      async (..._args: Parameters<typeof fetch>) =>
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
         new Response(JSON.stringify({ output_text: "ignored" }), {
           status: 200,
           headers: {
@@ -75,7 +73,7 @@ describe("generateOpenAiText", () => {
   });
 
   it("rejects invalid successful JSON responses explicitly", async () => {
-    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response("not-json", { status: 200 }));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("not-json", { status: 200 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(generateOpenAiText("instructions", "input")).rejects.toThrow("OpenAI response was not valid JSON");

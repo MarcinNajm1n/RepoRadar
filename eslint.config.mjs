@@ -2,6 +2,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
 const ignores = [
+  ".agents/**",
   ".next/**",
   "node_modules/**",
   "reports/**",
