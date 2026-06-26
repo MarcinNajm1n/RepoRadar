@@ -243,28 +243,72 @@ describe("AI action OpenAI budget preflight", () => {
     await generateIdeaAction("repo_1", true);
     await generateOpportunityCandidateAction("repo_1", true);
     await generateShortSummaryAction("repo_1", true);
+    await promoteCandidateToFullIdeaAction("idea_1", true);
 
+    expect(mocks.generateFullReportForRepository).toHaveBeenCalledWith("repo_1", true);
+    expect(mocks.generateIdeaForRepository).toHaveBeenCalledWith("repo_1", true);
+    expect(mocks.generateOpportunityCandidateForRepository).toHaveBeenCalledWith("repo_1", true);
+    expect(mocks.generateShortSummaryForRepository).toHaveBeenCalledWith("repo_1", true);
+    expect(mocks.promoteCandidateToFullIdea).toHaveBeenCalledWith("idea_1", true);
     expect(mocks.runAiJob).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ type: "REPORT", repoId: "repo_1", dedupeKey: "report:repo_1" }),
+      expect.objectContaining({ type: "REPORT", repoId: "repo_1", priority: 80, dedupeKey: "report:repo_1" }),
       expect.any(Function),
       expect.any(Function)
     );
     expect(mocks.runAiJob).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ type: "IDEA", repoId: "repo_1", dedupeKey: "idea:repo_1" }),
+      expect.objectContaining({ type: "IDEA", repoId: "repo_1", priority: 80, dedupeKey: "idea:repo_1" }),
       expect.any(Function),
       expect.any(Function)
     );
     expect(mocks.runAiJob).toHaveBeenNthCalledWith(
       3,
-      expect.objectContaining({ type: "RESEARCH", repoId: "repo_1", dedupeKey: "research:repo_1" }),
+      expect.objectContaining({ type: "RESEARCH", repoId: "repo_1", priority: 70, dedupeKey: "research:repo_1" }),
       expect.any(Function),
       expect.any(Function)
     );
     expect(mocks.runAiJob).toHaveBeenNthCalledWith(
       4,
-      expect.objectContaining({ type: "SUMMARY", repoId: "repo_1", dedupeKey: "summary:repo_1" }),
+      expect.objectContaining({ type: "SUMMARY", repoId: "repo_1", priority: 70, dedupeKey: "summary:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
+  it("does not treat truthy non-boolean force payloads as forced AI work", async () => {
+    await generateReportAction("repo_1", "true" as unknown as boolean);
+    await generateIdeaAction("repo_1", 1 as unknown as boolean);
+    await generateOpportunityCandidateAction("repo_1", "yes" as unknown as boolean);
+    await generateShortSummaryAction("repo_1", "true" as unknown as boolean);
+    await promoteCandidateToFullIdeaAction("idea_1", 1 as unknown as boolean);
+
+    expect(mocks.generateFullReportForRepository).toHaveBeenCalledWith("repo_1", false);
+    expect(mocks.generateIdeaForRepository).toHaveBeenCalledWith("repo_1", false);
+    expect(mocks.generateOpportunityCandidateForRepository).toHaveBeenCalledWith("repo_1", false);
+    expect(mocks.generateShortSummaryForRepository).toHaveBeenCalledWith("repo_1", false);
+    expect(mocks.promoteCandidateToFullIdea).toHaveBeenCalledWith("idea_1", false);
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ type: "REPORT", priority: 60 }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ type: "IDEA", priority: 50 }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ type: "RESEARCH", priority: 40 }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ type: "SUMMARY", priority: 40 }),
       expect.any(Function),
       expect.any(Function)
     );
