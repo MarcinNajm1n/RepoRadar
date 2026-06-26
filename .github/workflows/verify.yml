@@ -36,17 +36,5 @@ jobs:
       - name: Apply SQLite migrations
         run: npx prisma migrate deploy
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Unit tests
-        run: npm run test
-
-      - name: Build
-        run: npm run build
-
-      - name: Sensitive file check
-        run: npm run security:check
+      - name: Verify
+        run: npm run verify

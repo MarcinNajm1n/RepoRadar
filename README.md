@@ -259,7 +259,7 @@ npm run benchmark:large -- --size=200 --output=test-results/benchmarks/smoke.jso
 
 ## CI
 
-GitHub Actions runs on `windows-latest` without real secrets. The workflow installs dependencies, generates Prisma Client, migrates a local SQLite database, then runs typecheck, lint, Vitest, build, and the sensitive-file check.
+GitHub Actions runs on `windows-latest` without real secrets. The workflow installs dependencies, generates Prisma Client, migrates a local SQLite database, then runs `npm run verify` so CI and local checks stay aligned.
 
 ## Commit Safety
 
