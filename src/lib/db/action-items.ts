@@ -98,8 +98,12 @@ function cleanMetadata(metadata: Record<string, unknown> | undefined) {
   return JSON.stringify(metadata);
 }
 
-function cleanPriority(priority: number | undefined) {
-  return Math.round(clamp(priority ?? 0, -100, 100));
+function cleanPriority(priority: unknown) {
+  if (typeof priority !== "number" || !Number.isFinite(priority)) {
+    return 0;
+  }
+
+  return Math.round(clamp(priority, -100, 100));
 }
 
 function buildCreateData(input: CreateActionItemInput) {
