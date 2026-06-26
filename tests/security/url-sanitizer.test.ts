@@ -15,6 +15,12 @@ describe("sanitizeExternalUrl", () => {
     expect(sanitizeExternalUrl("javascript:alert(1)")).toBeNull();
   });
 
+  it("blocks URLs with embedded credentials", () => {
+    expect(sanitizeExternalUrl("https://token@example.com/repo")).toBeNull();
+    expect(sanitizeExternalUrl("https://user:secret@example.com/repo")).toBeNull();
+    expect(sanitizeExternalUrl("https://example.com@evil.test/repo")).toBeNull();
+  });
+
   it("allows public http and https URLs", () => {
     expect(sanitizeExternalUrl("https://example.com/post")).toBe("https://example.com/post");
     expect(sanitizeExternalUrl("http://example.org/feed")).toBe("http://example.org/feed");

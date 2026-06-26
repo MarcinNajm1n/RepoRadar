@@ -65,6 +65,9 @@ export function sanitizeExternalUrl(value: string | null | undefined, maxLength 
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return null;
     }
+    if (parsed.username || parsed.password) {
+      return null;
+    }
     if (isBlockedHost(parsed.hostname)) {
       return null;
     }
