@@ -1,9 +1,21 @@
 "use client";
 
-import { ClipboardList } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ClipboardList, RotateCcw, Search } from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
+import { ACTION_ITEM_STATUSES, ACTION_ITEM_TYPES, formatActionItemStatus, formatActionItemType } from "@/types/action-item";
+import { cn } from "@/lib/utils";
 import { ActionItemCard } from "./action-item-card";
-import { Button, EmptyState, MetricPill, SectionCard } from "./ui";
+import { Badge, Button, EmptyState, MetricPill, SectionCard } from "./ui";
+
+const ALL_FILTER_VALUE = "ALL";
+
+type TaskFilterState = {
+  query: string;
+  type: string;
+  status: string;
+  minPriority: number;
+};
 
 export function TasksView({
   items,
@@ -20,9 +32,26 @@ export function TasksView({
   onSnooze: (itemId: string) => void;
   onDismiss: (itemId: string) => void;
 }) {
-  const readyItems = sortQueueItems(items.filter((item) => item.status !== "DONE" && item.status !== "DISMISSED" && item.status !== "SNOOZED"));
-  const snoozedItems = sortQueueItems(items.filter((item) => item.status === "SNOOZED"));
-  const closedItems = sortQueueItems(items.filter((item) => item.status === "DONE" || item.status === "DISMISSED"));
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState(ALL_FILTER_VALUE);
+  const [statusFilter, setStatusFilter] = useState(ALL_FILTER_VALUE);
+  const [minPriority, setMinPriority] = useState(0);
+  const filters = useMemo(
+    () => ({ query, type: typeFilter, status: statusFilter, minPriority }),
+    [query, typeFilter, statusFilter, minPriority]
+  );
+  const hasActiveFilters = hasActiveTaskFilters(filters);
+  const activeFilterLabels = buildTaskFilterLabels(filters);
+  const filteredItems = useMemo(() => filterQueueItems(items, filters), [items, filters]);
+  const readyItems = sortQueueItems(filteredItems.filter((item) => item.status !== "DONE" && item.status !== "DISMISSED" && item.status !== "SNOOZED"));
+  const snoozedItems = sortQueueItems(filteredItems.filter((item) => item.status === "SNOOZED"));
+  const closedItems = sortQueueItems(filteredItems.filter((item) => item.status === "DONE" || item.status === "DISMISSED"));
+  const resetFilters = () => {
+    setQuery("");
+    setTypeFilter(ALL_FILTER_VALUE);
+    setStatusFilter(ALL_FILTER_VALUE);
+    setMinPriority(0);
+  };
 
   return (
     <section className="space-y-4">
@@ -39,50 +68,154 @@ export function TasksView({
           <MetricPill label="Do zrobienia" value={readyItems.length} />
           <MetricPill label="Odlozone" value={snoozedItems.length} />
           <MetricPill label="Zamkniete" value={closedItems.length} />
-          <MetricPill label="Razem" value={items.length} />
+          <MetricPill label="Widoczne" value={`${filteredItems.length}/${items.length}`} />
+        </div>
+
+        <div className="mt-4 rounded-md border border-border-subtle bg-surface-inset p-3">
+          <div className="grid gap-2 xl:grid-cols-[minmax(220px,1fr)_180px_160px_130px_auto]">
+            <label className="relative min-w-0">
+              <span className="sr-only">Szukaj zadan</span>
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                className={controlClassName("pl-9")}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Szukaj tytulu, repo, pomyslu..."
+              />
+            </label>
+
+            <label>
+              <span className="sr-only">Typ zadania</span>
+              <select className={controlClassName()} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                <option value={ALL_FILTER_VALUE}>Wszystkie typy</option>
+                {Object.keys(ACTION_ITEM_TYPES).map((type) => (
+                  <option key={type} value={type}>
+                    {formatActionItemType(type)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span className="sr-only">Status zadania</span>
+              <select className={controlClassName()} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value={ALL_FILTER_VALUE}>Wszystkie statusy</option>
+                {Object.keys(ACTION_ITEM_STATUSES).map((status) => (
+                  <option key={status} value={status}>
+                    {formatActionItemStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex h-9 items-center gap-2 rounded-md border border-control-border bg-control px-3 text-xs font-medium text-muted-foreground">
+              Priorytet
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums text-foreground outline-none"
+                type="number"
+                min={0}
+                value={minPriority}
+                onChange={(event) => setMinPriority(clampPriority(event.target.value))}
+              />
+            </label>
+
+            <Button variant="ghost" size="sm" onClick={resetFilters} disabled={!hasActiveFilters} className="h-9">
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-semibold uppercase text-muted-foreground">Filtry zadan</span>
+            {hasActiveFilters ? (
+              <>
+                <span className="tabular-nums text-foreground">
+                  Pokazano {filteredItems.length} z {items.length}
+                </span>
+                <div className="flex min-w-0 flex-wrap gap-1.5">
+                  {activeFilterLabels.map((filter) => (
+                    <Badge key={filter} tone="info" className="max-w-full truncate">
+                      {filter}
+                    </Badge>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <span>Brak aktywnych filtrow</span>
+            )}
+          </div>
         </div>
       </SectionCard>
 
-      <QueueGroup
-        title="Do zrobienia"
-        emptyTitle="Brak aktywnych zadan"
-        emptyText="Dodaj zadanie reczne albo skorzystaj z quick actions przy repo."
-        items={readyItems}
-        isPending={isPending}
-        onComplete={onComplete}
-        onSnooze={onSnooze}
-        onDismiss={onDismiss}
-      />
+      {filteredItems.length === 0 && hasActiveFilters ? (
+        <SectionCard title="Wyniki filtrowania">
+          <EmptyState
+            title="Brak zadan dla tych filtrow"
+            text="Zmien tekst, typ, status albo minimalny priorytet, zeby zobaczyc wiecej elementow kolejki."
+            primaryAction={
+              <Button variant="secondary" size="sm" onClick={resetFilters}>
+                Resetuj filtry
+              </Button>
+            }
+          />
+        </SectionCard>
+      ) : (
+        <>
+          {!hasActiveFilters || readyItems.length ? (
+            <QueueGroup
+              title="Do zrobienia"
+              emptyTitle="Brak aktywnych zadan"
+              emptyText="Dodaj zadanie reczne albo skorzystaj z quick actions przy repo."
+              items={readyItems}
+              isPending={isPending}
+              onComplete={onComplete}
+              onSnooze={onSnooze}
+              onDismiss={onDismiss}
+            />
+          ) : null}
 
-      {snoozedItems.length ? (
-        <QueueGroup
-          title="Odlozone"
-          items={snoozedItems}
-          isPending={isPending}
-          onComplete={onComplete}
-          onSnooze={onSnooze}
-          onDismiss={onDismiss}
-        />
-      ) : null}
+          {snoozedItems.length ? (
+            <QueueGroup
+              title="Odlozone"
+              items={snoozedItems}
+              isPending={isPending}
+              onComplete={onComplete}
+              onSnooze={onSnooze}
+              onDismiss={onDismiss}
+            />
+          ) : null}
 
-      {closedItems.length ? (
-        <details className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
-          <summary className="cursor-pointer text-base font-semibold">Zamkniete ({closedItems.length})</summary>
-          <div className="mt-3 space-y-3">
-            {closedItems.map((item, index) => (
-              <ActionItemCard
-                key={item.id}
-                item={item}
-                position={index + 1}
+          {closedItems.length ? (
+            hasActiveFilters ? (
+              <QueueGroup
+                title="Zamkniete"
+                items={closedItems}
                 isPending={isPending}
-                onComplete={() => onComplete(item.id)}
-                onSnooze={() => onSnooze(item.id)}
-                onDismiss={() => onDismiss(item.id)}
+                onComplete={onComplete}
+                onSnooze={onSnooze}
+                onDismiss={onDismiss}
               />
-            ))}
-          </div>
-        </details>
-      ) : null}
+            ) : (
+              <details className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
+                <summary className="cursor-pointer text-base font-semibold">Zamkniete ({closedItems.length})</summary>
+                <div className="mt-3 space-y-3">
+                  {closedItems.map((item, index) => (
+                    <ActionItemCard
+                      key={item.id}
+                      item={item}
+                      position={index + 1}
+                      isPending={isPending}
+                      onComplete={() => onComplete(item.id)}
+                      onSnooze={() => onSnooze(item.id)}
+                      onDismiss={() => onDismiss(item.id)}
+                    />
+                  ))}
+                </div>
+              </details>
+            )
+          ) : null}
+        </>
+      )}
     </section>
   );
 }
@@ -129,6 +262,40 @@ function QueueGroup({
   );
 }
 
+export function filterQueueItems(items: ActionItemListItem[], filters: TaskFilterState) {
+  const normalizedQuery = normalizeFilterText(filters.query);
+
+  return items.filter((item) => {
+    if (filters.type !== ALL_FILTER_VALUE && item.type !== filters.type) {
+      return false;
+    }
+
+    if (filters.status !== ALL_FILTER_VALUE && item.status !== filters.status) {
+      return false;
+    }
+
+    if (filters.minPriority > 0 && item.priority < filters.minPriority) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [
+      item.title,
+      item.description,
+      item.repoFullName,
+      item.ideaTitle,
+      item.reportTitle,
+      formatActionItemType(item.type),
+      formatActionItemStatus(item.status)
+    ]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => normalizeFilterText(value).includes(normalizedQuery));
+  });
+}
+
 function sortQueueItems(items: ActionItemListItem[]) {
   return [...items].sort((a, b) => {
     if (b.priority !== a.priority) {
@@ -143,4 +310,38 @@ function sortQueueItems(items: ActionItemListItem[]) {
 
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
+}
+
+function hasActiveTaskFilters(filters: TaskFilterState) {
+  return filters.query.trim().length > 0 || filters.type !== ALL_FILTER_VALUE || filters.status !== ALL_FILTER_VALUE || filters.minPriority > 0;
+}
+
+function buildTaskFilterLabels(filters: TaskFilterState) {
+  return [
+    filters.query.trim() ? `Szukaj: ${filters.query.trim()}` : null,
+    filters.type !== ALL_FILTER_VALUE ? `Typ: ${formatActionItemType(filters.type)}` : null,
+    filters.status !== ALL_FILTER_VALUE ? `Status: ${formatActionItemStatus(filters.status)}` : null,
+    filters.minPriority > 0 ? `Priorytet >= ${filters.minPriority}` : null
+  ].filter((value): value is string => Boolean(value));
+}
+
+function normalizeFilterText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function clampPriority(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(parsed));
+}
+
+function controlClassName(className?: string) {
+  return cn(
+    "h-9 w-full rounded-md border border-control-border bg-control px-3 text-sm text-foreground outline-none transition duration-fast ease-interface",
+    "focus:border-primary focus:ring-2 focus:ring-focus/30",
+    className
+  );
 }
