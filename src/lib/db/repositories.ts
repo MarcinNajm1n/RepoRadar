@@ -40,13 +40,16 @@ import type {
   TasksPanelData,
   WeeklyReportsPanelData
 } from "@/types/repository";
-import { safeJsonParse } from "@/lib/utils";
+import { safeJsonParse, sanitizeExternalText } from "@/lib/utils";
 import { parseStoredNumberRecord, parseStoredStringArray, sanitizeStoredNumberRecord } from "@/lib/stored-json";
 import type { Prisma, Repository } from "@prisma/client";
 
 const DEFAULT_REPOSITORY_PAGE = 1;
 const DEFAULT_REPOSITORY_PAGE_SIZE = 100;
+const MAX_REPOSITORY_PAGE = 10_000;
 const MAX_REPOSITORY_PAGE_SIZE = 200;
+const MAX_REPOSITORY_FILTER_TEXT_LENGTH = 160;
+const REPOSITORY_SORT_KEYS = new Set(["trend_desc", "stars_desc", "pushed_desc", "first_seen_desc", "growth7d_desc", "name_asc"]);
 const latestSnapshotInclude = {
   snapshots: {
     orderBy: { capturedAt: "desc" as const },
@@ -897,18 +900,33 @@ function buildRepositoryPage(items: RepositoryListItem[], total: number, page = 
   };
 }
 
+function normalizePageNumber(value: unknown, fallback: number, min: number, max: number) {
+  const numeric = Number(value);
+  const parsed = Number.isFinite(numeric) ? Math.floor(numeric) : fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeRepositoryFilterText(value: unknown, fallback: string) {
+  return sanitizeExternalText(value, MAX_REPOSITORY_FILTER_TEXT_LENGTH) ?? fallback;
+}
+
+function normalizeRepositorySortKey(value: unknown) {
+  const sortKey = normalizeRepositoryFilterText(value, "trend_desc");
+  return REPOSITORY_SORT_KEYS.has(sortKey) ? sortKey : "trend_desc";
+}
+
 function normalizeRepositoryPageInput(input: RepositoryPageInput = {}) {
-  const page = Math.max(1, Math.floor(input.page ?? DEFAULT_REPOSITORY_PAGE));
-  const pageSize = Math.min(MAX_REPOSITORY_PAGE_SIZE, Math.max(1, Math.floor(input.pageSize ?? DEFAULT_REPOSITORY_PAGE_SIZE)));
+  const page = normalizePageNumber(input.page, DEFAULT_REPOSITORY_PAGE, 1, MAX_REPOSITORY_PAGE);
+  const pageSize = normalizePageNumber(input.pageSize, DEFAULT_REPOSITORY_PAGE_SIZE, 1, MAX_REPOSITORY_PAGE_SIZE);
 
   return {
-    tab: input.tab ?? "library",
-    query: input.query?.trim() ?? "",
-    status: input.status ?? "ALL",
-    language: input.language ?? "ALL",
-    profile: input.profile ?? "ALL",
-    minTrend: Math.min(100, Math.max(0, Math.floor(input.minTrend ?? 0))),
-    sortKey: input.sortKey ?? "trend_desc",
+    tab: normalizeRepositoryFilterText(input.tab, "library"),
+    query: normalizeRepositoryFilterText(input.query, "").trim(),
+    status: normalizeRepositoryFilterText(input.status, "ALL"),
+    language: normalizeRepositoryFilterText(input.language, "ALL"),
+    profile: normalizeRepositoryFilterText(input.profile, "ALL"),
+    minTrend: normalizePageNumber(input.minTrend, 0, 0, 100),
+    sortKey: normalizeRepositorySortKey(input.sortKey),
     page,
     pageSize
   };

@@ -98,6 +98,36 @@ describe("getRepositoryPage", () => {
     expect(mocks.repositoryCount).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes malformed pagination and filters before querying Prisma", async () => {
+    await getRepositoryPage({
+      query: `  ai\u0000${"x".repeat(240)}  `,
+      tab: { value: "library" },
+      status: { value: "HOT" },
+      language: "\u0000TypeScript",
+      profile: "\u0000fresh_repos",
+      minTrend: Number.NaN,
+      sortKey: "unknown",
+      page: Number.NaN,
+      pageSize: Number.POSITIVE_INFINITY
+    } as unknown as Parameters<typeof getRepositoryPage>[0]);
+
+    const call = mocks.repositoryFindMany.mock.calls[0]?.[0];
+    const where = call?.where as { AND?: Array<Record<string, unknown>> };
+    const queryFilter = where.AND?.find((filter) => "OR" in filter) as { OR?: Array<Record<string, { contains: string }>> } | undefined;
+
+    expect(call).toMatchObject({
+      orderBy: [{ trendScore: "desc" }, { initialMomentumScore: "desc" }, { starsCurrent: "desc" }],
+      skip: 0,
+      take: 100
+    });
+    expect(where.AND).toContainEqual({ isDeletedFromView: false });
+    expect(where.AND).toContainEqual({ primaryLanguage: "TypeScript" });
+    expect(where.AND).toContainEqual({ discoveryProfilesJson: { contains: "fresh_repos" } });
+    expect(queryFilter?.OR?.[0]?.fullName.contains).toHaveLength(160);
+    expect(queryFilter?.OR?.[0]?.fullName.contains).not.toContain("\u0000");
+    expect(where.AND).not.toContainEqual({ status: "HOT" });
+  });
+
   it("returns mapped repositories in the Prisma result order", async () => {
     mocks.repositoryFindMany.mockResolvedValueOnce([
       repositoryRecord({ id: "repo_low", githubId: 10, fullName: "server/low", trendScore: 10 }),
