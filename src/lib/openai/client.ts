@@ -1,5 +1,8 @@
 import { getConfig } from "@/lib/config";
 
+const MAX_OPENAI_RESPONSE_BYTES = 1_000_000;
+const MAX_OPENAI_ERROR_RESPONSE_BYTES = 16_000;
+
 type OpenAiResponse = {
   output_text?: string;
   output?: Array<{
@@ -47,6 +50,72 @@ export type GenerateOpenAiTextOptions = {
   maxOutputTokens?: number;
 };
 
+function assertContentLengthWithinLimit(response: Response, maxBytes: number) {
+  const rawContentLength = response.headers.get("content-length");
+  if (!rawContentLength) {
+    return;
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`OpenAI response exceeds ${maxBytes} bytes`);
+  }
+}
+
+async function readResponseTextWithLimit(response: Response, maxBytes: number) {
+  assertContentLengthWithinLimit(response, maxBytes);
+
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new Error(`OpenAI response exceeds ${maxBytes} bytes`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(`OpenAI response exceeds ${maxBytes} bytes`);
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function parseOpenAiResponse(body: string) {
+  try {
+    return JSON.parse(body) as OpenAiResponse;
+  } catch {
+    throw new Error("OpenAI response was not valid JSON");
+  }
+}
+
+function parseOpenAiErrorResponse(body: string) {
+  try {
+    return JSON.parse(body) as OpenAiResponse;
+  } catch {
+    return {};
+  }
+}
+
 function collectOutputText(response: OpenAiResponse) {
   if (response.output_text) {
     return response.output_text.trim();
@@ -93,11 +162,14 @@ export async function generateOpenAiText(instructions: string, input: string, op
     body: JSON.stringify(buildOpenAiResponsesBody(config.openAiModel, instructions, input, options))
   });
 
-  const data = (await response.json()) as OpenAiResponse;
   if (!response.ok) {
+    const errorBody = await readResponseTextWithLimit(response, MAX_OPENAI_ERROR_RESPONSE_BYTES).catch(() => "");
+    const data = errorBody ? parseOpenAiErrorResponse(errorBody) : {};
     throw new Error(`OpenAI API ${response.status}: ${data.error?.message ?? "request failed"}`);
   }
 
+  const body = await readResponseTextWithLimit(response, MAX_OPENAI_RESPONSE_BYTES);
+  const data = parseOpenAiResponse(body);
   const text = collectOutputText(data);
   if (!text) {
     throw new Error("OpenAI response did not contain text output");
