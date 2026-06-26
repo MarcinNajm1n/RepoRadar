@@ -22,14 +22,15 @@ beforeEach(() => {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  vi.restoreAllMocks();
 });
 
 describe("fetchWithTimeout", () => {
   it("fetches public external hosts after DNS validation", async () => {
     mocks.lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
 
-    await expect(fetchWithTimeout("https://example.com/feed", { maxBytes: 8, allowedHosts: ["example.com"] })).resolves.toBe(
-      "research"
+    await expect(fetchWithTimeout("https://example.com/feed", { maxBytes: 20, allowedHosts: ["example.com"] })).resolves.toBe(
+      "research payload"
     );
 
     expect(mocks.lookup).toHaveBeenCalledWith("example.com", { all: true, verbatim: true });
@@ -38,6 +39,32 @@ describe("fetchWithTimeout", () => {
       expect.objectContaining({
         redirect: "manual"
       })
+    );
+  });
+
+  it("rejects external responses that exceed the configured byte limit while streaming", async () => {
+    mocks.lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    global.fetch = vi.fn(async () => new Response("0123456789", { status: 200 })) as typeof fetch;
+
+    await expect(fetchWithTimeout("https://example.com/feed", { maxBytes: 5, allowedHosts: ["example.com"] })).rejects.toThrow(
+      "External response exceeds 5 bytes"
+    );
+  });
+
+  it("rejects oversized external responses from content length before reading", async () => {
+    mocks.lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    global.fetch = vi.fn(
+      async () =>
+        new Response("short", {
+          status: 200,
+          headers: {
+            "content-length": "100"
+          }
+        })
+    ) as typeof fetch;
+
+    await expect(fetchWithTimeout("https://example.com/feed", { maxBytes: 50, allowedHosts: ["example.com"] })).rejects.toThrow(
+      "External response exceeds 50 bytes"
     );
   });
 

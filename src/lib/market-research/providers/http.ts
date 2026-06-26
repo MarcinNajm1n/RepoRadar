@@ -2,6 +2,8 @@ import { lookup } from "node:dns/promises";
 import type { LookupAddress } from "node:dns";
 import { isBlockedExternalHost, sanitizeExternalUrl } from "@/lib/utils";
 
+const DEFAULT_MAX_BYTES = 700_000;
+
 type ExternalFetchOptions = {
   timeoutMs?: number;
   maxBytes?: number;
@@ -39,8 +41,9 @@ export async function fetchWithTimeout(url: string, options: ExternalFetchOption
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const text = await response.text();
-    return text.slice(0, options.maxBytes ?? 700_000);
+    const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+    assertContentLengthWithinLimit(response, maxBytes);
+    return readResponseTextWithLimit(response, maxBytes);
   } finally {
     clearTimeout(timeout);
   }
@@ -56,6 +59,54 @@ function assertAllowedExternalFetchHost(hostname: string, allowedHosts: readonly
   const allowed = allowedHosts.map(normalizeHostname).filter(Boolean);
   if (!allowed.length || !allowed.includes(normalized)) {
     throw new Error("Blocked external URL host allowlist");
+  }
+}
+
+function assertContentLengthWithinLimit(response: Response, maxBytes: number) {
+  const rawContentLength = response.headers.get("content-length");
+  if (!rawContentLength) {
+    return;
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`External response exceeds ${maxBytes} bytes`);
+  }
+}
+
+async function readResponseTextWithLimit(response: Response, maxBytes: number) {
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new Error(`External response exceeds ${maxBytes} bytes`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(`External response exceeds ${maxBytes} bytes`);
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
   }
 }
 
