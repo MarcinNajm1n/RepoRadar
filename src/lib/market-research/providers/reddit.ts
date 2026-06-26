@@ -2,6 +2,9 @@ import { getConfig } from "@/lib/config";
 import { sanitizeExternalText, sanitizeExternalUrl } from "@/lib/utils";
 import type { MarketResearchContext, MarketResearchProvider, MarketResearchSourceInput } from "../types";
 
+const MAX_REDDIT_TOKEN_RESPONSE_BYTES = 64_000;
+const MAX_REDDIT_SEARCH_RESPONSE_BYTES = 700_000;
+
 type RedditTokenResponse = {
   access_token?: unknown;
   error?: unknown;
@@ -30,6 +33,65 @@ function redditConfigured() {
   return Boolean(config.enableRedditSource && config.redditClientId && config.redditClientSecret);
 }
 
+function assertContentLengthWithinLimit(response: Response, maxBytes: number) {
+  const rawContentLength = response.headers.get("content-length");
+  if (!rawContentLength) {
+    return;
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`Reddit response exceeds ${maxBytes} bytes`);
+  }
+}
+
+async function readResponseTextWithLimit(response: Response, maxBytes: number) {
+  assertContentLengthWithinLimit(response, maxBytes);
+
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new Error(`Reddit response exceeds ${maxBytes} bytes`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(`Reddit response exceeds ${maxBytes} bytes`);
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function readRedditJson<T>(response: Response, maxBytes: number) {
+  const body = await readResponseTextWithLimit(response, maxBytes);
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new Error("Reddit response was not valid JSON");
+  }
+}
+
 async function getRedditAccessToken() {
   const config = getConfig();
   if (!config.redditClientId || !config.redditClientSecret) {
@@ -49,7 +111,7 @@ async function getRedditAccessToken() {
     signal: controller.signal
   }).finally(() => clearTimeout(timeout));
 
-  const data = (await response.json()) as RedditTokenResponse;
+  const data = await readRedditJson<RedditTokenResponse>(response, MAX_REDDIT_TOKEN_RESPONSE_BYTES);
   const accessToken = sanitizeExternalText(data.access_token, 2000);
   if (!response.ok || !accessToken) {
     throw new Error(`Reddit OAuth failed: ${sanitizeExternalText(data.error, 120) ?? response.status}`);
@@ -166,7 +228,7 @@ export const redditProvider: MarketResearchProvider = {
     if (rateLimitError) {
       throw new Error(rateLimitError);
     }
-    const data = (await response.json()) as RedditSearchResponse;
+    const data = await readRedditJson<RedditSearchResponse>(response, MAX_REDDIT_SEARCH_RESPONSE_BYTES);
     if (!response.ok) {
       throw new Error(`Reddit search failed with HTTP ${response.status}`);
     }

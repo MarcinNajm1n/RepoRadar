@@ -46,6 +46,21 @@ describe("redditProvider", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects oversized OAuth responses before parsing them", async () => {
+    global.fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ access_token: "ignored" }), {
+          status: 200,
+          headers: {
+            "content-length": "64001"
+          }
+        })
+    ) as typeof fetch;
+
+    await expect(redditProvider.research(context)).rejects.toThrow("Reddit response exceeds 64000 bytes");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("drops unsafe result URLs and sanitizes invalid Reddit metadata", async () => {
     global.fetch = vi
       .fn()
@@ -95,5 +110,22 @@ describe("redditProvider", () => {
       relevanceScore: 60
     });
     expect(result.sources[0].snippet).not.toContain("[object Object]");
+  });
+
+  it("rejects oversized search responses before parsing them", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "test-token" }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { children: [] } }), {
+          status: 200,
+          headers: {
+            "content-length": "700001"
+          }
+        })
+      ) as typeof fetch;
+
+    await expect(redditProvider.research(context)).rejects.toThrow("Reddit response exceeds 700000 bytes");
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
