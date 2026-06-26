@@ -2,7 +2,12 @@ import { prisma } from "@/lib/db/client";
 import { getConfig } from "@/lib/config";
 import { runAiJob } from "@/lib/db/ai-jobs";
 import { monthsBetween, safeJsonParse, sanitizeExternalStringArray, sanitizeExternalText } from "@/lib/utils";
-import { sanitizeGitHubRepositoryUrl } from "@/lib/github/sanitize";
+import {
+  sanitizeGitHubCount,
+  sanitizeGitHubDate,
+  sanitizeGitHubRepositoryUrl,
+  sanitizeOptionalGitHubDate
+} from "@/lib/github/sanitize";
 import { calculateGrowth } from "@/lib/scoring/growth";
 import { calculateTrendScore } from "@/lib/scoring/trend-score";
 import { generateShortSummaryForRepository } from "@/lib/openai/repository-analysis";
@@ -70,8 +75,12 @@ async function upsertRepositoryFromGitHub(
   const existingByFullName = existingByGitHubId ? null : await prisma.repository.findUnique({ where: { fullName } });
   const existing = existingByGitHubId ?? existingByFullName;
 
-  const createdAt = new Date(item.created_at);
-  const pushedAt = item.pushed_at ? new Date(item.pushed_at) : null;
+  const createdAt = sanitizeGitHubDate(item.created_at, existing?.createdAt ?? now, now);
+  const pushedAt = sanitizeOptionalGitHubDate(item.pushed_at, now);
+  const starsCurrent = sanitizeGitHubCount(item.stargazers_count);
+  const forksCurrent = sanitizeGitHubCount(item.forks_count);
+  const watchersCurrent = sanitizeGitHubCount(item.subscribers_count, sanitizeGitHubCount(item.watchers_count));
+  const openIssues = sanitizeGitHubCount(item.open_issues_count);
   const ageMonths = monthsBetween(createdAt, now);
   const isOldRepo = ageMonths > config.oldRepoAgeMonths;
 
@@ -90,10 +99,10 @@ async function upsertRepositoryFromGitHub(
     createdAt,
     pushedAt,
     lastSeenAt: now,
-    starsCurrent: item.stargazers_count,
-    forksCurrent: item.forks_count,
-    watchersCurrent: item.subscribers_count ?? item.watchers_count,
-    openIssues: item.open_issues_count,
+    starsCurrent,
+    forksCurrent,
+    watchersCurrent,
+    openIssues,
     ageMonths,
     isOldRepo,
     isArchived: item.archived,

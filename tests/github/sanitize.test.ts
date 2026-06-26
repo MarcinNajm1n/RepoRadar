@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeGitHubRepositoryUrl } from "../../src/lib/github/sanitize";
+import {
+  sanitizeGitHubCount,
+  sanitizeGitHubDate,
+  sanitizeGitHubRepositoryUrl,
+  sanitizeOptionalGitHubDate
+} from "../../src/lib/github/sanitize";
 import { sanitizeExternalStringArray, sanitizeExternalText, sanitizeExternalUrl } from "../../src/lib/utils";
 
 describe("sanitizeExternalText", () => {
@@ -57,5 +62,46 @@ describe("sanitizeGitHubRepositoryUrl", () => {
     expect(sanitizeGitHubRepositoryUrl("owner/toolkit?x=y")).toBe("https://github.com/");
     expect(sanitizeGitHubRepositoryUrl("owner/toolkit#readme")).toBe("https://github.com/");
     expect(sanitizeGitHubRepositoryUrl({ fullName: "owner/toolkit" })).toBe("https://github.com/");
+  });
+});
+
+describe("sanitizeGitHubCount", () => {
+  it("keeps non-negative finite integer counts", () => {
+    expect(sanitizeGitHubCount(42.8)).toBe(42);
+    expect(sanitizeGitHubCount("7")).toBe(7);
+  });
+
+  it("falls back for blank, negative and non-finite counts", () => {
+    expect(sanitizeGitHubCount("", 3)).toBe(3);
+    expect(sanitizeGitHubCount("Infinity", 3)).toBe(3);
+    expect(sanitizeGitHubCount(Number.NaN, 3)).toBe(3);
+    expect(sanitizeGitHubCount(-5)).toBe(0);
+    expect(sanitizeGitHubCount(3_000_000_000)).toBe(2_147_483_647);
+  });
+});
+
+describe("sanitizeGitHubDate", () => {
+  it("keeps valid GitHub date strings", () => {
+    expect(sanitizeGitHubDate("2026-06-01T00:00:00Z", new Date("2026-01-01T00:00:00Z")).toISOString()).toBe(
+      "2026-06-01T00:00:00.000Z"
+    );
+  });
+
+  it("uses fallbacks for invalid required dates and null for invalid optional dates", () => {
+    const fallback = new Date("2026-01-01T00:00:00Z");
+
+    expect(sanitizeGitHubDate("not-a-date", fallback)).toBe(fallback);
+    expect(sanitizeGitHubDate("2026-06-01", fallback)).toBe(fallback);
+    expect(sanitizeGitHubDate("2026-02-30T00:00:00Z", fallback)).toBe(fallback);
+    expect(sanitizeOptionalGitHubDate("not-a-date")).toBeNull();
+    expect(sanitizeOptionalGitHubDate(null)).toBeNull();
+  });
+
+  it("rejects GitHub dates after the current scan time", () => {
+    const fallback = new Date("2026-06-01T00:00:00Z");
+    const now = new Date("2026-06-10T00:00:00Z");
+
+    expect(sanitizeGitHubDate("2026-06-11T00:00:00Z", fallback, now)).toBe(fallback);
+    expect(sanitizeOptionalGitHubDate("2026-06-11T00:00:00Z", now)).toBeNull();
   });
 });
