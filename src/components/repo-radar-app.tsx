@@ -76,6 +76,9 @@ type ReportState = {
   evidenceSources: EvidenceSourceItem[];
 } | null;
 
+const EMPTY_IDEAS: IdeaListItem[] = [];
+const EMPTY_ACTION_ITEMS: TasksPanelData["actionItems"] = [];
+
 function getTomorrowIso() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 }
@@ -346,8 +349,8 @@ export function RepoRadarApp({ initialData }: { initialData: DashboardData }) {
     }
   }, [activeTab, hasTriedSettingsPanelLoad, isSettingsPanelLoading, loadSettingsPanelData, settingsPanelData]);
 
-  const panelIdeas = ideasPanelData?.ideas ?? [];
-  const panelActionItems = tasksPanelData?.actionItems ?? [];
+  const panelIdeas = ideasPanelData?.ideas ?? EMPTY_IDEAS;
+  const panelActionItems = tasksPanelData?.actionItems ?? EMPTY_ACTION_ITEMS;
   const candidates = useMemo(() => panelIdeas.filter((idea) => idea.status === IDEA_STATUS.CANDIDATE), [panelIdeas]);
   const fullIdeas = useMemo(() => panelIdeas.filter((idea) => isFullIdeaStatus(idea.status)), [panelIdeas]);
   const savedIdeas = useMemo(() => panelIdeas.filter((idea) => idea.status === IDEA_STATUS.SAVED), [panelIdeas]);
