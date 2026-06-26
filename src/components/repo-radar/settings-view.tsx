@@ -183,6 +183,11 @@ export function SettingsView({
               GITHUB_TOKEN ustaw w `.env`, zeby zwiekszyc limit skanow GitHub. Po zmianie zrestartuj `npm run dev`. UI nie pokazuje ani nie zapisuje wartosci tokena.
             </p>
           ) : null}
+          {!settingsSummary.openAiConfigured ? (
+            <p className="mt-3 rounded-md border border-info/40 bg-info/10 p-3 text-sm text-info-foreground">
+              OPENAI_API_KEY jest opcjonalny. Dodaj go w `.env` tylko dla raportow, briefow i pomyslow AI na zadanie; po zmianie zrestartuj `npm run dev`.
+            </p>
+          ) : null}
           {settingsSummary.discordWebhookStatus === "invalid" ? (
             <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground" role="alert">
               DISCORD_WEBHOOK_URL musi byc adresem HTTPS w formacie https://discord.com/api/webhooks/ID/TOKEN.

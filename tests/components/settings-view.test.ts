@@ -331,6 +331,30 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("UI nie pokazuje ani nie zapisuje wartosci tokena");
   });
 
+  it("renders OpenAI as optional when the API key is missing", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        settingsSummary: settingsSummary({ openAiConfigured: false }),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain("OPENAI_API_KEY jest opcjonalny");
+    expect(html).toContain("tylko dla raportow, briefow i pomyslow AI na zadanie");
+    expect(html).toContain("po zmianie zrestartuj `npm run dev`");
+  });
+
   it("marks the controlled settings section as active", () => {
     const html = renderToStaticMarkup(
       React.createElement(SettingsView, {
