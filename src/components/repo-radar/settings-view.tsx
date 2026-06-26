@@ -178,6 +178,11 @@ export function SettingsView({
           <p className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3 text-sm text-muted-foreground">
             Sekrety nie są zapisywane w SQLite. Zmieniaj je ręcznie w `.env`; UI pokazuje tylko status.
           </p>
+          {!settingsSummary.githubTokenConfigured ? (
+            <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground" role="alert">
+              GITHUB_TOKEN ustaw w `.env`, zeby zwiekszyc limit skanow GitHub. UI nie pokazuje ani nie zapisuje wartosci tokena.
+            </p>
+          ) : null}
           {settingsSummary.discordWebhookStatus === "invalid" ? (
             <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning-foreground" role="alert">
               DISCORD_WEBHOOK_URL musi byc adresem HTTPS w formacie https://discord.com/api/webhooks/ID/TOKEN.

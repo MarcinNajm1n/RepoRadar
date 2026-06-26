@@ -307,6 +307,29 @@ describe("SettingsView maintenance preview", () => {
     expect(html).toContain("https://discord.com/api/webhooks/ID/TOKEN");
   });
 
+  it("renders a safe setup hint when GitHub token is missing", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsView, {
+        settingsSummary: settingsSummary({ githubTokenConfigured: false }),
+        notificationSummary,
+        isLoading: false,
+        isPending: false,
+        onSaveSetting: noop,
+        onClearExpiredExternalCache: noop,
+        onClearOldNotificationLogs: noop,
+        onTestNotification: noop,
+        onRetryAiJob: noop,
+        onOpenDailyBriefing: noop,
+        onDownloadIdeasCsv: noop,
+        onPruneSnapshots: noop,
+        onRetryLoad: noop
+      })
+    );
+
+    expect(html).toContain("GITHUB_TOKEN ustaw w `.env`");
+    expect(html).toContain("UI nie pokazuje ani nie zapisuje wartosci tokena");
+  });
+
   it("marks the controlled settings section as active", () => {
     const html = renderToStaticMarkup(
       React.createElement(SettingsView, {
