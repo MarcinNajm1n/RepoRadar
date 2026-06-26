@@ -202,10 +202,31 @@ function freshnessPoints(publishedAt: string | null | undefined) {
   return 2;
 }
 
+function finiteNumber(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function cleanScore(value: unknown, min: number, max: number) {
+  const parsed = finiteNumber(value);
+  return parsed === null ? null : Math.round(clamp(parsed, min, max));
+}
+
 export function estimateSourceConfidence(source: MarketResearchSourceInput, context?: MarketResearchContext) {
   const kind = (source.evidenceKind as EvidenceKind | undefined) ?? classifyEvidenceKind(source, context);
   const text = sourceText(source);
-  const relevancePoints = clamp(source.relevanceScore ?? 50, 0, 100) * 0.4;
+  const relevancePoints = (cleanScore(source.relevanceScore, 0, 100) ?? 50) * 0.4;
   const providerPoints = sourceTypeWeight(source.sourceType);
   const snippetLength = sanitizeExternalText(source.snippet, 1400)?.length ?? 0;
   const snippetPoints = snippetLength >= 120 ? 10 : snippetLength >= 40 ? 6 : 2;
@@ -219,8 +240,8 @@ export function estimateSourceConfidence(source: MarketResearchSourceInput, cont
 
 export function rankEvidenceSource(source: MarketResearchSourceInput) {
   return Math.round(
-    clamp(source.sourceConfidence ?? 0, 0, 100) +
-      clamp(source.relevanceScore ?? 50, 0, 100) * 0.25 +
+    (cleanScore(source.sourceConfidence, 0, 100) ?? 0) +
+      (cleanScore(source.relevanceScore, 0, 100) ?? 50) * 0.25 +
       sourceTypeWeight(source.sourceType)
   );
 }
@@ -264,10 +285,7 @@ export function normalizeSource(source: MarketResearchSourceInput, providerName:
     publishedAt: sanitizeExternalText(source.publishedAt, 80),
     snippet,
     sentiment: sanitizeExternalText(source.sentiment, 60),
-    relevanceScore:
-      source.relevanceScore === null || source.relevanceScore === undefined
-        ? null
-        : Math.round(clamp(Number(source.relevanceScore), 0, 100)),
+    relevanceScore: cleanScore(source.relevanceScore, 0, 100),
     evidenceKind,
     providerItemId: sanitizeExternalText(source.providerItemId, 240)
   };

@@ -5,7 +5,8 @@ import {
   classifyEvidenceKind,
   dedupeEvidenceSources,
   estimateSourceConfidence,
-  normalizeSource
+  normalizeSource,
+  rankEvidenceSource
 } from "../../src/lib/market-research/evidence";
 import type { MarketResearchContext, MarketResearchSourceInput } from "../../src/lib/market-research/types";
 
@@ -108,5 +109,37 @@ describe("evidence engine", () => {
     expect(deduped).toHaveLength(3);
     expect(deduped.filter((item) => item.sourceType === "rss")).toHaveLength(2);
     expect(new Set(deduped.map((item) => item.sourceKey)).size).toBe(3);
+  });
+
+  it("keeps invalid runtime relevance scores out of confidence and ranking", () => {
+    const normalized = normalizeSource(source({ relevanceScore: "bad" as unknown as number }), "hn", context);
+    const infinite = normalizeSource(source({ relevanceScore: Number.POSITIVE_INFINITY }), "hn", context);
+    const blank = normalizeSource(source({ relevanceScore: "  " as unknown as number }), "hn", context);
+
+    expect(normalized?.relevanceScore).toBeNull();
+    expect(infinite?.relevanceScore).toBeNull();
+    expect(blank?.relevanceScore).toBeNull();
+    expect(normalized?.sourceConfidence).toEqual(expect.any(Number));
+    expect(normalized?.sourceRank).toEqual(expect.any(Number));
+    expect(Number.isFinite(normalized?.sourceConfidence)).toBe(true);
+    expect(Number.isFinite(normalized?.sourceRank)).toBe(true);
+  });
+
+  it("parses and clamps numeric runtime relevance score strings", () => {
+    const normalized = normalizeSource(source({ relevanceScore: "105.8" as unknown as number }), "hn", context);
+
+    expect(normalized?.relevanceScore).toBe(100);
+  });
+
+  it("keeps invalid runtime confidence scores out of direct ranking", () => {
+    const rank = rankEvidenceSource(
+      source({
+        sourceConfidence: Number.POSITIVE_INFINITY,
+        relevanceScore: "80" as unknown as number
+      })
+    );
+
+    expect(rank).toEqual(expect.any(Number));
+    expect(Number.isFinite(rank)).toBe(true);
   });
 });
