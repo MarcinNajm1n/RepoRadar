@@ -176,4 +176,25 @@ describe("market research service aggregation", () => {
       })
     );
   });
+
+  it("ignores malformed cached research payloads and refreshes provider data", async () => {
+    mocks.prisma.externalResearchCache.findUnique
+      .mockResolvedValueOnce({
+        contentJson: JSON.stringify({
+          provider: "hn",
+          summary: "Cached payload without sources",
+          sentiment: "mixed"
+        }),
+        expiresAt: new Date(Date.now() + 60_000)
+      })
+      .mockResolvedValueOnce(null);
+
+    const result = await getMarketResearchForRepository(context);
+
+    expect(mocks.hnResearch).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("SUCCESS");
+    expect(result.summary).toBe("HN found evidence");
+    expect(result.runIds).toEqual(["run_hn"]);
+    expect(mocks.prisma.marketResearchRun.count).toHaveBeenCalled();
+  });
 });

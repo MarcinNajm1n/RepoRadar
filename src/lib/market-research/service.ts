@@ -96,6 +96,67 @@ function parsePublishedAt(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function cachedStringArray(value: unknown, maxItems: number, maxLength: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => sanitizeExternalText(item, maxLength))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, maxItems);
+}
+
+function cachedSourceArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value.filter((source): source is MarketResearchSourceInput => Boolean(source) && typeof source === "object");
+}
+
+function cachedNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeCachedMarketResearchResult(
+  cached: unknown,
+  provider: string,
+  queries: string[]
+): MarketResearchResult | null {
+  if (!cached || typeof cached !== "object" || Array.isArray(cached)) {
+    return null;
+  }
+
+  const record = cached as Record<string, unknown>;
+  const summary = sanitizeExternalText(record.summary, 2000);
+  const sentiment = sanitizeExternalText(record.sentiment, 120);
+  const sources = cachedSourceArray(record.sources);
+  if (!summary || !sentiment || !sources) {
+    return null;
+  }
+
+  const cachedQueries = cachedStringArray(record.queries, 12, 180);
+  const cachedProviders = cachedStringArray(record.providers, 8, 80);
+
+  return {
+    provider: sanitizeExternalText(record.provider, 80) ?? provider,
+    summary,
+    signals: cachedStringArray(record.signals, 8, 300),
+    userProblems: cachedStringArray(record.userProblems, 8, 300),
+    sentiment,
+    demandEvidence: cachedStringArray(record.demandEvidence, 8, 300),
+    validationRisks: cachedStringArray(record.validationRisks, 8, 300),
+    confidenceScore: cachedNumber(record.confidenceScore),
+    sources,
+    queries: cachedQueries.length ? cachedQueries : queries,
+    providers: cachedProviders.length ? cachedProviders : [provider],
+    independentSourceCount: cachedNumber(record.independentSourceCount) ?? undefined,
+    evidenceSummary: sanitizeExternalText(record.evidenceSummary, 1200),
+    conflictSummary: sanitizeExternalText(record.conflictSummary, 1200)
+  };
+}
+
 function enrichMarketResearchResult(
   context: MarketResearchContext,
   provider: string,
@@ -204,7 +265,7 @@ async function storeRun(
 
 async function tryCached(context: MarketResearchContext, provider: MarketResearchProvider, hash: string) {
   const queries = buildResearchQueries(context);
-  const cached = await getExternalResearchCache<MarketResearchResult>(provider.name, hash);
+  const cached = normalizeCachedMarketResearchResult(await getExternalResearchCache(provider.name, hash), provider.name, queries);
   if (!cached) {
     return null;
   }
