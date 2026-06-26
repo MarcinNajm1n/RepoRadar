@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { toIsoDate } from "@/lib/utils";
 import { isHighValueRepository } from "@/lib/notifications/thresholds";
+import { markdownLink } from "./markdown";
 
 export async function createDailyReport(scanRunId: string) {
   const scanRun = await prisma.scanRun.findUniqueOrThrow({ where: { id: scanRunId } });
@@ -40,12 +41,12 @@ export async function createDailyReport(scanRunId: string) {
     ...top.map((repo, index) => {
       const snapshot = repo.snapshots[0];
       const growth = snapshot?.growth7d === null || snapshot?.growth7d === undefined ? "zbieramy dane" : `+${snapshot.growth7d} / 7d`;
-      return `${index + 1}. [${repo.fullName}](${repo.url}) - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growth}`;
+      return `${index + 1}. ${markdownLink(repo.fullName, repo.url)} - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growth}`;
     }),
     "",
     "## Repo warte uwagi",
     ...(highValue.length
-      ? highValue.map((repo) => `- [${repo.fullName}](${repo.url}) - trend ${repo.trendScore}, relevance ${repo.relevanceScore}`)
+      ? highValue.map((repo) => `- ${markdownLink(repo.fullName, repo.url)} - trend ${repo.trendScore}, relevance ${repo.relevanceScore}`)
       : ["- Brak repo przekraczających próg powiadomień."]),
     "",
     "## Uwagi",

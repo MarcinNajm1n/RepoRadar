@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { formatDate, getIsoWeek, toIsoDate } from "@/lib/utils";
+import { markdownLink } from "./markdown";
 
 type PortfolioRepo = {
   id: string;
@@ -73,7 +74,7 @@ function growthLabel(repo: PortfolioRepo) {
 
 function repoLine(repo: PortfolioRepo) {
   const summary = repo.shortSummaryPl ?? repo.description ?? "Brak opisu.";
-  return `- [${repo.fullName}](${repo.url}) - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growthLabel(repo)}. ${summary}`;
+  return `- ${markdownLink(repo.fullName, repo.url)} - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growthLabel(repo)}. ${summary}`;
 }
 
 function ideaLine(idea: PortfolioIdea) {

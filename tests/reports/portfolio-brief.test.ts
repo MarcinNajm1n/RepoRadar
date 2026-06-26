@@ -51,4 +51,41 @@ describe("portfolio brief markdown", () => {
     expect(markdown).toContain("[owner/tool](https://github.com/owner/tool)");
     expect(markdown).toContain("zapisac jako PDF");
   });
+
+  it("escapes repository markdown links from stored data", () => {
+    const markdown = buildPortfolioBriefMarkdown({
+      generatedAt,
+      counts: {
+        repositories: 1,
+        newRepositories: 0,
+        savedRepositories: 0,
+        activeTasks: 0,
+        ideas: 0,
+        weeklyReports: 0
+      },
+      topRepositories: [
+        {
+          id: "repo_1",
+          fullName: "owner/repo]name",
+          url: "javascript:alert(1)",
+          trendScore: 91,
+          relevanceScore: 80,
+          initialMomentumScore: 70,
+          starsCurrent: 1234,
+          status: "HOT",
+          primaryLanguage: "TypeScript",
+          shortSummaryPl: null,
+          description: "Mocny sygnal.",
+          snapshots: []
+        }
+      ],
+      latestRepositories: [],
+      ideas: [],
+      lastScan: null,
+      latestWeeklyReport: null
+    });
+
+    expect(markdown).toContain("[owner/repo\\]name](https://github.com/)");
+    expect(markdown).not.toContain("javascript:alert");
+  });
 });

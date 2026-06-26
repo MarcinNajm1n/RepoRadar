@@ -4,10 +4,11 @@ import { REPORT_TYPES } from "@/types/status";
 import type { ActionItemListItem } from "@/types/action-item";
 import type { DashboardData, IdeaListItem, RepositoryListItem } from "@/types/repository";
 import { toIsoDate } from "@/lib/utils";
+import { markdownLink } from "./markdown";
 
 function repoLine(repo: RepositoryListItem, index: number) {
   const growth = repo.growth7d === null ? "baseline" : `+${repo.growth7d} stars / 7d`;
-  return `${index + 1}. [${repo.fullName}](${repo.url}) - trend ${repo.trendScore}, initial ${repo.initialMomentumScore}, ${growth}`;
+  return `${index + 1}. ${markdownLink(repo.fullName, repo.url)} - trend ${repo.trendScore}, initial ${repo.initialMomentumScore}, ${growth}`;
 }
 
 function ideaLine(idea: IdeaListItem, index: number) {

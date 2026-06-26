@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { getIsoWeek } from "@/lib/utils";
+import { markdownLink } from "./markdown";
 
 function repoLine(repo: {
   fullName: string;
@@ -14,7 +15,7 @@ function repoLine(repo: {
     latest?.growthPercent7d === null || latest?.growthPercent7d === undefined
       ? ""
       : ` (${latest.growthPercent7d.toFixed(1)}%)`;
-  return `- [${repo.fullName}](${repo.url}) - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growth}${percent}`;
+  return `- ${markdownLink(repo.fullName, repo.url)} - score ${repo.trendScore}, ${repo.starsCurrent} stars, ${growth}${percent}`;
 }
 
 export async function createWeeklyReport(now = new Date()) {
@@ -99,7 +100,7 @@ export async function createWeeklyReport(now = new Date()) {
     "",
     "## Potencjalne pomysły",
     ...(ideas.length
-      ? ideas.map((idea) => `- ${idea.title} - źródło: [${idea.repository.fullName}](${idea.repository.url})`)
+      ? ideas.map((idea) => `- ${idea.title} - źródło: ${markdownLink(idea.repository.fullName, idea.repository.url)}`)
       : ["- Brak wygenerowanych pomysłów."]),
     "",
     "## Podsumowanie",
