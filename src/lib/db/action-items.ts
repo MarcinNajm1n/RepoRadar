@@ -80,6 +80,19 @@ function cleanOptionalText(value: string | null | undefined, maxLength: number) 
   return sanitizeExternalText(value, maxLength);
 }
 
+function cleanOptionalId(value: unknown) {
+  return sanitizeExternalText(value, 120) || null;
+}
+
+function cleanRequiredId(value: unknown) {
+  const id = cleanOptionalId(value);
+  if (!id) {
+    throw new Error("Action item id is required.");
+  }
+
+  return id;
+}
+
 function cleanOptionalDate(value: string | Date | null | undefined) {
   if (!value) {
     return null;
@@ -122,9 +135,9 @@ function buildCreateData(input: CreateActionItemInput) {
     type: normalizeActionItemType(input.type),
     title: cleanTitle(input.title),
     description: cleanOptionalText(input.description, 1000),
-    repoId: input.repoId || null,
-    ideaId: input.ideaId || null,
-    reportId: input.reportId || null,
+    repoId: cleanOptionalId(input.repoId),
+    ideaId: cleanOptionalId(input.ideaId),
+    reportId: cleanOptionalId(input.reportId),
     priority: cleanPriority(input.priority),
     dueAt: cleanOptionalDate(input.dueAt),
     dedupeKey: cleanOptionalText(input.dedupeKey, 200),
@@ -138,9 +151,9 @@ function buildUpdateData(input: UpdateActionItemInput) {
     ...(input.status !== undefined ? { status: normalizeActionItemStatus(input.status) } : {}),
     ...(input.title !== undefined ? { title: cleanTitle(input.title) } : {}),
     ...(input.description !== undefined ? { description: cleanOptionalText(input.description, 1000) } : {}),
-    ...(input.repoId !== undefined ? { repoId: input.repoId || null } : {}),
-    ...(input.ideaId !== undefined ? { ideaId: input.ideaId || null } : {}),
-    ...(input.reportId !== undefined ? { reportId: input.reportId || null } : {}),
+    ...(input.repoId !== undefined ? { repoId: cleanOptionalId(input.repoId) } : {}),
+    ...(input.ideaId !== undefined ? { ideaId: cleanOptionalId(input.ideaId) } : {}),
+    ...(input.reportId !== undefined ? { reportId: cleanOptionalId(input.reportId) } : {}),
     ...(input.priority !== undefined ? { priority: cleanPriority(input.priority) } : {}),
     ...(input.dueAt !== undefined ? { dueAt: cleanOptionalDate(input.dueAt) } : {}),
     ...(input.snoozedUntil !== undefined ? { snoozedUntil: cleanOptionalDate(input.snoozedUntil) } : {}),
@@ -221,7 +234,7 @@ export async function createActionItem(input: CreateActionItemInput) {
 
 export async function updateActionItem(id: string, input: UpdateActionItemInput) {
   const item = await prisma.actionItem.update({
-    where: { id },
+    where: { id: cleanRequiredId(id) },
     data: buildUpdateData(input),
     include: {
       repository: { select: { fullName: true, url: true } },

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
     actionItem: {
       create: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
       upsert: vi.fn()
     }
   },
@@ -24,7 +25,8 @@ import {
   getActionItems,
   getActiveActionItems,
   normalizeActionItemStatus,
-  normalizeActionItemType
+  normalizeActionItemType,
+  updateActionItem
 } from "../../src/lib/db/action-items";
 
 function actionItemRecord(overrides: Record<string, unknown> = {}) {
@@ -118,6 +120,44 @@ describe("action item input normalization", () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({ priority: -100 })
+      })
+    );
+  });
+
+  it("sanitizes optional relation ids before creating action items", async () => {
+    await createActionItem({
+      type: "CUSTOM",
+      title: "Manual task",
+      repoId: "\u0000repo_1",
+      ideaId: { id: "idea_1" } as unknown as string,
+      reportId: "  report_1  "
+    });
+
+    expect(mocks.prisma.actionItem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          repoId: "repo_1",
+          ideaId: null,
+          reportId: "report_1"
+        })
+      })
+    );
+  });
+
+  it("sanitizes action item ids before update and rejects blank ids", async () => {
+    mocks.prisma.actionItem.update.mockResolvedValue(actionItemRecord());
+
+    await updateActionItem("  task_1\u0000  ", { repoId: "\u0000repo_1", ideaId: { id: "idea_1" } as unknown as string });
+    await expect(updateActionItem("   ", { title: "Ignored" })).rejects.toThrow("Action item id is required");
+
+    expect(mocks.prisma.actionItem.update).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.actionItem.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "task_1" },
+        data: expect.objectContaining({
+          repoId: "repo_1",
+          ideaId: null
+        })
       })
     );
   });
