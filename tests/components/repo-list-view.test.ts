@@ -87,16 +87,13 @@ function repository(overrides: Partial<RepositoryListItem>): RepositoryListItem 
 function noop() {}
 
 describe("RepoListView", () => {
-  it("renders repositories in the server-provided page order", () => {
-    const first = repository({ id: "low", fullName: "server/low", trendScore: 10, starsCurrent: 10 });
-    const second = repository({ id: "high", fullName: "server/high", trendScore: 99, starsCurrent: 99 });
-
-    const markup = renderToStaticMarkup(
+  function renderRepoListView(overrides: Partial<React.ComponentProps<typeof RepoListView>> = {}) {
+    return renderToStaticMarkup(
       React.createElement(RepoListView, {
-        repositories: [first, second],
+        repositories: [],
         filterBar: React.createElement("div"),
-        totalCount: 2,
-        hasMore: true,
+        totalCount: 0,
+        hasMore: false,
         onLoadMore: noop,
         expandedRepoId: null,
         timelines: {},
@@ -104,8 +101,8 @@ describe("RepoListView", () => {
         decisionContexts: {},
         loadingDecisionContextRepoId: null,
         decisionContextErrors: {},
-        selectedCompareRepoIds: ["high", "low"],
-        showInbox: true,
+        selectedCompareRepoIds: [],
+        showInbox: false,
         hasActiveFilters: false,
         isLoading: false,
         isPending: false,
@@ -128,13 +125,34 @@ describe("RepoListView", () => {
           onAddDemoTask: noop,
           onValidateMarket: noop,
           onIgnore: noop
-        }
+        },
+        ...overrides
       })
     );
+  }
+
+  it("renders repositories in the server-provided page order", () => {
+    const first = repository({ id: "low", fullName: "server/low", trendScore: 10, starsCurrent: 10 });
+    const second = repository({ id: "high", fullName: "server/high", trendScore: 99, starsCurrent: 99 });
+
+    const markup = renderRepoListView({
+      repositories: [first, second],
+      totalCount: 2,
+      hasMore: true,
+      selectedCompareRepoIds: ["high", "low"],
+      showInbox: true
+    });
 
     expect(markup.indexOf("server/low")).toBeLessThan(markup.indexOf("server/high"));
     expect(markup).toContain("inbox:server/low|server/high");
     expect(markup).toContain("compare:server/high|server/low");
     expect(markup).toContain("Pokazano <span class=\"font-semibold text-foreground\">2</span> z");
+  });
+
+  it("prioritizes resetting filters when an empty result is caused by active filters", () => {
+    const markup = renderRepoListView({ hasActiveFilters: true });
+
+    expect(markup).toContain("Filtry nie znalazly repozytoriow");
+    expect(markup.indexOf("Reset filtrow")).toBeLessThan(markup.indexOf("Uruchom scan"));
   });
 });

@@ -163,14 +163,20 @@ export function RepoListView({
               : "Uruchom scan, zeby RepoRadar pobral pierwsze repozytoria do lokalnej bazy."
           }
           primaryAction={
-            <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
-              Uruchom scan
-            </Button>
+            hasActiveFilters ? (
+              <Button variant="secondary" size="sm" onClick={onResetFilters}>
+                Reset filtrow
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
+                Uruchom scan
+              </Button>
+            )
           }
           secondaryAction={
             hasActiveFilters ? (
-              <Button variant="ghost" size="sm" onClick={onResetFilters}>
-                Reset filtrow
+              <Button variant="ghost" size="sm" onClick={onRunScan} disabled={isPending}>
+                Uruchom scan
               </Button>
             ) : null
           }
