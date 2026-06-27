@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import { Badge, Button, EmptyState, MetricPill, SectionCard, TextClamp } from "./ui";
 
 export const WEEKLY_REPORT_SEARCH_QUERY_LIMIT = 120;
+export const WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT = 12000;
 const WEEKLY_REPORT_SEARCH_FIELD_LIMIT = 20000;
 
 export function WeeklyReportsView({ reports, comparison: panelComparison }: { reports: ReportListItem[]; comparison?: WeeklyReportComparison | null }) {
@@ -73,34 +74,7 @@ export function WeeklyReportsView({ reports, comparison: panelComparison }: { re
       <div className="space-y-3">
         {filteredReports.length ? (
           filteredReports.map((weeklyReport) => (
-            <article key={weeklyReport.id} className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="break-words text-base font-semibold">
-                      {cleanDisplayText(weeklyReport.title, { maxLength: 140 })}
-                    </h3>
-                    <Badge variant="source">{formatDate(weeklyReport.createdAt)}</Badge>
-                    <Badge variant="score">{weeklyReport.repoCount} repo</Badge>
-                  </div>
-                  {weeklyReport.summary ? (
-                    <TextClamp lines={2} className="mt-2">
-                      {cleanDisplayText(weeklyReport.summary, { maxLength: 280 })}
-                    </TextClamp>
-                  ) : null}
-                  {weeklyReport.markdownPath ? (
-                    <p className="mt-2 break-words text-xs text-muted-foreground">Plik: {weeklyReport.markdownPath}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <details className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3">
-                <summary className="cursor-pointer text-sm font-semibold">Surowy raport tygodniowy</summary>
-                <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
-                  {weeklyReport.contentMarkdown}
-                </pre>
-              </details>
-            </article>
+            <WeeklyReportArticle key={weeklyReport.id} weeklyReport={weeklyReport} />
           ))
         ) : (
           <EmptyState
@@ -118,6 +92,43 @@ export function WeeklyReportsView({ reports, comparison: panelComparison }: { re
   );
 }
 
+function WeeklyReportArticle({ weeklyReport }: { weeklyReport: ReportListItem }) {
+  const markdownPreview = buildWeeklyReportMarkdownPreview(weeklyReport.contentMarkdown);
+
+  return (
+    <article className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="break-words text-base font-semibold">{cleanDisplayText(weeklyReport.title, { maxLength: 140 })}</h3>
+            <Badge variant="source">{formatDate(weeklyReport.createdAt)}</Badge>
+            <Badge variant="score">{weeklyReport.repoCount} repo</Badge>
+          </div>
+          {weeklyReport.summary ? (
+            <TextClamp lines={2} className="mt-2">
+              {cleanDisplayText(weeklyReport.summary, { maxLength: 280 })}
+            </TextClamp>
+          ) : null}
+          {weeklyReport.markdownPath ? <p className="mt-2 break-words text-xs text-muted-foreground">Plik: {weeklyReport.markdownPath}</p> : null}
+        </div>
+      </div>
+
+      <details className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Podglad surowego raportu tygodniowego</summary>
+        {markdownPreview.isTruncated ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Podglad uciety do {WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT.toLocaleString("pl-PL")} znakow. Pominieto{" "}
+            {markdownPreview.omittedCharacters.toLocaleString("pl-PL")} znakow; pelny raport pozostaje zapisany lokalnie.
+          </p>
+        ) : null}
+        <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+          {markdownPreview.content}
+        </pre>
+      </details>
+    </article>
+  );
+}
+
 export function filterWeeklyReports(reports: ReportListItem[], query: string) {
   const normalizedQuery = normalizeWeeklyReportSearchQuery(query);
   if (!normalizedQuery) {
@@ -129,6 +140,17 @@ export function filterWeeklyReports(reports: ReportListItem[], query: string) {
 
 export function normalizeWeeklyReportSearchQuery(value: string) {
   return cleanLimitedWeeklyReportText(value, WEEKLY_REPORT_SEARCH_QUERY_LIMIT).toLowerCase();
+}
+
+export function buildWeeklyReportMarkdownPreview(markdown: string) {
+  const content = markdown.slice(0, WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT);
+  const omittedCharacters = Math.max(0, markdown.length - content.length);
+
+  return {
+    content,
+    isTruncated: omittedCharacters > 0,
+    omittedCharacters
+  };
 }
 
 function buildWeeklyReportSearchText(report: ReportListItem) {

@@ -2,7 +2,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  buildWeeklyReportMarkdownPreview,
   filterWeeklyReports,
+  WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT,
   normalizeWeeklyReportSearchQuery,
   WEEKLY_REPORT_SEARCH_QUERY_LIMIT,
   WeeklyReportsView
@@ -113,11 +115,30 @@ describe("weekly report comparison", () => {
     expect(filterWeeklyReports([reportWithHugeMarkdown], "unique-tail-marker")).toEqual([]);
   });
 
+  it("builds a bounded raw markdown preview for weekly reports", () => {
+    const markdown = `${"a".repeat(WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT)}tail-marker`;
+    const preview = buildWeeklyReportMarkdownPreview(markdown);
+
+    expect(preview.content).toHaveLength(WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT);
+    expect(preview.content).not.toContain("tail-marker");
+    expect(preview.isTruncated).toBe(true);
+    expect(preview.omittedCharacters).toBe("tail-marker".length);
+  });
+
   it("renders weekly report archive search controls", () => {
     const html = renderToStaticMarkup(React.createElement(WeeklyReportsView, { reports: [report("current", "AI agent notes", 1)] }));
 
     expect(html).toContain("Szukaj raportow tygodniowych");
     expect(html).toContain("Szukaj po tytule, streszczeniu, pliku albo tresci");
     expect(html).toContain("Archiwum raportow");
+  });
+
+  it("shows truncation copy instead of rendering the full raw markdown", () => {
+    const markdown = `${"a".repeat(WEEKLY_REPORT_MARKDOWN_PREVIEW_LIMIT)}tail-marker`;
+    const html = renderToStaticMarkup(React.createElement(WeeklyReportsView, { reports: [report("huge", markdown, 1)] }));
+
+    expect(html).toContain("Podglad uciety do");
+    expect(html).toContain("pelny raport pozostaje zapisany lokalnie");
+    expect(html).not.toContain("tail-marker");
   });
 });
