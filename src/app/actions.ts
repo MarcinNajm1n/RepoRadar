@@ -40,12 +40,24 @@ import { createPortfolioBrief } from "@/lib/reports/portfolio-brief";
 import { createRepoQuickBrief } from "@/lib/reports/repo-quick-brief";
 import { createWeeklyReport } from "@/lib/reports/weekly";
 import { setSetting } from "@/lib/db/settings";
+import { sanitizeExternalText } from "@/lib/utils";
+
+const MAX_SERVER_ACTION_ID_LENGTH = 120;
 
 function isExplicitForce(force: unknown) {
   return force === true;
 }
 
 const USER_EDITABLE_BOOLEAN_SETTINGS = new Set(["auto_generate_weekly_ideas", "enable_local_notifications"]);
+
+function normalizeRequiredActionId(value: unknown, label: string) {
+  const id = sanitizeExternalText(value, MAX_SERVER_ACTION_ID_LENGTH);
+  if (!id) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return id;
+}
 
 function normalizeUserEditableSetting(key: unknown, value: unknown) {
   if (typeof key !== "string" || !USER_EDITABLE_BOOLEAN_SETTINGS.has(key)) {
@@ -109,11 +121,12 @@ export async function getWeeklyReportsPanelDataAction() {
 }
 
 export async function generateReportAction(repoId: string, force = false) {
+  const cleanRepoId = normalizeRequiredActionId(repoId, "Repository id");
   const forced = isExplicitForce(force);
   await assertOpenAiBudgetForAction("repo-report");
   const report = await runAiJob(
-    { type: "REPORT", repoId, priority: forced ? 80 : 60, dedupeKey: `report:${repoId}` },
-    () => generateFullReportForRepository(repoId, forced),
+    { type: "REPORT", repoId: cleanRepoId, priority: forced ? 80 : 60, dedupeKey: `report:${cleanRepoId}` },
+    () => generateFullReportForRepository(cleanRepoId, forced),
     (value) => ({ reportId: value.id })
   );
   const evidenceSources = await getEvidenceSourcesForReport(report.id);
@@ -129,7 +142,8 @@ export async function generateReportAction(repoId: string, force = false) {
 }
 
 export async function generateQuickBriefAction(repoId: string) {
-  const report = await createRepoQuickBrief(repoId);
+  const cleanRepoId = normalizeRequiredActionId(repoId, "Repository id");
+  const report = await createRepoQuickBrief(cleanRepoId);
   revalidatePath("/");
   return {
     id: report.id,
@@ -142,23 +156,25 @@ export async function generateQuickBriefAction(repoId: string) {
 }
 
 export async function generateShortSummaryAction(repoId: string, force = false) {
+  const cleanRepoId = normalizeRequiredActionId(repoId, "Repository id");
   const forced = isExplicitForce(force);
   await assertOpenAiBudgetForAction("summary");
   const summary = await runAiJob(
-    { type: "SUMMARY", repoId, priority: forced ? 70 : 40, dedupeKey: `summary:${repoId}` },
-    () => generateShortSummaryForRepository(repoId, forced),
-    () => ({ repoId })
+    { type: "SUMMARY", repoId: cleanRepoId, priority: forced ? 70 : 40, dedupeKey: `summary:${cleanRepoId}` },
+    () => generateShortSummaryForRepository(cleanRepoId, forced),
+    () => ({ repoId: cleanRepoId })
   );
   revalidatePath("/");
-  return { repoId, summary };
+  return { repoId: cleanRepoId, summary };
 }
 
 export async function generateIdeaAction(repoId: string, force = false) {
+  const cleanRepoId = normalizeRequiredActionId(repoId, "Repository id");
   const forced = isExplicitForce(force);
   await assertOpenAiBudgetForAction("idea");
   const idea = await runAiJob(
-    { type: "IDEA", repoId, priority: forced ? 80 : 50, dedupeKey: `idea:${repoId}` },
-    () => generateIdeaForRepository(repoId, forced),
+    { type: "IDEA", repoId: cleanRepoId, priority: forced ? 80 : 50, dedupeKey: `idea:${cleanRepoId}` },
+    () => generateIdeaForRepository(cleanRepoId, forced),
     (value) => ({ ideaId: value.id })
   );
   revalidatePath("/");
@@ -169,11 +185,12 @@ export async function generateIdeaAction(repoId: string, force = false) {
 }
 
 export async function generateOpportunityCandidateAction(repoId: string, force = false) {
+  const cleanRepoId = normalizeRequiredActionId(repoId, "Repository id");
   const forced = isExplicitForce(force);
   await assertOpenAiBudgetForAction("opportunity-research");
   const result = await runAiJob(
-    { type: "RESEARCH", repoId, priority: forced ? 70 : 40, dedupeKey: `research:${repoId}` },
-    () => generateOpportunityCandidateForRepository(repoId, forced),
+    { type: "RESEARCH", repoId: cleanRepoId, priority: forced ? 70 : 40, dedupeKey: `research:${cleanRepoId}` },
+    () => generateOpportunityCandidateForRepository(cleanRepoId, forced),
     (value) => ({ created: value.created, ideaId: value.ideaId ?? null, opportunityScore: value.opportunityScore ?? null })
   );
   revalidatePath("/");
@@ -181,9 +198,10 @@ export async function generateOpportunityCandidateAction(repoId: string, force =
 }
 
 export async function promoteCandidateToFullIdeaAction(ideaId: string, force = false) {
+  const cleanIdeaId = normalizeRequiredActionId(ideaId, "Idea id");
   const forced = isExplicitForce(force);
   await assertOpenAiBudgetForAction("idea-promote");
-  const idea = await promoteCandidateToFullIdea(ideaId, forced);
+  const idea = await promoteCandidateToFullIdea(cleanIdeaId, forced);
   revalidatePath("/");
   return {
     id: idea.id,

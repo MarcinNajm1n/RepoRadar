@@ -258,6 +258,57 @@ describe("settings action validation", () => {
 });
 
 describe("AI action OpenAI budget preflight", () => {
+  it("normalizes repository and idea ids before budgeted AI work", async () => {
+    await generateReportAction("  repo_1\u0000  ", true);
+    await generateIdeaAction("  repo_2\u0000  ", true);
+    await generateOpportunityCandidateAction("  repo_3\u0000  ", true);
+    await expect(generateShortSummaryAction("  repo_4\u0000  ", true)).resolves.toEqual({
+      repoId: "repo_4",
+      summary: "Krotkie streszczenie"
+    });
+    await promoteCandidateToFullIdeaAction("  idea_1\u0000  ", true);
+
+    expect(mocks.generateFullReportForRepository).toHaveBeenCalledWith("repo_1", true);
+    expect(mocks.generateIdeaForRepository).toHaveBeenCalledWith("repo_2", true);
+    expect(mocks.generateOpportunityCandidateForRepository).toHaveBeenCalledWith("repo_3", true);
+    expect(mocks.generateShortSummaryForRepository).toHaveBeenCalledWith("repo_4", true);
+    expect(mocks.promoteCandidateToFullIdea).toHaveBeenCalledWith("idea_1", true);
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ type: "REPORT", repoId: "repo_1", dedupeKey: "report:repo_1" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ type: "IDEA", repoId: "repo_2", dedupeKey: "idea:repo_2" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ type: "RESEARCH", repoId: "repo_3", dedupeKey: "research:repo_3" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+    expect(mocks.runAiJob).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ type: "SUMMARY", repoId: "repo_4", dedupeKey: "summary:repo_4" }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
+  it("rejects blank AI action ids before checking OpenAI budget", async () => {
+    await expect(generateReportAction("  \u0000  ")).rejects.toThrow("Repository id is required");
+    await expect(promoteCandidateToFullIdeaAction("  \u0000  ")).rejects.toThrow("Idea id is required");
+
+    expect(mocks.countOpenAiAnalysesToday).not.toHaveBeenCalled();
+    expect(mocks.runAiJob).not.toHaveBeenCalled();
+    expect(mocks.generateFullReportForRepository).not.toHaveBeenCalled();
+    expect(mocks.promoteCandidateToFullIdea).not.toHaveBeenCalled();
+  });
+
   it("runs the AI job when the report budget is allowed", async () => {
     await expect(generateReportAction("repo_1")).resolves.toMatchObject({
       id: "report_1",
