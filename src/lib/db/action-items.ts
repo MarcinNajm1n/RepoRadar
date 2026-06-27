@@ -18,6 +18,20 @@ export const ACTIVE_ACTION_ITEM_STATUSES: ActionItemStatus[] = [
 const DEFAULT_ACTION_ITEM_LIMIT = 50;
 const DEFAULT_ACTIVE_ACTION_ITEM_LIMIT = 20;
 const MAX_ACTION_ITEM_LIMIT = 100;
+const MAX_ACTION_ITEM_METADATA_KEYS = 30;
+const MAX_ACTION_ITEM_METADATA_KEY_LENGTH = 80;
+const MAX_ACTION_ITEM_METADATA_STRING_LENGTH = 500;
+const MAX_ACTION_ITEM_METADATA_ARRAY_ITEMS = 20;
+const MAX_ACTION_ITEM_METADATA_DEPTH = 2;
+const MAX_ACTION_ITEM_METADATA_BYTES = 20_000;
+
+type CleanMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | CleanMetadataValue[]
+  | { [key: string]: CleanMetadataValue };
 
 type ActionItemRecord = Awaited<ReturnType<typeof prisma.actionItem.findMany>>[number] & {
   repository?: { fullName: string; url: string } | null;
@@ -106,12 +120,62 @@ function cleanOptionalDate(value: string | Date | null | undefined) {
   return date;
 }
 
+function cleanMetadataValue(value: unknown, depth: number): CleanMetadataValue | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return sanitizeExternalText(value, MAX_ACTION_ITEM_METADATA_STRING_LENGTH) ?? "";
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, MAX_ACTION_ITEM_METADATA_ARRAY_ITEMS)
+      .map((item) => cleanMetadataValue(item, depth + 1))
+      .filter((item): item is CleanMetadataValue => item !== undefined);
+  }
+
+  if (typeof value === "object" && value && depth < MAX_ACTION_ITEM_METADATA_DEPTH) {
+    return cleanMetadataRecord(value as Record<string, unknown>, depth + 1);
+  }
+
+  return undefined;
+}
+
+function cleanMetadataRecord(metadata: Record<string, unknown>, depth = 0): Record<string, CleanMetadataValue> {
+  const cleaned: Record<string, CleanMetadataValue> = {};
+
+  for (const [rawKey, rawValue] of Object.entries(metadata).slice(0, MAX_ACTION_ITEM_METADATA_KEYS)) {
+    const key = sanitizeExternalText(rawKey, MAX_ACTION_ITEM_METADATA_KEY_LENGTH);
+    if (!key) {
+      continue;
+    }
+
+    const value = cleanMetadataValue(rawValue, depth);
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+
+  return cleaned;
+}
+
 function cleanMetadata(metadata: Record<string, unknown> | undefined) {
-  if (!metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "{}";
   }
 
-  return JSON.stringify(metadata);
+  const json = JSON.stringify(cleanMetadataRecord(metadata));
+  return new TextEncoder().encode(json).length <= MAX_ACTION_ITEM_METADATA_BYTES ? json : "{}";
 }
 
 function cleanPriority(priority: unknown) {

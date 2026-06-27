@@ -144,6 +144,61 @@ describe("action item input normalization", () => {
     );
   });
 
+  it("sanitizes metadata before creating action items", async () => {
+    await createActionItem({
+      type: "CUSTOM",
+      title: "Manual task",
+      metadata: {
+        " source\u0000key ": " value\u0000with control ",
+        unsafeNumber: Number.POSITIVE_INFINITY,
+        safeNumber: 3,
+        nested: {
+          ok: "yes",
+          missing: Symbol("bad"),
+          deeper: {
+            label: "deep",
+            tooDeep: { dropped: "value" }
+          }
+        },
+        list: ["one", Number.NaN, "two", { nested: "kept" }],
+        unsupported: () => "bad"
+      } as unknown as Record<string, unknown>
+    });
+
+    const call = mocks.prisma.actionItem.create.mock.calls[0]?.[0] as { data: { metadataJson: string } };
+    const metadata = JSON.parse(call.data.metadataJson);
+
+    expect(metadata).toEqual({
+      sourcekey: "valuewith control",
+      safeNumber: 3,
+      nested: {
+        ok: "yes",
+        deeper: {
+          label: "deep"
+        }
+      },
+      list: ["one", "two", { nested: "kept" }]
+    });
+  });
+
+  it("limits stored metadata keys before creating action items", async () => {
+    const metadata = Object.fromEntries(Array.from({ length: 35 }, (_, index) => [`field_${index}`, `value_${index}`]));
+
+    await createActionItem({
+      type: "CUSTOM",
+      title: "Manual task",
+      metadata
+    });
+
+    const call = mocks.prisma.actionItem.create.mock.calls[0]?.[0] as { data: { metadataJson: string } };
+    const parsed = JSON.parse(call.data.metadataJson) as Record<string, unknown>;
+
+    expect(Object.keys(parsed)).toHaveLength(30);
+    expect(parsed).toHaveProperty("field_0", "value_0");
+    expect(parsed).toHaveProperty("field_29", "value_29");
+    expect(parsed).not.toHaveProperty("field_30");
+  });
+
   it("sanitizes action item ids before update and rejects blank ids", async () => {
     mocks.prisma.actionItem.update.mockResolvedValue(actionItemRecord());
 
