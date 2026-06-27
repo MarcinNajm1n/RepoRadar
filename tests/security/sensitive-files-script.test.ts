@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 const repoRoot = path.resolve(__dirname, "..", "..");
 const scriptPath = path.join(repoRoot, "scripts", "check-sensitive-files.ps1");
 const runOnWindows = process.platform === "win32" ? it : it.skip;
+const securityScriptTestTimeoutMs = 20_000;
+const securityScriptProcessTimeoutMs = 15_000;
 
 function withTempGitRepo(run: (repoDir: string) => void) {
   const repoDir = mkdtempSync(path.join(tmpdir(), "reporadar-sensitive-"));
@@ -25,10 +27,17 @@ function stageFile(repoDir: string, filePath: string, content: string) {
 }
 
 function runSensitiveCheck(repoDir: string) {
-  return spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Staged"], {
+  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Staged"], {
     cwd: repoDir,
-    encoding: "utf8"
+    encoding: "utf8",
+    timeout: securityScriptProcessTimeoutMs
   });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result;
 }
 
 describe("check-sensitive-files.ps1", () => {
@@ -43,7 +52,7 @@ describe("check-sensitive-files.ps1", () => {
       expect(result.status).toBe(1);
       expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: leak.md");
     });
-  });
+  }, securityScriptTestTimeoutMs);
 
   runOnWindows("blocks staged npm registry auth tokens", () => {
     withTempGitRepo((repoDir) => {
@@ -55,7 +64,7 @@ describe("check-sensitive-files.ps1", () => {
       expect(result.status).toBe(1);
       expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: .npmrc");
     });
-  });
+  }, securityScriptTestTimeoutMs);
 
   runOnWindows("blocks staged legacy npm auth credentials", () => {
     withTempGitRepo((repoDir) => {
@@ -68,7 +77,7 @@ describe("check-sensitive-files.ps1", () => {
       expect(result.status).toBe(1);
       expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: .npmrc");
     });
-  });
+  }, securityScriptTestTimeoutMs);
 
   runOnWindows("allows empty secret placeholders in env examples", () => {
     withTempGitRepo((repoDir) => {
@@ -80,5 +89,5 @@ describe("check-sensitive-files.ps1", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Sensitive file check passed.");
     });
-  });
+  }, securityScriptTestTimeoutMs);
 });
