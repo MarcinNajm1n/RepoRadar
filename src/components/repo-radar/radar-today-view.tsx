@@ -4,6 +4,7 @@ import type React from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   Brain,
   CheckCircle2,
@@ -309,6 +310,7 @@ function FirstRunOnboardingPanel({
 }) {
   const requiredSteps = onboarding.steps.filter((step) => step.priority === "required");
   const optionalSteps = onboarding.steps.filter((step) => step.priority === "optional");
+  const nextRequiredStep = requiredSteps.find((step) => step.status !== "done") ?? null;
 
   return (
     <section className="rounded-lg border border-info/30 bg-info/10 p-4 shadow-soft" aria-labelledby="first-run-title">
@@ -327,6 +329,34 @@ function FirstRunOnboardingPanel({
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
             Ten panel znika, gdy masz lokalne dane, pierwszy scan i podstawowa konfiguracje GitHub. Kosztowne akcje AI nadal uruchamiasz recznie.
           </p>
+          {nextRequiredStep ? (
+            <div className="mt-3 rounded-md border border-info/30 bg-surface-panel p-3">
+              <div className="flex items-start gap-3">
+                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-info">Nastepny krok</div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">{nextRequiredStep.title}</div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{nextRequiredStep.description}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {nextRequiredStep.command ? (
+                      <code className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-subtle bg-surface-inset px-2 py-1 text-xs text-muted-foreground">
+                        <Terminal className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{nextRequiredStep.command}</span>
+                      </code>
+                    ) : null}
+                    <FirstRunStepAction
+                      step={nextRequiredStep}
+                      isPending={isPending}
+                      onOpenLibrary={onOpenLibrary}
+                      onOpenSettings={onOpenSettings}
+                      onOpenTasks={onOpenTasks}
+                      onRunScan={onRunScan}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={onRunScan} disabled={isPending}>
               <PlayCircle className="h-4 w-4" /> Uruchom scan

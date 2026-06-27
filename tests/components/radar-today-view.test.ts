@@ -125,7 +125,9 @@ describe("RadarTodayView", () => {
 
     expect(html).toContain("Szybki start");
     expect(html).toContain("Przygotuj lokalny radar do pierwszej decyzji");
+    expect(html).toContain("Nastepny krok");
     expect(html).toContain("Dane lokalne albo demo");
+    expect(html.indexOf("Nastepny krok")).toBeLessThan(html.indexOf("Opcjonalnie pozniej"));
     expect(html).toContain("npm run db:seed");
     expect(html).toContain("GitHub token");
     expect(html).toContain("Otworz Ustawienia dla kroku: GitHub token");
