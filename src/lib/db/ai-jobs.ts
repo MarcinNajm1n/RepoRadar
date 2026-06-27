@@ -1,6 +1,7 @@
 import { prisma } from "./client";
 import { AI_JOB_STATUSES, AI_JOB_TYPES } from "@/types/ai-job";
 import type { AiJobListItem, AiJobQueueSummary, AiJobSummary, AiJobType } from "@/types/ai-job";
+import { sanitizeExternalText } from "@/lib/utils";
 
 type RunAiJobInput = {
   type: AiJobType;
@@ -14,6 +15,8 @@ type RunAiJobInput = {
 const ACTIVE_AI_JOB_STATUSES = ["QUEUED", "RUNNING"] as const;
 const RETRYABLE_AI_JOB_TYPES = new Set(["REPORT", "IDEA", "SUMMARY", "RESEARCH"]);
 const STALE_AI_JOB_LOCK_MS = 60 * 60 * 1000;
+const MAX_AI_JOB_ID_LENGTH = 120;
+const MAX_AI_JOB_DEDUPE_KEY_LENGTH = 220;
 export const AI_JOB_ALREADY_RUNNING_MESSAGE = "Ta analiza już trwa.";
 export const AI_JOB_STALE_LOCK_ERROR = "Zadanie AI przerwane po przekroczeniu czasu blokady.";
 const activeAiJobDedupeKeys = new Set<string>();
@@ -80,6 +83,14 @@ function cleanPriority(priority: number | undefined) {
   return Math.max(-100, Math.min(100, Math.round(priority)));
 }
 
+function cleanOptionalAiJobId(value: unknown) {
+  return sanitizeExternalText(value, MAX_AI_JOB_ID_LENGTH) || null;
+}
+
+function cleanOptionalDedupeKey(value: unknown) {
+  return sanitizeExternalText(value, MAX_AI_JOB_DEDUPE_KEY_LENGTH) || null;
+}
+
 function isAiJobType(type: unknown): type is AiJobType {
   return typeof type === "string" && Object.prototype.hasOwnProperty.call(AI_JOB_TYPES, type);
 }
@@ -94,7 +105,14 @@ export function normalizeAiJobType(type: unknown): AiJobType {
 
 export function buildAiJobDedupeKey(input: RunAiJobInput) {
   const type = normalizeAiJobType(input.type);
-  return input.dedupeKey ?? [type, input.repoId, input.ideaId, input.reportId].filter(Boolean).join(":");
+  const explicitDedupeKey = cleanOptionalDedupeKey(input.dedupeKey);
+  if (explicitDedupeKey) {
+    return explicitDedupeKey;
+  }
+
+  return [type, cleanOptionalAiJobId(input.repoId), cleanOptionalAiJobId(input.ideaId), cleanOptionalAiJobId(input.reportId)]
+    .filter(Boolean)
+    .join(":");
 }
 
 export async function runAiJob<T>(
@@ -103,7 +121,10 @@ export async function runAiJob<T>(
   result: (value: T) => Record<string, unknown> = () => ({})
 ) {
   const type = normalizeAiJobType(input.type);
-  const dedupeKey = buildAiJobDedupeKey({ ...input, type });
+  const repoId = cleanOptionalAiJobId(input.repoId);
+  const ideaId = cleanOptionalAiJobId(input.ideaId);
+  const reportId = cleanOptionalAiJobId(input.reportId);
+  const dedupeKey = buildAiJobDedupeKey({ ...input, type, repoId, ideaId, reportId });
 
   if (activeAiJobDedupeKeys.has(dedupeKey)) {
     throw new Error(AI_JOB_ALREADY_RUNNING_MESSAGE);
@@ -142,9 +163,9 @@ export async function runAiJob<T>(
         data: {
           type,
           status: "RUNNING",
-          repoId: input.repoId ?? null,
-          ideaId: input.ideaId ?? null,
-          reportId: input.reportId ?? null,
+          repoId,
+          ideaId,
+          reportId,
           priority: cleanPriority(input.priority),
           dedupeKey,
           startedAt: new Date()

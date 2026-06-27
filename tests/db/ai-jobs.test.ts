@@ -50,6 +50,18 @@ describe("buildAiJobDedupeKey", () => {
     expect(buildAiJobDedupeKey({ type: "IDEA", repoId: "repo_1", dedupeKey: "custom" })).toBe("custom");
   });
 
+  it("normalizes identity parts and blank explicit dedupe keys", () => {
+    expect(
+      buildAiJobDedupeKey({
+        type: "REPORT",
+        repoId: "  repo_1\u0000  ",
+        ideaId: { id: "bad" } as unknown as string,
+        dedupeKey: "  \u0000  "
+      })
+    ).toBe("REPORT:repo_1");
+    expect(buildAiJobDedupeKey({ type: "IDEA", repoId: "repo_1", dedupeKey: "  custom\u0000key  " })).toBe("customkey");
+  });
+
   it("rejects unsupported runtime job types", () => {
     expect(normalizeAiJobType("REPORT")).toBe("REPORT");
     expect(() => buildAiJobDedupeKey({ type: "BAD" as unknown as AiJobType, repoId: "repo_1" })).toThrow(
@@ -138,6 +150,45 @@ describe("runAiJob", () => {
         status: "DONE",
         resultJson: JSON.stringify({ reportId: "report_1" }),
         finishedAt: expect.any(Date)
+      })
+    });
+  });
+
+  it("sanitizes runtime identity before creating database work", async () => {
+    const handler = vi.fn((): Promise<{ id: string }> => Promise.resolve({ id: "report_1" }));
+    mocks.aiJob.findFirst.mockResolvedValue(null);
+    mocks.aiJob.create.mockResolvedValue({ id: "job_1" });
+    mocks.aiJob.update.mockResolvedValue({ id: "job_1" });
+
+    await expect(
+      runAiJob(
+        {
+          type: "REPORT",
+          repoId: "  repo_1\u0000  ",
+          ideaId: { id: "bad" } as unknown as string,
+          reportId: "  report_1  ",
+          priority: "high" as unknown as number,
+          dedupeKey: "  custom\u0000key  "
+        },
+        handler
+      )
+    ).resolves.toEqual({ id: "report_1" });
+
+    expect(mocks.aiJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          dedupeKey: "customkey"
+        })
+      })
+    );
+    expect(mocks.aiJob.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "REPORT",
+        repoId: "repo_1",
+        ideaId: null,
+        reportId: "report_1",
+        priority: 0,
+        dedupeKey: "customkey"
       })
     });
   });
