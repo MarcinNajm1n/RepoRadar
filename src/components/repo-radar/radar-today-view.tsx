@@ -717,57 +717,59 @@ function RadarRepositoryCard({
 
   return (
     <article className="rounded-lg border border-border-subtle bg-surface-raised p-3">
-      <div className="grid gap-3 lg:grid-cols-[2rem_minmax(0,1fr)_auto]">
+      <div className="grid gap-3 sm:grid-cols-[2rem_minmax(0,1fr)]">
         <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-sm font-semibold tabular-nums text-primary">
           {rank}
         </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="break-words font-semibold">{cleanDisplayText(repo.fullName, { maxLength: 140 })}</h4>
+        <div className="min-w-0 space-y-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h4 className="min-w-0 break-words font-semibold">{cleanDisplayText(repo.fullName, { maxLength: 140 })}</h4>
             <Badge variant="status">{repo.status}</Badge>
             {repo.primaryLanguage ? <Badge variant="source">{repo.primaryLanguage}</Badge> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <ScoreChip label="Trend" score={repo.trendScore} />
             <ScoreChip label="Initial" score={repo.initialMomentumScore} />
           </div>
-          <TextClamp lines={2} className="mt-2">
+          <TextClamp lines={2}>
             {cleanDisplayText(repo.shortSummaryPl ?? repo.description ?? "Brak opisu.", { maxLength: 240 })}
           </TextClamp>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]">
             <MetricPill label="Stars" value={formatStars(repo.starsCurrent)} />
             <MetricPill label="Growth 7d" value={formatGrowth(repo.growth7d)} />
             <MetricPill label="Freshness" value={repo.pushedAt ? formatDisplayDate(repo.pushedAt) : "brak"} />
           </div>
-        </div>
-        <div className="flex flex-wrap items-start gap-2 lg:justify-end">
-          <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
-            <FileText className="h-4 w-4" /> Brief
-          </Button>
-          <span className="inline-flex items-center gap-1.5">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onOpenReport}
-              disabled={isPending}
-              aria-label={formatAiBudgetActionLabel("Raport", "repo-report")}
-              title={formatAiBudgetActionLabel("Raport", "repo-report")}
-            >
-              <FileText className="h-4 w-4" /> Raport
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={onOpenQuickBrief} disabled={isPending}>
+              <FileText className="h-4 w-4" /> Brief
             </Button>
-            <AiBudgetLabel action="repo-report" />
-          </span>
-          <Button variant="secondary" size="sm" onClick={onCreateReadmeTask} disabled={isPending}>
-            <BookOpen className="h-4 w-4" /> README
-          </Button>
-          {safeUrl && safeUrl.startsWith("https://github.com/") ? (
-            <a
-              href={safeUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition duration-fast ease-interface hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <ExternalLink className="h-4 w-4" /> GitHub
-            </a>
-          ) : null}
+            <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onOpenReport}
+                disabled={isPending}
+                aria-label={formatAiBudgetActionLabel("Raport", "repo-report")}
+                title={formatAiBudgetActionLabel("Raport", "repo-report")}
+              >
+                <FileText className="h-4 w-4" /> Raport
+              </Button>
+              <AiBudgetLabel action="repo-report" />
+            </span>
+            <Button variant="secondary" size="sm" onClick={onCreateReadmeTask} disabled={isPending}>
+              <BookOpen className="h-4 w-4" /> README
+            </Button>
+            {safeUrl && safeUrl.startsWith("https://github.com/") ? (
+              <a
+                href={safeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition duration-fast ease-interface hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <ExternalLink className="h-4 w-4" /> GitHub
+              </a>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
