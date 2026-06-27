@@ -87,7 +87,7 @@ export async function runScanAction() {
 }
 
 export async function updateStatusAction(repoId: string, status: string) {
-  await updateRepositoryStatus(repoId, status);
+  await updateRepositoryStatus(normalizeRequiredActionId(repoId, "Repository id"), status);
   revalidatePath("/");
   return { ok: true };
 }
@@ -97,11 +97,11 @@ export async function getRepositoryPageAction(input: RepositoryPageInput) {
 }
 
 export async function getRepositoryTimelineAction(repoId: string) {
-  return getRepositoryTimeline(repoId);
+  return getRepositoryTimeline(normalizeRequiredActionId(repoId, "Repository id"));
 }
 
 export async function getRepositoryDecisionContextAction(repoId: string) {
-  return getRepositoryDecisionContext(repoId);
+  return getRepositoryDecisionContext(normalizeRequiredActionId(repoId, "Repository id"));
 }
 
 export async function getSettingsPanelDataAction() {
@@ -210,7 +210,7 @@ export async function promoteCandidateToFullIdeaAction(ideaId: string, force = f
 }
 
 export async function updateIdeaStatusAction(ideaId: string, status: string) {
-  await updateIdeaStatus(ideaId, status);
+  await updateIdeaStatus(normalizeRequiredActionId(ideaId, "Idea id"), status);
   revalidatePath("/");
   return { ok: true };
 }

@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   countOpenAiAnalysesToday: vi.fn(),
   getConfig: vi.fn(),
   getEvidenceSourcesForReport: vi.fn(),
+  getRepositoryDecisionContext: vi.fn(),
+  getRepositoryTimeline: vi.fn(),
   generateFullReportForRepository: vi.fn(),
   generateIdeaForRepository: vi.fn(),
   generateOpportunityCandidateForRepository: vi.fn(),
@@ -13,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   clearOldNotificationLogs: vi.fn(),
   pruneOldSnapshots: vi.fn(),
   setSetting: vi.fn(),
+  updateIdeaStatus: vi.fn(),
+  updateRepositoryStatus: vi.fn(),
   revalidatePath: vi.fn(),
   runAiJob: vi.fn()
 }));
@@ -48,8 +52,8 @@ vi.mock("@/lib/db/repositories", () => ({
   getSettingsPanelData: vi.fn(),
   getTasksPanelData: vi.fn(),
   getWeeklyReportsPanelData: vi.fn(),
-  updateIdeaStatus: vi.fn(),
-  updateRepositoryStatus: vi.fn()
+  updateIdeaStatus: mocks.updateIdeaStatus,
+  updateRepositoryStatus: mocks.updateRepositoryStatus
 }));
 
 vi.mock("@/lib/db/action-items", () => ({
@@ -61,11 +65,11 @@ vi.mock("@/lib/db/action-items", () => ({
 }));
 
 vi.mock("@/lib/db/repository-timeline", () => ({
-  getRepositoryTimeline: vi.fn()
+  getRepositoryTimeline: mocks.getRepositoryTimeline
 }));
 
 vi.mock("@/lib/db/repository-decision-context", () => ({
-  getRepositoryDecisionContext: vi.fn()
+  getRepositoryDecisionContext: mocks.getRepositoryDecisionContext
 }));
 
 vi.mock("@/lib/github/scanner", () => ({
@@ -109,12 +113,16 @@ vi.mock("@/lib/db/settings", () => ({
 import {
   clearExpiredExternalCacheAction,
   clearOldNotificationLogsAction,
+  getRepositoryDecisionContextAction,
+  getRepositoryTimelineAction,
   generateIdeaAction,
   generateOpportunityCandidateAction,
   generateReportAction,
   generateShortSummaryAction,
   pruneOldSnapshotsAction,
   promoteCandidateToFullIdeaAction,
+  updateIdeaStatusAction,
+  updateStatusAction,
   updateSettingAction
 } from "../../src/app/actions";
 
@@ -151,6 +159,10 @@ beforeEach(() => {
     id: "idea_1",
     title: "Pelny pomysl"
   });
+  mocks.getRepositoryTimeline.mockResolvedValue([]);
+  mocks.getRepositoryDecisionContext.mockResolvedValue({ repoId: "repo_1" });
+  mocks.updateIdeaStatus.mockResolvedValue({});
+  mocks.updateRepositoryStatus.mockResolvedValue({});
   mocks.clearExpiredExternalCache.mockResolvedValue({ deletedCount: 3 });
   mocks.clearOldNotificationLogs.mockResolvedValue({ deletedCount: 4, cutoff: "2026-05-12T00:00:00.000Z" });
   mocks.pruneOldSnapshots.mockResolvedValue({ deletedCount: 5, cutoff: "2025-06-25T00:00:00.000Z" });
@@ -253,6 +265,34 @@ describe("settings action validation", () => {
     await expect(updateSettingAction("auto_generate_weekly_ideas", 1 as unknown as string)).rejects.toThrow("Unsupported UI setting value");
 
     expect(mocks.setSetting).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("server action id validation", () => {
+  it("normalizes repository and idea ids before status updates and detail reads", async () => {
+    await expect(updateStatusAction("  repo_1\u0000  ", "SAVED")).resolves.toEqual({ ok: true });
+    await expect(updateIdeaStatusAction("  idea_1\u0000  ", "SAVED")).resolves.toEqual({ ok: true });
+    await expect(getRepositoryTimelineAction("  repo_2\u0000  ")).resolves.toEqual([]);
+    await expect(getRepositoryDecisionContextAction("  repo_3\u0000  ")).resolves.toEqual({ repoId: "repo_1" });
+
+    expect(mocks.updateRepositoryStatus).toHaveBeenCalledWith("repo_1", "SAVED");
+    expect(mocks.updateIdeaStatus).toHaveBeenCalledWith("idea_1", "SAVED");
+    expect(mocks.getRepositoryTimeline).toHaveBeenCalledWith("repo_2");
+    expect(mocks.getRepositoryDecisionContext).toHaveBeenCalledWith("repo_3");
+    expect(mocks.revalidatePath).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects blank repository and idea ids before local operations", async () => {
+    await expect(updateStatusAction("  \u0000  ", "SAVED")).rejects.toThrow("Repository id is required");
+    await expect(updateIdeaStatusAction("  \u0000  ", "SAVED")).rejects.toThrow("Idea id is required");
+    await expect(getRepositoryTimelineAction("  \u0000  ")).rejects.toThrow("Repository id is required");
+    await expect(getRepositoryDecisionContextAction("  \u0000  ")).rejects.toThrow("Repository id is required");
+
+    expect(mocks.updateRepositoryStatus).not.toHaveBeenCalled();
+    expect(mocks.updateIdeaStatus).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryTimeline).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryDecisionContext).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
