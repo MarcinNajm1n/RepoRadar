@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ActionItemListItem } from "../../src/types/action-item";
-import { filterQueueItems, TasksView } from "../../src/components/repo-radar/tasks-view";
+import { filterQueueItems, parseTaskFilterState, serializeTaskFilterState, TasksView } from "../../src/components/repo-radar/tasks-view";
 
 const now = "2026-06-16T12:00:00.000Z";
 const noop = () => undefined;
@@ -104,5 +104,56 @@ describe("TasksView filters", () => {
     expect(html).toContain("Wszystkie statusy");
     expect(html).toContain("Widoczne");
     expect(html).toContain("4/4");
+  });
+
+  it("normalizes persisted task filters from localStorage", () => {
+    expect(parseTaskFilterState("not-json")).toEqual({
+      query: "",
+      type: "ALL",
+      status: "ALL",
+      minPriority: 0
+    });
+
+    const parsed = parseTaskFilterState(
+      JSON.stringify({
+        query: "x".repeat(180),
+        type: "CHECK_DEMO",
+        status: "SNOOZED",
+        minPriority: 999
+      })
+    );
+
+    expect(parsed).toEqual({
+      query: "x".repeat(160),
+      type: "CHECK_DEMO",
+      status: "SNOOZED",
+      minPriority: 100
+    });
+    expect(
+      parseTaskFilterState(JSON.stringify({ query: "demo", type: "BAD", status: "BAD", minPriority: -5 }))
+    ).toEqual({
+      query: "demo",
+      type: "ALL",
+      status: "ALL",
+      minPriority: 0
+    });
+  });
+
+  it("serializes bounded task filters for localStorage", () => {
+    expect(
+      JSON.parse(
+        serializeTaskFilterState({
+          query: "  demo  ",
+          type: "CHECK_DEMO",
+          status: "OPEN",
+          minPriority: 2.8
+        })
+      )
+    ).toEqual({
+      query: "demo",
+      type: "CHECK_DEMO",
+      status: "OPEN",
+      minPriority: 2
+    });
   });
 });

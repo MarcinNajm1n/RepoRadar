@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, RotateCcw, Search } from "lucide-react";
 import type { ActionItemListItem } from "@/types/action-item";
 import { ACTION_ITEM_STATUSES, ACTION_ITEM_TYPES, formatActionItemStatus, formatActionItemType } from "@/types/action-item";
@@ -9,12 +9,20 @@ import { ActionItemCard } from "./action-item-card";
 import { Badge, Button, EmptyState, MetricPill, SectionCard } from "./ui";
 
 const ALL_FILTER_VALUE = "ALL";
+export const TASK_FILTER_STORAGE_KEY = "reporadar.taskFilters.v1";
 
-type TaskFilterState = {
+export type TaskFilterState = {
   query: string;
   type: string;
   status: string;
   minPriority: number;
+};
+
+const DEFAULT_TASK_FILTERS: TaskFilterState = {
+  query: "",
+  type: ALL_FILTER_VALUE,
+  status: ALL_FILTER_VALUE,
+  minPriority: 0
 };
 
 export function TasksView({
@@ -32,10 +40,11 @@ export function TasksView({
   onSnooze: (itemId: string) => void;
   onDismiss: (itemId: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState(ALL_FILTER_VALUE);
-  const [statusFilter, setStatusFilter] = useState(ALL_FILTER_VALUE);
-  const [minPriority, setMinPriority] = useState(0);
+  const [initialFilters] = useState(readPersistedTaskFilters);
+  const [query, setQuery] = useState(initialFilters.query);
+  const [typeFilter, setTypeFilter] = useState(initialFilters.type);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+  const [minPriority, setMinPriority] = useState(initialFilters.minPriority);
   const filters = useMemo(
     () => ({ query, type: typeFilter, status: statusFilter, minPriority }),
     [query, typeFilter, statusFilter, minPriority]
@@ -52,6 +61,22 @@ export function TasksView({
     setStatusFilter(ALL_FILTER_VALUE);
     setMinPriority(0);
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      if (hasActiveFilters) {
+        window.localStorage.setItem(TASK_FILTER_STORAGE_KEY, serializeTaskFilterState(filters));
+      } else {
+        window.localStorage.removeItem(TASK_FILTER_STORAGE_KEY);
+      }
+    } catch {
+      // Filters still work for the current session when localStorage is unavailable.
+    }
+  }, [filters, hasActiveFilters]);
 
   return (
     <section className="space-y-4">
@@ -114,6 +139,7 @@ export function TasksView({
                 className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums text-foreground outline-none"
                 type="number"
                 min={0}
+                max={100}
                 value={minPriority}
                 onChange={(event) => setMinPriority(clampPriority(event.target.value))}
               />
@@ -335,7 +361,72 @@ function clampPriority(value: string) {
     return 0;
   }
 
-  return Math.max(0, Math.floor(parsed));
+  return clampPriorityValue(parsed);
+}
+
+export function parseTaskFilterState(value: string | null): TaskFilterState {
+  if (!value) {
+    return DEFAULT_TASK_FILTERS;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") {
+      return DEFAULT_TASK_FILTERS;
+    }
+
+    const input = parsed as Partial<TaskFilterState>;
+    return {
+      query: typeof input.query === "string" ? input.query.slice(0, 160) : DEFAULT_TASK_FILTERS.query,
+      type: normalizeTaskTypeFilter(input.type),
+      status: normalizeTaskStatusFilter(input.status),
+      minPriority: clampPriorityValue(input.minPriority)
+    };
+  } catch {
+    return DEFAULT_TASK_FILTERS;
+  }
+}
+
+export function serializeTaskFilterState(filters: TaskFilterState) {
+  return JSON.stringify({
+    query: filters.query.trim().slice(0, 160),
+    type: normalizeTaskTypeFilter(filters.type),
+    status: normalizeTaskStatusFilter(filters.status),
+    minPriority: clampPriorityValue(filters.minPriority)
+  });
+}
+
+function readPersistedTaskFilters() {
+  if (typeof window === "undefined") {
+    return DEFAULT_TASK_FILTERS;
+  }
+
+  try {
+    return parseTaskFilterState(window.localStorage.getItem(TASK_FILTER_STORAGE_KEY));
+  } catch {
+    return DEFAULT_TASK_FILTERS;
+  }
+}
+
+function normalizeTaskTypeFilter(value: unknown) {
+  return typeof value === "string" && (value === ALL_FILTER_VALUE || Object.prototype.hasOwnProperty.call(ACTION_ITEM_TYPES, value))
+    ? value
+    : DEFAULT_TASK_FILTERS.type;
+}
+
+function normalizeTaskStatusFilter(value: unknown) {
+  return typeof value === "string" && (value === ALL_FILTER_VALUE || Object.prototype.hasOwnProperty.call(ACTION_ITEM_STATUSES, value))
+    ? value
+    : DEFAULT_TASK_FILTERS.status;
+}
+
+function clampPriorityValue(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_TASK_FILTERS.minPriority;
+  }
+
+  return Math.max(0, Math.min(100, Math.floor(parsed)));
 }
 
 function controlClassName(className?: string) {
