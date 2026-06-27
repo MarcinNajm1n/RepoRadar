@@ -99,4 +99,41 @@ describe("notification dispatcher settings", () => {
     expect(mocks.sendNoopNotification).not.toHaveBeenCalled();
     expect(mocks.prisma.notificationLog.create).toHaveBeenCalledTimes(2);
   });
+
+  it("stores bounded valid payload snapshots from notification channels", async () => {
+    mocks.sendWindowsNotification.mockResolvedValueOnce({
+      channel: "windows",
+      eventType: "test_notification",
+      status: "SENT",
+      maskedTarget: "local-windows",
+      payloadJson: "{bad-json"
+    });
+    mocks.sendDiscordNotification.mockResolvedValueOnce({
+      channel: "discord",
+      eventType: "test_notification",
+      status: "SENT",
+      maskedTarget: "discord.com/configured",
+      payloadJson: JSON.stringify({
+        title: ` noisy\u0000${"x".repeat(400)}`,
+        repoCount: 999,
+        opportunityCandidateId: { id: "bad" }
+      })
+    });
+
+    await dispatchTestNotification();
+
+    const windowsLog = mocks.prisma.notificationLog.create.mock.calls[0]?.[0]?.data as { payloadJson: string };
+    const discordLog = mocks.prisma.notificationLog.create.mock.calls[1]?.[0]?.data as { payloadJson: string };
+    const windowsPayload = JSON.parse(windowsLog.payloadJson);
+    const discordPayload = JSON.parse(discordLog.payloadJson);
+
+    expect(windowsPayload).toEqual({
+      title: "RepoRadar: test notification",
+      repoCount: 0
+    });
+    expect(discordPayload.title).not.toContain("\u0000");
+    expect(discordPayload.title).toHaveLength(250);
+    expect(discordPayload.repoCount).toBe(50);
+    expect(discordPayload).not.toHaveProperty("opportunityCandidateId");
+  });
 });

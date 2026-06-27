@@ -1,7 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db/client";
 import { getBooleanSetting } from "@/lib/db/settings";
-import { truncateText } from "@/lib/utils";
+import { clamp, safeJsonParse, sanitizeExternalText, truncateText } from "@/lib/utils";
 import { isExcellentOpportunity } from "@/lib/market-research/opportunity";
 import { IDEA_STATUS } from "@/types/idea-status";
 import { isHighValueRepository } from "./thresholds";
@@ -10,14 +10,50 @@ import { sendNoopNotification } from "./channels/noop";
 import { sendWindowsNotification } from "./channels/windows";
 import type { NotificationPayload, NotificationRepository, NotificationResult } from "./types";
 
-async function saveNotificationLog(result: NotificationResult) {
+const MAX_NOTIFICATION_LOG_TITLE_LENGTH = 250;
+const MAX_NOTIFICATION_LOG_ID_LENGTH = 120;
+const MAX_NOTIFICATION_LOG_REPO_COUNT = 50;
+
+function cleanNotificationPayloadRecord(value: string | undefined) {
+  const parsed = safeJsonParse<unknown>(value, {});
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {};
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function cleanNotificationPayloadCount(value: unknown, fallback: number) {
+  const count = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.round(clamp(count, 0, MAX_NOTIFICATION_LOG_REPO_COUNT));
+}
+
+function cleanNotificationPayloadJson(result: NotificationResult, payload: NotificationPayload) {
+  const raw = cleanNotificationPayloadRecord(result.payloadJson);
+  const title = sanitizeExternalText(raw.title ?? payload.title, MAX_NOTIFICATION_LOG_TITLE_LENGTH) ?? "RepoRadar";
+  const repoCount = cleanNotificationPayloadCount(raw.repoCount, payload.repositories?.length ?? 0);
+  const scanRunId = sanitizeExternalText(raw.scanRunId ?? payload.scanRunId, MAX_NOTIFICATION_LOG_ID_LENGTH);
+  const opportunityCandidateId = sanitizeExternalText(
+    raw.opportunityCandidateId ?? payload.opportunityCandidateId,
+    MAX_NOTIFICATION_LOG_ID_LENGTH
+  );
+
+  return JSON.stringify({
+    title,
+    repoCount,
+    ...(scanRunId ? { scanRunId } : {}),
+    ...(opportunityCandidateId ? { opportunityCandidateId } : {})
+  });
+}
+
+async function saveNotificationLog(result: NotificationResult, payload: NotificationPayload) {
   await prisma.notificationLog.create({
     data: {
       channel: result.channel,
       eventType: result.eventType,
       status: result.status,
       maskedTarget: result.maskedTarget,
-      payloadJson: result.payloadJson,
+      payloadJson: cleanNotificationPayloadJson(result, payload),
       error: result.error ? truncateText(result.error, 1000) : null
     }
   });
@@ -35,7 +71,7 @@ async function sendAndLog(payload: NotificationPayload) {
     results.push(await sendDiscordNotification(payload));
   }
 
-  await Promise.all(results.map(saveNotificationLog));
+  await Promise.all(results.map((result) => saveNotificationLog(result, payload)));
   return results;
 }
 
