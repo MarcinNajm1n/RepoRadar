@@ -1,12 +1,23 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { RotateCcw, Search } from "lucide-react";
 import type { ReportListItem, WeeklyReportComparison } from "@/types/repository";
 import { cleanDisplayText } from "@/lib/display/clean-display-text";
 import { buildWeeklyReportComparison } from "@/lib/reports/weekly-comparison";
 import { formatDate } from "@/lib/utils";
-import { Badge, EmptyState, MetricPill, SectionCard, TextClamp } from "./ui";
+import { Badge, Button, EmptyState, MetricPill, SectionCard, TextClamp } from "./ui";
+
+export const WEEKLY_REPORT_SEARCH_QUERY_LIMIT = 120;
+const WEEKLY_REPORT_SEARCH_FIELD_LIMIT = 20000;
 
 export function WeeklyReportsView({ reports, comparison: panelComparison }: { reports: ReportListItem[]; comparison?: WeeklyReportComparison | null }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedSearchQuery = normalizeWeeklyReportSearchQuery(searchQuery);
+  const filteredReports = useMemo(() => filterWeeklyReports(reports, normalizedSearchQuery), [reports, normalizedSearchQuery]);
+  const hasActiveSearch = normalizedSearchQuery.length > 0;
+  const resetSearch = () => setSearchQuery("");
+
   if (!reports.length) {
     return (
       <SectionCard title="Raporty tygodniowe" description="Lokalne podsumowania zapisane jako markdown.">
@@ -29,40 +40,118 @@ export function WeeklyReportsView({ reports, comparison: panelComparison }: { re
 
       <WeeklyComparisonPanel latest={latestReport} previous={previousReport} comparison={comparison} />
 
-      <div className="space-y-3">
-        {reports.map((weeklyReport) => (
-          <article key={weeklyReport.id} className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="break-words text-base font-semibold">
-                    {cleanDisplayText(weeklyReport.title, { maxLength: 140 })}
-                  </h3>
-                  <Badge variant="source">{formatDate(weeklyReport.createdAt)}</Badge>
-                  <Badge variant="score">{weeklyReport.repoCount} repo</Badge>
-                </div>
-                {weeklyReport.summary ? (
-                  <TextClamp lines={2} className="mt-2">
-                    {cleanDisplayText(weeklyReport.summary, { maxLength: 280 })}
-                  </TextClamp>
-                ) : null}
-                {weeklyReport.markdownPath ? (
-                  <p className="mt-2 break-words text-xs text-muted-foreground">Plik: {weeklyReport.markdownPath}</p>
-                ) : null}
-              </div>
-            </div>
+      <div className="rounded-md border border-border-subtle bg-surface-inset p-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Szukaj raportow tygodniowych</span>
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <input
+              className="h-9 w-full rounded-md border border-control-border bg-control px-3 pl-9 text-sm text-foreground outline-none transition duration-fast ease-interface focus:border-primary focus:ring-2 focus:ring-focus/30"
+              value={searchQuery}
+              maxLength={WEEKLY_REPORT_SEARCH_QUERY_LIMIT}
+              onChange={(event) => setSearchQuery(event.target.value.slice(0, WEEKLY_REPORT_SEARCH_QUERY_LIMIT))}
+              placeholder="Szukaj po tytule, streszczeniu, pliku albo tresci..."
+            />
+          </label>
+          <Button variant="ghost" size="sm" onClick={resetSearch} disabled={!hasActiveSearch} className="h-9">
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Reset
+          </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-semibold uppercase text-muted-foreground">Archiwum raportow</span>
+          {hasActiveSearch ? (
+            <span className="tabular-nums text-foreground">
+              Pokazano {filteredReports.length} z {reports.length}
+            </span>
+          ) : (
+            <span>Wpisz tekst, zeby zawezyc liste raportow.</span>
+          )}
+        </div>
+      </div>
 
-            <details className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3">
-              <summary className="cursor-pointer text-sm font-semibold">Surowy raport tygodniowy</summary>
-              <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
-                {weeklyReport.contentMarkdown}
-              </pre>
-            </details>
-          </article>
-        ))}
+      <div className="space-y-3">
+        {filteredReports.length ? (
+          filteredReports.map((weeklyReport) => (
+            <article key={weeklyReport.id} className="rounded-lg border border-border-subtle bg-surface-panel p-4 shadow-soft">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="break-words text-base font-semibold">
+                      {cleanDisplayText(weeklyReport.title, { maxLength: 140 })}
+                    </h3>
+                    <Badge variant="source">{formatDate(weeklyReport.createdAt)}</Badge>
+                    <Badge variant="score">{weeklyReport.repoCount} repo</Badge>
+                  </div>
+                  {weeklyReport.summary ? (
+                    <TextClamp lines={2} className="mt-2">
+                      {cleanDisplayText(weeklyReport.summary, { maxLength: 280 })}
+                    </TextClamp>
+                  ) : null}
+                  {weeklyReport.markdownPath ? (
+                    <p className="mt-2 break-words text-xs text-muted-foreground">Plik: {weeklyReport.markdownPath}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <details className="mt-3 rounded-md border border-border-subtle bg-surface-inset p-3">
+                <summary className="cursor-pointer text-sm font-semibold">Surowy raport tygodniowy</summary>
+                <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+                  {weeklyReport.contentMarkdown}
+                </pre>
+              </details>
+            </article>
+          ))
+        ) : (
+          <EmptyState
+            title="Brak raportow dla tego wyszukiwania"
+            text="Zmien tekst albo wyczysc wyszukiwanie, zeby zobaczyc wszystkie lokalne raporty tygodniowe."
+            primaryAction={
+              <Button variant="secondary" size="sm" onClick={resetSearch}>
+                Pokaz wszystkie raporty
+              </Button>
+            }
+          />
+        )}
       </div>
     </section>
   );
+}
+
+export function filterWeeklyReports(reports: ReportListItem[], query: string) {
+  const normalizedQuery = normalizeWeeklyReportSearchQuery(query);
+  if (!normalizedQuery) {
+    return reports;
+  }
+
+  return reports.filter((report) => buildWeeklyReportSearchText(report).includes(normalizedQuery));
+}
+
+export function normalizeWeeklyReportSearchQuery(value: string) {
+  return cleanLimitedWeeklyReportText(value, WEEKLY_REPORT_SEARCH_QUERY_LIMIT).toLowerCase();
+}
+
+function buildWeeklyReportSearchText(report: ReportListItem) {
+  return [
+    report.title,
+    report.summary,
+    report.markdownPath,
+    report.contentMarkdown,
+    report.createdAt,
+    formatDate(report.createdAt),
+    `${report.repoCount} repo`
+  ]
+    .map((value) => cleanLimitedWeeklyReportText(value, WEEKLY_REPORT_SEARCH_FIELD_LIMIT))
+    .join(" ")
+    .toLowerCase();
+}
+
+function cleanLimitedWeeklyReportText(value: string | null | undefined, maxLength: number) {
+  if (!value) {
+    return "";
+  }
+
+  return cleanDisplayText(value.slice(0, maxLength), { maxLength });
 }
 
 function WeeklyComparisonPanel({
