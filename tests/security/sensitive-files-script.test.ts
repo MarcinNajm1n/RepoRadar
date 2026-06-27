@@ -79,10 +79,40 @@ describe("check-sensitive-files.ps1", () => {
     });
   }, securityScriptTestTimeoutMs);
 
+  runOnWindows("blocks staged generic secret assignments in env examples", () => {
+    withTempGitRepo((repoDir) => {
+      const secretName = ["NEXTAUTH", "SECRET"].join("_");
+      const passwordName = ["DATABASE", "PASSWORD"].join("_");
+      const privateKeyName = ["APP", "PRIVATE", "KEY"].join("_");
+      const webhookName = ["DISCORD", "WEBHOOK", "URL"].join("_");
+      const secretKeyName = ["SECRET", "KEY"].join("_");
+      const exportedSecretKeyName = ["EXPORTED", "SECRET", "KEY"].join("_");
+      const openQuoteSecretName = ["OPENQUOTE", "SECRET"].join("_");
+      stageFile(
+        repoDir,
+        ".env.example",
+        `${secretName}="#x"\n${passwordName}='#'\n${privateKeyName}=' spaced key value '\n${webhookName}=https://example.com/webhook\n${secretKeyName}=tiny\nexport ${exportedSecretKeyName}=tiny\n${openQuoteSecretName}="tiny\n`
+      );
+
+      const result = runSensitiveCheck(repoDir);
+
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}\n${result.stderr}`).toContain("Possible secret content in: .env.example");
+    });
+  }, securityScriptTestTimeoutMs);
+
   runOnWindows("allows empty secret placeholders in env examples", () => {
     withTempGitRepo((repoDir) => {
       const keyName = ["GEMINI", "API", "KEY"].join("_");
-      stageFile(repoDir, ".env.example", `${keyName}=\n`);
+      const secretName = ["NEXTAUTH", "SECRET"].join("_");
+      const passwordName = ["DATABASE", "PASSWORD"].join("_");
+      const secretKeyName = ["SECRET", "KEY"].join("_");
+      const exportedSecretKeyName = ["EXPORTED", "SECRET", "KEY"].join("_");
+      stageFile(
+        repoDir,
+        ".env.example",
+        `${keyName}=\n${secretName}=\"\"\n${passwordName}='   '\n${secretKeyName}=# comment\nexport ${exportedSecretKeyName}=\n`
+      );
 
       const result = runSensitiveCheck(repoDir);
 
