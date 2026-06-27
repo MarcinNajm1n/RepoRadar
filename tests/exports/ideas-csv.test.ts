@@ -42,4 +42,20 @@ describe("buildIdeasCsv", () => {
     expect(csv).toContain('"Workflow ""automation"""');
     expect(csv).toContain('"Manual, slow work"');
   });
+
+  it("prefixes spreadsheet formulas before exporting cells", () => {
+    const csv = buildIdeasCsv([
+      idea({
+        title: "=IMPORTXML(\"https://example.com\")",
+        problem: "+SUM(1,1)",
+        targetUser: " @external",
+        mvpScope: "-2+3"
+      })
+    ]);
+
+    expect(csv).toContain('"\'=IMPORTXML(""https://example.com"")"');
+    expect(csv).toContain(`"'+SUM(1,1)"`);
+    expect(csv).toContain('"\' @external"');
+    expect(csv).toContain('"\'-2+3"');
+  });
 });

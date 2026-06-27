@@ -2,9 +2,12 @@ import { prisma } from "@/lib/db/client";
 import type { IdeaListItem } from "@/types/repository";
 import { toIsoDate } from "@/lib/utils";
 
+const CSV_FORMULA_PREFIX_PATTERN = /^\s*[=+\-@]/;
+
 function csvCell(value: unknown) {
   const text = value === null || value === undefined ? "" : String(value);
-  return `"${text.replace(/"/g, '""')}"`;
+  const safeText = CSV_FORMULA_PREFIX_PATTERN.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
 }
 
 export function buildIdeasCsv(ideas: IdeaListItem[]) {
